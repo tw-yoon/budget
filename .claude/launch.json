@@ -1,0 +1,13 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "budget-claude",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["next", "dev"],
+      "env": { "NEXT_DIST_DIR": ".next-preview" },
+      "port": 3000,
+      "autoPort": true
+    }
+  ]
+}

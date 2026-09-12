@@ -1,0 +1,222 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model PlaidItem {
+  id          String    @id @default(cuid())
+  itemId      String    @unique
+  institution String
+  cursor      String?
+  lastSynced  DateTime?
+  createdAt   DateTime  @default(now())
+
+  accounts Account[]
+  syncLogs SyncLog[]
+}
+
+model Account {
+  id               String   @id @default(cuid())
+  plaidAccountId   String   @unique
+  itemId           String
+  name             String
+  officialName     String?
+  mask             String?
+  type             String
+  subtype          String?
+  currentBalance   Float
+  availableBalance Float?
+  balanceFetchedAt DateTime @default(now())
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  // Credit-card liability details (from /liabilities/get), nullable
+  nextPaymentDueDate   DateTime?
+  lastStatementBalance Float?
+  minimumPaymentAmount Float?
+  paymentIsOverdue     Boolean?
+  displayName          String? // user-set name override (e.g. rename "CREDIT CARD")
+  manualDueDay         Int? // user-set day-of-month when the issuer doesn't share it
+  manualCreditLimit    Float? // user-set credit limit; available = limit - currentBalance
+
+  item         PlaidItem     @relation(fields: [itemId], references: [itemId])
+  transactions Transaction[]
+  debitCards   DebitCard[]
+}
+
+model Transaction {
+  id           String   @id @default(cuid())
+  plaidTxId    String   @unique
+  accountId    String
+  amount       Float
+  date         DateTime
+  name         String
+  merchantName String?
+  pfcPrimary   String   @default("UNCATEGORIZED") // Plaid personal_finance_category.primary
+  pfcDetailed  String?                            // Plaid personal_finance_category.detailed
+  logoUrl      String?
+  pending      Boolean  @default(false)
+  isTransfer   Boolean  @default(false)
+  isFee        Boolean  @default(false)
+  personalNote String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Provenance + user categorization. Most rows come straight from Plaid; rows
+  // imported from a Venmo CSV statement carry source=VENMO, a user-assigned
+  // category, the other party, and (for received payments) a link to the
+  // bank-side cash-out Transaction they were eventually pooled into.
+  source         String  @default("PLAID") // PLAID | VENMO
+  userCategory   String? // user override; takes precedence over pfcPrimary in analytics
+  // Provenance of userCategory so the rules engine never clobbers a manual edit
+  // or a Venmo-assigned category: rules only (re)write rows where this is null
+  // or "RULE". null whenever userCategory is null.
+  userCategorySource String? // RULE | VENMO | MANUAL
+  counterparty   String? // Venmo: the other person on the payment
+  fundsCashoutId String? // Venmo inflows: id of the bank Venmo deposit this helped fund
+
+  account Account @relation(fields: [accountId], references: [id])
+
+  @@index([accountId, date])
+  @@index([date])
+  @@index([isTransfer, isFee])
+  @@index([pfcPrimary])
+  @@index([source])
+  @@index([fundsCashoutId])
+}
+
+// ─── Cards & benefits (user-entered) ─────────────────────────────────────────
+
+// A card the user owns. Issuer is chosen from a fixed list; everything else,
+// including the benefits, is entered by the user (no external catalog).
+model UserCard {
+  id                  String        @id @default(cuid())
+  issuer              String        // AMEX | CHASE | DISCOVER
+  name                String?       // optional product name, e.g. "Platinum"
+  last4               String
+  membershipStartYear Int
+  // Month (1-12) the account was opened. Optional — cards added before this
+  // existed have only the year, and fall back to calendar-year windows.
+  membershipStartMonth Int?
+  annualFee           Float         @default(0) // for credits-vs-fee tracking
+  // Assumed cash value of one earned point, in cents. Only used to compare
+  // earnings against other cards, which may pay cashback rather than points.
+  pointValueCents     Float         @default(1)
+  sortOrder           Int           @default(0) // manual display order (asc)
+  accountId           String?       // auto-linked when last4 matches Account.mask
+  createdAt           DateTime      @default(now())
+
+  benefits    UserBenefit[]
+  rewardRates RewardRate[]
+}
+
+// Earning rate (points/cashback multiplier) for a spending category on a card.
+// Pre-fillable from a preset catalog; editable by the user.
+model RewardRate {
+  id         String   @id @default(cuid())
+  userCardId String
+  category   String   // DINING | GROCERIES | TRAVEL | GAS | TRANSIT | ENTERTAINMENT | ONLINE_SHOPPING | DRUGSTORES | OTHER
+  multiplier Float    // e.g. 3 means 3x or 3%
+  unit       String   @default("X") // "X" (points/miles) or "PERCENT" (cashback)
+  notes      String?  // caps/conditions, e.g. "US supermarkets, up to $25k/yr"
+
+  card UserCard @relation(fields: [userCardId], references: [id], onDelete: Cascade)
+
+  @@unique([userCardId, category])
+  @@index([userCardId])
+}
+
+// A benefit/credit on a UserCard, defined by the user. Progress is computed
+// from matched transactions when a category + linked account exist, otherwise
+// from a manually logged amount.
+model UserBenefit {
+  id              String   @id @default(cuid())
+  userCardId      String
+  name            String
+  notes           String?
+  amount          Float    // credit value, or spend cap to track toward
+  period          String   // MONTHLY | QUARTERLY | SEMIANNUAL | ANNUAL
+  matchCategories String   @default("[]") // JSON array of PFC primaries; empty = manual
+  matchText       String   @default("[]") // JSON array of name keywords; matches the
+                                           // reimbursement (inflow) transaction, e.g. Amex
+                                           // statement credits posting as "AMEX Dining Credit"
+  // Set when the benefit is a flat-value perk you've switched on (Apple TV,
+  // DashPass) rather than a statement credit that posts a transaction. While
+  // set, every period window ending after this date counts as fully captured.
+  perkActiveFrom  DateTime?
+  usedManual      Float?   // legacy single current-period override (still honored)
+  manualOverrides String   @default("{}") // JSON map of periodKey -> amount; per-window
+                                           // override of any month/period in the yearly view
+  createdAt       DateTime @default(now())
+
+  card UserCard @relation(fields: [userCardId], references: [id], onDelete: Cascade)
+
+  @@index([userCardId])
+}
+
+// A debit card the user owns, linked to one of their checking accounts.
+// Entered manually — Plaid doesn't expose debit-card numbers.
+model DebitCard {
+  id        String   @id @default(cuid())
+  name      String
+  last4     String
+  accountId String
+  createdAt DateTime @default(now())
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId])
+}
+
+// A recurring subscription — either added manually or auto-detected from
+// Plaid's recurring-transactions stream (keyed by streamId).
+model Subscription {
+  id           String    @id @default(cuid())
+  name         String
+  amount       Float
+  cadence      String    @default("MONTHLY") // WEEKLY | BIWEEKLY | MONTHLY | QUARTERLY | YEARLY
+  nextDate     DateTime?
+  merchantName String?
+  accountId    String? // loose link to an Account
+  source       String    @default("MANUAL") // MANUAL | AUTO
+  streamId     String?   @unique // Plaid recurring stream_id (AUTO only)
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+}
+
+// User-defined auto-categorization rules. On sync (and on demand) the first
+// matching enabled rule, ordered by `priority` then creation, assigns its
+// `category` to a transaction's userCategory. Setting a rule's category to
+// "Transfer" excludes matching rows from spending analytics (existing
+// semantics), so rules double as an exclusion mechanism.
+model CategoryRule {
+  id        String   @id @default(cuid())
+  field     String   @default("EITHER") // MERCHANT | NAME | EITHER
+  matchType String   @default("CONTAINS") // CONTAINS | EQUALS | STARTS_WITH | REGEX
+  pattern   String
+  category  String // the userCategory to assign
+  priority  Int      @default(0) // lower runs first; first match wins
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([enabled, priority])
+}
+
+model SyncLog {
+  id       String   @id @default(cuid())
+  itemId   String
+  added    Int      @default(0)
+  modified Int      @default(0)
+  removed  Int      @default(0)
+  errors   String?
+  syncedAt DateTime @default(now())
+
+  item PlaidItem @relation(fields: [itemId], references: [itemId])
+
+  @@index([itemId, syncedAt])
+}

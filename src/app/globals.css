@@ -1,0 +1,129 @@
+@import "tailwindcss";
+
+/*
+ * Terminal theme. The dark palette came first; light mode is the same system
+ * on paper rather than a separate design. Accent: green.
+ */
+:root {
+  --bg: #f1f0ed;
+  --panel: #faf9f6;
+  --panel2: #f3f2ee;
+  --border: #d5d2ca;
+  --grid: #e4e1d9;
+  --text: #26282a;
+  --muted: #6f7570;
+  --dim: #a9aca4;
+  --accent: #0c8f4f;
+  --accent-contrast: #ffffff;
+  --green: #0c8f4f;
+  --red: #c93030;
+  --amber: #a56a00;
+
+  --background: var(--bg);
+  --foreground: var(--text);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0a0b0c;
+    --panel: #111213;
+    --panel2: #0d0e0f;
+    --border: #27292b;
+    --grid: #1a1c1d;
+    --text: #d6d9db;
+    --muted: #6b7075;
+    --dim: #3c4043;
+    --accent: #27d980;
+    --accent-contrast: #000000;
+    --green: #27d980;
+    --red: #ff4b4b;
+    --amber: #ffb000;
+  }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-panel: var(--panel);
+  --color-panel2: var(--panel2);
+  --color-line: var(--border);
+  --color-grid: var(--grid);
+  --color-muted2: var(--muted);
+  --color-dim2: var(--dim);
+  --color-accent: var(--accent);
+  --color-accent-contrast: var(--accent-contrast);
+  --font-sans: ui-monospace, "SF Mono", Menlo, "IBM Plex Mono", Consolas,
+    monospace;
+  --font-mono: ui-monospace, "SF Mono", Menlo, "IBM Plex Mono", Consolas,
+    monospace;
+}
+
+/* Terminal chrome: sharp corners, flat surfaces, one mono face everywhere. */
+*,
+*::before,
+*::after {
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+html,
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: ui-monospace, "SF Mono", Menlo, "IBM Plex Mono", Consolas,
+    monospace;
+  font-size: 13px;
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+
+/* Page + section titles read as terminal panel headers. */
+h1,
+h2,
+h3 {
+  font-weight: 400 !important;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+}
+
+h1 {
+  font-size: 12px !important;
+}
+
+h2 {
+  font-size: 11px !important;
+}
+
+h3 {
+  font-size: 10px !important;
+}
+
+h1::before,
+h2::before {
+  content: "▪ ";
+  color: var(--accent);
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+.blink {
+  animation: blink 1.1s steps(1) infinite;
+}
+
+input::-webkit-calendar-picker-indicator {
+  filter: invert(0.5);
+}
