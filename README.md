@@ -7,13 +7,6 @@ account balances and net worth, gives you a searchable transaction ledger,
 shows spending analytics (by category, by month, by merchant), and works out
 which of your credit cards earns the most for each kind of purchase.
 
-## Screenshot
-
-<!-- Add a screenshot at public/screenshot-analytics.png, then use:
-![Budget Claude — Analytics](public/screenshot-analytics.png) -->
-
-*(screenshot coming soon)*
-
 ## Before you start
 
 You'll need:
