@@ -217,3 +217,14 @@ npx prisma generate
 
 Then restart `npm run dev`. (Use UTC timestamps for the folder name so migrations
 stay in order.)
+
+---
+
+## A note on support
+
+This is a personal project, shared as-is because it might be useful to someone
+else. Issues and pull requests are open and I read them, but I may not respond,
+and I make no promise to fix anything or keep it maintained.
+
+If you find a security problem, please report it privately through GitHub's
+security advisories rather than opening a public issue.
