@@ -152,6 +152,11 @@ export async function GET(req: NextRequest) {
           id: t.id,
           label: t.label,
           name: t.merchantName ?? t.name,
+          // Deliberately the RAW userCategory, not split into parent/sub. This
+          // value is fed back through resolveLinkedCategory below, where
+          // splitCategory derives both the parent category and the subcategory
+          // for a linked row. Splitting it here would strip the subcategory a
+          // linked refund inherits.
           category: t.userCategory ?? humanizePfc(t.pfcPrimary),
         },
       ])
