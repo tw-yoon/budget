@@ -21,6 +21,7 @@ import {
   suggestCategory,
   type VenmoRow,
 } from "@/lib/venmo";
+import { nextLabel } from "@/lib/next-label";
 
 const APPROX = 0.005; // dollar tolerance when matching amounts
 
@@ -113,6 +114,10 @@ export async function importVenmoStatements(): Promise<ImportResult> {
     const amount = p.direction === "out" ? p.amount : -p.amount;
     const name = p.note || `Venmo ${p.direction === "out" ? "payment" : "received"}`;
     const fundsCashoutId = allocation.get(p.venmoId) ?? null;
+    // Computed before the upsert so it is available to the `create` branch.
+    // If the row already exists we take the update branch and this value goes
+    // unused — no number is burned, since the maximum is unchanged.
+    const label = await nextLabel();
 
     await prisma.transaction.upsert({
       where: { plaidTxId },
@@ -132,6 +137,7 @@ export async function importVenmoStatements(): Promise<ImportResult> {
         isTransfer: false,
         isFee: false,
         pending: false,
+        label,
       },
       update: {
         // Keep user edits to userCategory; refresh the mechanical fields.

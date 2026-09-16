@@ -79,7 +79,20 @@ model Transaction {
   counterparty   String? // Venmo: the other person on the payment
   fundsCashoutId String? // Venmo inflows: id of the bank Venmo deposit this helped fund
 
+  // Permanent display serial, shown left of the date in the ledger. Assigned
+  // once and never reused: a deleted transaction leaves a gap, so a number
+  // written down somewhere never changes meaning. Nullable only because SQLite
+  // cannot add a NOT NULL UNIQUE column to a populated table without a rebuild.
+  label Int? @unique
+
+  // A money-in row (refund, partial refund, Venmo/Zelle payback) points at the
+  // purchase it offsets. Many refunds may share one purchase. The refund holds
+  // no category of its own — it derives one through this link.
+  linkedToId String?
+
   account Account @relation(fields: [accountId], references: [id])
+  linkedTo Transaction?  @relation("TxRefunds", fields: [linkedToId], references: [id], onDelete: SetNull)
+  refunds  Transaction[] @relation("TxRefunds")
 
   @@index([accountId, date])
   @@index([date])
@@ -87,6 +100,7 @@ model Transaction {
   @@index([pfcPrimary])
   @@index([source])
   @@index([fundsCashoutId])
+  @@index([linkedToId])
 }
 
 // ─── Cards & benefits (user-entered) ─────────────────────────────────────────

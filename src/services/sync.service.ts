@@ -9,6 +9,7 @@ import { getAccessToken } from "@/lib/token-store";
 import { prisma } from "@/lib/prisma";
 import { getEnabledRulesOrdered, categorizeRow } from "@/services/rules.service";
 import { upsertAccounts } from "@/services/accounts.service";
+import { nextLabel } from "@/lib/next-label";
 import type { Transaction as PlaidTransaction } from "plaid";
 import type { CategoryRule } from "@prisma/client";
 
@@ -87,6 +88,10 @@ export async function syncTransactions(
         name: tx.name,
         merchantName: tx.merchant_name ?? null,
       });
+      // Computed before the upsert so it is available to the `create` branch.
+      // If the row already exists we take the update branch and this value goes
+      // unused — no number is burned, since the maximum is unchanged.
+      const label = await nextLabel();
       await prisma.transaction.upsert({
         where: { plaidTxId: tx.transaction_id },
         create: {
@@ -104,6 +109,7 @@ export async function syncTransactions(
           isFee: c.isFee,
           userCategory: ruleCat ?? undefined,
           userCategorySource: ruleCat ? "RULE" : undefined,
+          label,
         },
         update: {
           amount: tx.amount,
