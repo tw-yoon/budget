@@ -1,3 +1,20 @@
+/** The purchase a refund is linked to, as shown on the refund's row. */
+export interface LinkedTargetDTO {
+  id: string;
+  label: number | null;
+  name: string;
+  category: string;
+}
+
+/** A refund linked to a purchase, as listed under that purchase. */
+export interface RefundDTO {
+  id: string;
+  label: number | null;
+  date: string; // ISO
+  amount: number; // negative (money in)
+  name: string;
+}
+
 export interface TransactionDTO {
   id: string;
   plaidTxId: string;
@@ -19,6 +36,12 @@ export interface TransactionDTO {
   isFee: boolean;
   personalNote: string | null;
   source: string; // PLAID | VENMO
+  label: number | null; // permanent display serial, shown left of the date
+  // Set on a money-in row connected to the purchase it pays back. While set,
+  // this row's category is the purchase's.
+  linkedTo: LinkedTargetDTO | null;
+  refunds: RefundDTO[]; // on a purchase: the refunds linked to it
+  netAmount: number; // amount less any linked refunds; equals amount when none
   // Present on bank-side Venmo cash-out deposits: the categorized Venmo
   // payments pooled into this lump sum, plus any unaccounted prior balance.
   breakdown: CashoutBreakdown | null;

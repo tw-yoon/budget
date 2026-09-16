@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { humanizePfc } from "@/lib/format";
 import { splitCategory } from "@/lib/categories";
 import { getCashoutBreakdowns } from "@/services/venmo.service";
+import { netAmount, resolveLinkedCategory } from "@/lib/links";
+import type { LinkedTargetDTO, RefundDTO } from "@/types";
 import type { Prisma } from "@prisma/client";
 
 // GET /api/transactions
@@ -104,11 +106,70 @@ export async function GET(req: NextRequest) {
       .map((t) => ({ id: t.id, amount: t.amount }));
     const breakdowns = await getCashoutBreakdowns(cashoutCandidates);
 
+    // Two extra queries per page: the refunds hanging off the purchases shown
+    // here, and the purchases that the refunds shown here point at.
+    const pageIds = rows.map((r) => r.id);
+    const targetIds = [
+      ...new Set(rows.map((r) => r.linkedToId).filter((v): v is string => v !== null)),
+    ];
+    const [refundRows, targetRows] = await Promise.all([
+      prisma.transaction.findMany({
+        where: { linkedToId: { in: pageIds } },
+        select: {
+          id: true, label: true, date: true, amount: true,
+          name: true, merchantName: true, linkedToId: true,
+        },
+        orderBy: { date: "asc" },
+      }),
+      targetIds.length
+        ? prisma.transaction.findMany({
+            where: { id: { in: targetIds } },
+            select: {
+              id: true, label: true, name: true, merchantName: true,
+              userCategory: true, pfcPrimary: true,
+            },
+          })
+        : Promise.resolve([]),
+    ]);
+
+    const refundsByPurchase = new Map<string, RefundDTO[]>();
+    for (const r of refundRows) {
+      const list = refundsByPurchase.get(r.linkedToId!) ?? [];
+      list.push({
+        id: r.id,
+        label: r.label,
+        date: r.date.toISOString(),
+        amount: r.amount,
+        name: r.merchantName ?? r.name,
+      });
+      refundsByPurchase.set(r.linkedToId!, list);
+    }
+
+    const targetsById = new Map<string, LinkedTargetDTO>(
+      targetRows.map((t) => [
+        t.id,
+        {
+          id: t.id,
+          label: t.label,
+          name: t.merchantName ?? t.name,
+          category: t.userCategory ?? humanizePfc(t.pfcPrimary),
+        },
+      ])
+    );
+
     const transactions = rows.map((t) => {
       const bd = breakdowns.get(t.id);
+      const linkedTo = t.linkedToId ? targetsById.get(t.linkedToId) ?? null : null;
+      const refunds = refundsByPurchase.get(t.id) ?? [];
+      // A linked row shows its purchase's category; otherwise its own override.
+      const { raw } = resolveLinkedCategory({
+        amount: t.amount,
+        userCategory: t.userCategory,
+        linkedToCategory: linkedTo?.category ?? null,
+      });
       // A userCategory override may carry a "Parent > Sub" subcategory; the
       // parent is the category, the sub replaces Plaid's detailed label.
-      const uc = t.userCategory ? splitCategory(t.userCategory) : null;
+      const uc = raw ? splitCategory(raw) : null;
       return {
         id: t.id,
         plaidTxId: t.plaidTxId,
@@ -136,6 +197,10 @@ export async function GET(req: NextRequest) {
         isFee: t.isFee,
         personalNote: t.personalNote,
         source: t.source,
+        label: t.label,
+        linkedTo,
+        refunds,
+        netAmount: netAmount(t.amount, refunds),
         breakdown: bd && (bd.slices.length > 0 || bd.priorBalance > 0)
           ? { slices: bd.slices, priorBalance: bd.priorBalance }
           : null,

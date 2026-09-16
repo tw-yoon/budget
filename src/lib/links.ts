@@ -143,3 +143,13 @@ export function rankCandidates(
     .slice(0, limit)
     .map((x) => x.c);
 }
+
+/**
+ * What a purchase actually cost after the refunds linked to it. Refund amounts
+ * are negative (money in), so summing them in reduces the total. Over-refunding
+ * is allowed and simply goes negative.
+ */
+export function netAmount(amount: number, refunds: { amount: number }[]): number {
+  const sum = refunds.reduce((total, r) => total + r.amount, amount);
+  return Math.round(sum * 100) / 100;
+}

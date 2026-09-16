@@ -138,3 +138,17 @@ test("ranking drops non-candidates and caps the list", () => {
   assert.ok(!out.some((r) => r.id === "future"));
   assert.equal(out[0].id, "a");
 });
+
+import { netAmount } from "../src/lib/links.ts";
+
+test("a purchase with no refunds nets to itself", () => {
+  assert.equal(netAmount(84.2, []), 84.2);
+});
+
+test("refunds reduce a purchase's net cost", () => {
+  assert.equal(netAmount(84.2, [{ amount: -30 }, { amount: -4.2 }]), 50);
+});
+
+test("over-refunding is allowed and goes negative", () => {
+  assert.equal(netAmount(10, [{ amount: -15 }]), -5);
+});
