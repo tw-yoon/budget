@@ -18,7 +18,18 @@ assert_lacks() { case "$1" in *"$2"*) fail "$3" "should not contain: $2";; *) pa
 # one parent dir at exit covers every fixture regardless.
 SUITE_TMP=$(mktemp -d)
 [ -n "$SUITE_TMP" ] || { echo "mktemp failed" >&2; exit 1; }
-trap 'rm -rf "$SUITE_TMP"' EXIT
+# Fixtures reach the real node_modules through that symlink, and a fixture that
+# runs the full launch path runs `prisma generate` -- which rewrites the shared
+# node_modules/.prisma/client with the schema path of a fixture that is about to
+# be deleted. The real app then resolves its relative `file:./dev.db` against a
+# directory that no longer exists, opens an empty database next to the client,
+# and answers every request with a 500. Regenerating from this checkout on the
+# way out puts the client back the way the suite found it.
+restore_prisma_client() {
+  npx --prefix "$ROOT" prisma generate >/dev/null 2>&1 || true
+  rm -f "$ROOT/node_modules/.prisma/client/dev.db"
+}
+trap 'rm -rf "$SUITE_TMP"; restore_prisma_client' EXIT
 
 # npm's own stamp file. Fixtures symlink node_modules to this checkout's, so a
 # real `npm install` inside a fixture would mutate the real dependencies. The

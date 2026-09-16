@@ -349,6 +349,17 @@ main() {
   BACKUP_DIR="prisma/backups"
   KEEP_DAYS=30
 
+  # Point every reader at this checkout's database, absolutely. A relative
+  # `file:./dev.db` means different files to different readers: the Prisma CLI
+  # resolves it against prisma/schema.prisma, while the generated client
+  # resolves it against whatever schema path was recorded when it was last
+  # generated -- and the launcher tests regenerate that client from a throwaway
+  # copy under $TMPDIR that symlinks this node_modules. Once that copy is gone,
+  # the app silently opens an empty node_modules/.prisma/client/dev.db and every
+  # route answers 500. A path built from SCRIPT_DIR cannot drift that way: a
+  # test fixture computes its own, this checkout computes its own.
+  export DATABASE_URL="file:$SCRIPT_DIR/prisma/dev.db"
+
   NO_OPEN=false
   FORCE=false
   CHECK_ONLY=false
