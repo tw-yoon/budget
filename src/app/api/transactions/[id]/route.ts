@@ -1,14 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { joinCategory } from "@/lib/categories";
+import { validateLink } from "@/lib/links";
 
-// PATCH /api/transactions/:id — manually override a transaction's category.
-//   body: { category: string | null, subcategory?: string | null }
-// Stored as "Category > Subcategory" when a subcategory is given, otherwise
-// just the category (the sub defaults to the category itself in analytics).
-// category: null clears the override, reverting to Plaid's PFC category.
-// Manual edits set userCategorySource=MANUAL so the rules engine never
-// clobbers them.
+// PATCH /api/transactions/:id — manually override a transaction's category,
+// and/or connect a money-in row to the purchase it offsets.
+//   body: { category?: string | null, subcategory?: string | null,
+//           linkedToLabel?: number | null }
+//
+// `linkedToLabel` absent leaves any existing link alone; null unlinks; a number
+// links to the transaction carrying that display label. A linked row derives
+// its category from its target, so linking clears any category of its own and
+// stamps userCategorySource=LINK, which keeps the rules engine off it.
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -18,11 +21,15 @@ export async function PATCH(
     const body = (await req.json()) as {
       category?: string | null;
       subcategory?: string | null;
+      linkedToLabel?: number | null;
     };
+
+    if (body.linkedToLabel !== undefined) {
+      return handleLink(id, body.linkedToLabel);
+    }
 
     const category = body.category?.trim() || null;
     const subcategory = body.subcategory?.trim() || null;
-
     const userCategory = category ? joinCategory(category, subcategory) : null;
 
     const { count } = await prisma.transaction.updateMany({
@@ -43,4 +50,64 @@ export async function PATCH(
       { status: 500 }
     );
   }
+}
+
+async function handleLink(id: string, label: number | null) {
+  const refund = await prisma.transaction.findUnique({
+    where: { id },
+    select: { id: true, amount: true, linkedToId: true },
+  });
+  if (!refund) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  if (label === null) {
+    await prisma.transaction.update({
+      where: { id },
+      data: { linkedToId: null, userCategorySource: null },
+    });
+    return NextResponse.json({ ok: true, linkedTo: null });
+  }
+
+  const target = await prisma.transaction.findUnique({
+    where: { label },
+    select: {
+      id: true,
+      amount: true,
+      linkedToId: true,
+      label: true,
+      name: true,
+      merchantName: true,
+    },
+  });
+  if (!target) {
+    return NextResponse.json(
+      { error: `No transaction numbered ${label}` },
+      { status: 404 }
+    );
+  }
+
+  const problem = validateLink(refund, target);
+  if (problem) {
+    return NextResponse.json({ error: problem }, { status: 400 });
+  }
+
+  await prisma.transaction.update({
+    where: { id },
+    data: {
+      linkedToId: target.id,
+      // The link owns the category now — drop any of this row's own.
+      userCategory: null,
+      userCategorySource: "LINK",
+    },
+  });
+
+  return NextResponse.json({
+    ok: true,
+    linkedTo: {
+      id: target.id,
+      label: target.label,
+      name: target.merchantName ?? target.name,
+    },
+  });
 }
