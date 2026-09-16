@@ -59,6 +59,7 @@ export function TransactionTable({
       <table className="w-full border-collapse text-sm">
         <thead>
           <tr className="border-b border-black/10 text-left text-xs uppercase tracking-wide text-black/50 dark:border-white/10 dark:text-white/50">
+            <th className="px-4 py-3 font-medium">#</th>
             <th className="px-4 py-3 font-medium">Date</th>
             <th className="px-4 py-3 font-medium">Description</th>
             <th className="px-4 py-3 font-medium">Account</th>
@@ -69,6 +70,8 @@ export function TransactionTable({
           {transactions.map((t) => {
             const { text, isOutflow } = formatSignedAmount(t.amount);
             const hasBreakdown = t.breakdown !== null;
+            const hasRefunds = t.refunds.length > 0;
+            const isExpandable = hasBreakdown || hasRefunds;
             const isOpen = expanded.has(t.id);
             // Effective category/sub: session override wins, then the
             // server-computed values (which already fold in stored overrides).
@@ -87,18 +90,21 @@ export function TransactionTable({
               <FragmentRow key={t.id}>
                 <tr
                   className={`border-b border-black/[0.06] last:border-0 dark:border-white/[0.06] ${
-                    hasBreakdown
+                    isExpandable
                       ? "cursor-pointer hover:bg-black/[0.03] dark:hover:bg-white/[0.04]"
                       : "hover:bg-black/[0.02] dark:hover:bg-white/[0.03]"
                   }`}
-                  onClick={hasBreakdown ? () => toggle(t.id) : undefined}
+                  onClick={isExpandable ? () => toggle(t.id) : undefined}
                 >
+                  <td className="whitespace-nowrap px-4 py-3 font-mono text-xs tabular-nums text-black/35 dark:text-white/35">
+                    {t.label ?? "—"}
+                  </td>
                   <td className="whitespace-nowrap px-4 py-3 text-black/60 dark:text-white/60">
                     {formatDate(t.date)}
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
-                      {hasBreakdown && (
+                      {isExpandable && (
                         <span className="text-black/40 dark:text-white/40">
                           {isOpen ? "▾" : "▸"}
                         </span>
@@ -109,6 +115,11 @@ export function TransactionTable({
                       {t.source === "VENMO" && <Badge tone="violet">Venmo</Badge>}
                       {t.source !== "VENMO" && isZelleName(t.name) && (
                         <Badge tone="violet">Zelle</Badge>
+                      )}
+                      {t.linkedTo && (
+                        <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
+                          → #{t.linkedTo.label ?? "?"} {t.linkedTo.name}
+                        </span>
                       )}
                       {t.pending && <Badge tone="amber">Pending</Badge>}
                       {t.isTransfer && !hasBreakdown && (
@@ -181,12 +192,18 @@ export function TransactionTable({
                     }`}
                   >
                     {text}
+                    {hasRefunds && (
+                      <div className="text-xs font-normal text-green-600 dark:text-green-400">
+                        net {formatCurrency(t.netAmount)}
+                      </div>
+                    )}
                   </td>
                 </tr>
-                {hasBreakdown && isOpen && (
+                {isExpandable && isOpen && (
                   <tr className="border-b border-black/[0.06] bg-black/[0.015] dark:border-white/[0.06] dark:bg-white/[0.02]">
-                    <td colSpan={4} className="px-4 py-3">
-                      <BreakdownPanel breakdown={t.breakdown!} />
+                    <td colSpan={5} className="px-4 py-3">
+                      {hasBreakdown && <BreakdownPanel breakdown={t.breakdown!} />}
+                      {hasRefunds && <RefundPanel refunds={t.refunds} />}
                     </td>
                   </tr>
                 )}
@@ -229,6 +246,31 @@ function BreakdownPanel({
             </span>
           </li>
         )}
+      </ul>
+    </div>
+  );
+}
+
+function RefundPanel({ refunds }: { refunds: TransactionDTO["refunds"] }) {
+  return (
+    <div className="pl-6">
+      <p className="mb-2 text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
+        Paid back by
+      </p>
+      <ul className="space-y-1">
+        {refunds.map((r) => (
+          <li key={r.id} className="flex items-center justify-between gap-4 text-sm">
+            <span className="text-black/70 dark:text-white/70">
+              <span className="font-mono text-xs text-black/35 dark:text-white/35">
+                #{r.label ?? "—"}
+              </span>{" "}
+              {formatDate(r.date)} · {r.name}
+            </span>
+            <span className="font-mono tabular-nums text-green-600 dark:text-green-400">
+              {formatCurrency(Math.abs(r.amount))}
+            </span>
+          </li>
+        ))}
       </ul>
     </div>
   );
