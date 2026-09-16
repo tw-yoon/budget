@@ -27,3 +27,31 @@ export function validateLink(refund: LinkSide, target: LinkSide): string | null 
   if (target.linkedToId !== null) return "That transaction is itself linked to another purchase";
   return null;
 }
+
+export interface ResolvableRow {
+  amount: number;
+  userCategory: string | null;
+  /** The linked purchase's already-resolved, already-humanized category. */
+  linkedToCategory: string | null;
+}
+
+export interface ResolvedCategory {
+  /** Effective raw category, possibly "Parent > Sub". Null means uncategorized. */
+  raw: string | null;
+  /**
+   * True when this is money-in that should net against its category rather than
+   * count as income — a refund, or a payback for something you bought.
+   */
+  isOffset: boolean;
+}
+
+/**
+ * A row's effective category. Its own category wins; otherwise it inherits
+ * from the purchase it is linked to. Deriving rather than copying means the
+ * inherited category cannot go stale, and that linking a refund before
+ * categorizing the purchase works exactly as well as the other order.
+ */
+export function resolveLinkedCategory(row: ResolvableRow): ResolvedCategory {
+  const raw = row.userCategory ?? row.linkedToCategory ?? null;
+  return { raw, isOffset: row.amount < 0 && raw !== null };
+}

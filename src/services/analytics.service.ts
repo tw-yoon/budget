@@ -11,6 +11,7 @@ import { prisma } from "@/lib/prisma";
 import { humanizePfc } from "@/lib/format";
 import { splitCategory } from "@/lib/categories";
 import { isP2p } from "@/lib/zelle";
+import { resolveLinkedCategory } from "@/lib/links";
 import type {
   AnalyticsResult,
   CashflowMonth,
@@ -145,8 +146,17 @@ async function fetchTxInputs(start: Date): Promise<TxInput[]> {
       pending: false,
       AND: [
         // Normal spend (not a transfer), OR any P2P transfer the user has
-        // classified — a userCategory promotes a Venmo/Zelle transfer in.
-        { OR: [{ isTransfer: false }, { userCategory: { not: null } }] },
+        // classified — a userCategory promotes a Venmo/Zelle transfer in — OR
+        // any row linked to a purchase. Without that last clause a linked Zelle
+        // payback (isTransfer, and holding no category of its own) is filtered
+        // out before it can offset anything.
+        {
+          OR: [
+            { isTransfer: false },
+            { userCategory: { not: null } },
+            { linkedToId: { not: null } },
+          ],
+        },
         // Drop anything explicitly flagged "Transfer" (null-safe: keep
         // nulls), including subcategorized "Transfer > ..." overrides.
         {
@@ -170,25 +180,40 @@ async function fetchTxInputs(start: Date): Promise<TxInput[]> {
       name: true,
       source: true,
       userCategory: true,
+      linkedTo: { select: { userCategory: true, pfcPrimary: true } },
     },
   });
 
-  return rows.map((r) => {
-    // A user category (Venmo/Zelle/manual) wins over Plaid's PFC primary.
-    // Subcategorized overrides ("Parent > Sub") roll up to their parent; the
-    // sub travels alongside for drill-down views (single-month Sankey).
-    const uc = r.userCategory ? splitCategory(r.userCategory) : null;
-    return {
+  return rows.flatMap((r) => {
+    // The linked purchase's own effective category, humanized the same way a
+    // top-level row's would be.
+    const linkedToCategory = r.linkedTo
+      ? r.linkedTo.userCategory ?? humanizePfc(r.linkedTo.pfcPrimary)
+      : null;
+    const { raw, isOffset } = resolveLinkedCategory({
+      amount: r.amount,
+      userCategory: r.userCategory,
+      linkedToCategory,
+    });
+
+    // The WHERE clause excludes rows tagged "Transfer" with a string match,
+    // which cannot reach through a relation — so a row that inherits
+    // "Transfer" has to be dropped here instead.
+    if (raw === "Transfer" || raw?.startsWith("Transfer > ")) return [];
+
+    // A user category (Venmo/Zelle/manual/inherited) wins over Plaid's PFC
+    // primary. Subcategorized values ("Parent > Sub") roll up to their parent;
+    // the sub travels alongside for drill-down views (single-month Sankey).
+    const uc = raw ? splitCategory(raw) : null;
+    return [{
       amount: r.amount,
       date: r.date,
       category: uc ? uc.parent : humanizePfc(r.pfcPrimary),
       subcategory: uc?.sub ?? null,
       // P2P rows use a person as the "merchant" — keep them out of merchant totals.
       merchant: isP2p(r.source, r.name) ? null : r.merchantName ?? r.name,
-      // A classified inflow is a reimbursement: it offsets its category instead
-      // of counting as income.
-      isOffset: r.amount < 0 && r.userCategory != null,
-    };
+      isOffset,
+    }];
   });
 }
 

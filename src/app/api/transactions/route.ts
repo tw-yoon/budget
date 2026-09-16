@@ -46,6 +46,9 @@ export async function GET(req: NextRequest) {
           { isTransfer: false },
           // Keep classified P2P transfers (Venmo/Zelle) — they're real spend now.
           { userCategory: { not: null } },
+          // Keep anything linked to a purchase — a Zelle payback holds no
+          // category of its own but is real, netted spend.
+          { linkedToId: { not: null } },
           // Keep Venmo cash-out deposits — they expand into a categorized breakdown.
           {
             isTransfer: true,
