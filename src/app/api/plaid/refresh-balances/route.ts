@@ -3,6 +3,7 @@ import { plaidClient } from "@/lib/plaid";
 import { getAccessToken } from "@/lib/token-store";
 import { prisma } from "@/lib/prisma";
 import { syncLiabilities } from "@/services/liabilities.service";
+import { upsertAccounts } from "@/services/accounts.service";
 
 // POST /api/plaid/refresh-balances — body: { item_id } or omit for all
 export async function POST(req: NextRequest) {
@@ -31,18 +32,13 @@ export async function POST(req: NextRequest) {
         // /accounts/balance/get always returns real-time balances, unlike /accounts/get
         const res = await plaidClient.accountsBalanceGet({ access_token: accessToken });
 
-        const upserts = res.data.accounts.map((acct) =>
-          prisma.account.update({
-            where: { plaidAccountId: acct.account_id },
-            data: {
-              currentBalance: acct.balances.current ?? 0,
-              availableBalance: acct.balances.available ?? null,
-              balanceFetchedAt: new Date(),
-            },
-          })
-        );
-
-        const rows = await prisma.$transaction(upserts);
+        // Upsert, not update: reconnecting a bank can add an account to a
+        // login that was already linked -- a new card on the same login --
+        // and Plaid hands it back here before anything has created its row.
+        // `update` raised "record to update not found" for that one account,
+        // and because every account on the item went into a single
+        // transaction, it took every other balance on that login down with it.
+        const rows = await upsertAccounts(item.itemId, res.data.accounts);
 
         rows.forEach((row) =>
           updated.push({

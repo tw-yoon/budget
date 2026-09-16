@@ -8,6 +8,7 @@ import { plaidClient } from "@/lib/plaid";
 import { getAccessToken } from "@/lib/token-store";
 import { prisma } from "@/lib/prisma";
 import { getEnabledRulesOrdered, categorizeRow } from "@/services/rules.service";
+import { upsertAccounts } from "@/services/accounts.service";
 import type { Transaction as PlaidTransaction } from "plaid";
 import type { CategoryRule } from "@prisma/client";
 
@@ -46,6 +47,15 @@ export async function syncTransactions(
   const accessToken = getAccessToken(itemId);
   const item = await prisma.plaidItem.findUniqueOrThrow({ where: { itemId } });
 
+  // Pick up accounts added since the last sync. Reconnecting a bank can add a
+  // new card to a login that was already linked, and /transactions/sync starts
+  // returning that card's transactions straight away. The cursor advances
+  // whether or not we can store them, so a transaction whose account we don't
+  // know yet is not just skipped -- it is never offered again. Refreshing the
+  // account list first is what keeps that from happening.
+  const accountsRes = await plaidClient.accountsGet({ access_token: accessToken });
+  await upsertAccounts(itemId, accountsRes.data.accounts);
+
   // User auto-categorization rules, evaluated against each incoming row.
   const rules: CategoryRule[] = await getEnabledRulesOrdered();
 
@@ -70,7 +80,7 @@ export async function syncTransactions(
       const account = await prisma.account.findUnique({
         where: { plaidAccountId: tx.account_id },
       });
-      if (!account) continue; // account not yet synced — skip
+      if (!account) continue; // safety net: accounts are refreshed above
 
       const c = classify(tx);
       const ruleCat = categorizeRow(rules, {
