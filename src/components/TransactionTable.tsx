@@ -79,7 +79,15 @@ export function TransactionTable({
               ? overrides.get(t.id)!
               : t.userCategory;
             const split = rawOverride ? splitCategory(rawOverride) : null;
-            const category = split ? split.parent : t.plaidCategory;
+            // overrides.has(...) here means an in-session "override cleared"
+            // (revert to Plaid's), since the server hasn't refetched yet.
+            // Otherwise t.category is the server's effective category — for a
+            // linked row, the one inherited from its purchase.
+            const category = split
+              ? split.parent
+              : overrides.has(t.id)
+                ? t.plaidCategory
+                : t.category;
             const categoryDetailed = split
               ? split.sub
               : overrides.has(t.id)
