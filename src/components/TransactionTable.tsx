@@ -6,11 +6,14 @@ import { formatSignedAmount, formatDate, formatCurrency } from "@/lib/format";
 import { splitCategory } from "@/lib/categories";
 import { RULE_CATEGORIES } from "@/lib/rules";
 import { isZelleName } from "@/lib/zelle";
+import { TransactionLinkPicker } from "./TransactionLinkPicker";
 
 export function TransactionTable({
   transactions,
+  onChanged,
 }: {
   transactions: TransactionDTO[];
+  onChanged: () => void;
 }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [editing, setEditing] = useState<string | null>(null);
@@ -147,6 +150,22 @@ export function TransactionTable({
                         subcategory={split?.sub ?? ""}
                         knownSubs={knownSubs}
                         hasOverride={rawOverride !== null}
+                        linkedTo={t.linkedTo}
+                        onLinked={() => {
+                          // A link/unlink just changed this row's category on
+                          // the server. Drop any stale session override so it
+                          // doesn't keep masking the server's value after the
+                          // refetch below — the link (or Plaid, once
+                          // unlinked) owns the category now.
+                          setOverrides((prev) => {
+                            if (!prev.has(t.id)) return prev;
+                            const next = new Map(prev);
+                            next.delete(t.id);
+                            return next;
+                          });
+                          setEditing(null);
+                          onChanged();
+                        }}
                         onDone={(raw) => {
                           if (raw !== undefined)
                             setOverrides((prev) =>
@@ -298,6 +317,8 @@ function CategoryEditor({
   subcategory,
   knownSubs,
   hasOverride,
+  linkedTo,
+  onLinked,
   onDone,
 }: {
   transaction: TransactionDTO;
@@ -305,6 +326,8 @@ function CategoryEditor({
   subcategory: string;
   knownSubs: Map<string, Set<string>>;
   hasOverride: boolean;
+  linkedTo: TransactionDTO["linkedTo"];
+  onLinked: (linked: { label: number | null; name: string } | null) => void;
   // raw userCategory saved, null = cleared, undefined = cancelled
   onDone: (raw?: string | null) => void;
 }) {
@@ -312,6 +335,7 @@ function CategoryEditor({
   const [sub, setSub] = useState(subcategory);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(false);
+  const locked = linkedTo !== null;
 
   // Selectable categories: the rule/P2P set, plus whatever this row already
   // shows (e.g. a Plaid primary not in the list) so nothing gets orphaned.
@@ -359,7 +383,7 @@ function CategoryEditor({
           setCat(e.target.value);
           setSub("");
         }}
-        disabled={saving}
+        disabled={saving || locked}
         className="rounded border border-black/15 bg-white px-1.5 py-1 dark:border-white/20 dark:bg-neutral-900"
       >
         {options.map((c) => (
@@ -374,7 +398,7 @@ function CategoryEditor({
         onChange={(e) => setSub(e.target.value)}
         placeholder="Subcategory (optional)"
         list={datalistId}
-        disabled={saving}
+        disabled={saving || locked}
         onKeyDown={(e) => {
           if (e.key === "Enter") patch({ category: cat, subcategory: sub });
           if (e.key === "Escape") onDone();
@@ -415,6 +439,15 @@ function CategoryEditor({
       </button>
       {error && (
         <span className="text-red-600 dark:text-red-400">Failed to save</span>
+      )}
+      {transaction.amount < 0 && (
+        <div className="mt-1 w-full border-t border-black/[0.06] pt-1.5 dark:border-white/[0.06]">
+          <TransactionLinkPicker
+            transactionId={transaction.id}
+            linkedTo={linkedTo}
+            onLinked={onLinked}
+          />
+        </div>
       )}
     </div>
   );

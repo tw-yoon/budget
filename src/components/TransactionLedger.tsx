@@ -147,7 +147,10 @@ export function TransactionLedger() {
       ) : (
         <>
           <div className={loading ? "opacity-60 transition-opacity" : ""}>
-            <TransactionTable transactions={data?.transactions ?? []} />
+            <TransactionTable
+              transactions={data?.transactions ?? []}
+              onChanged={load}
+            />
           </div>
 
           {totalPages > 1 && (
