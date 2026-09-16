@@ -79,3 +79,62 @@ test("an outflow is never an offset, however it is categorized", () => {
   const r = resolveLinkedCategory({ amount: 84.2, userCategory: "Shopping", linkedToCategory: null });
   assert.equal(r.isOffset, false);
 });
+
+import { scoreCandidate, rankCandidates } from "../src/lib/links.ts";
+
+const base = {
+  date: new Date("2026-09-10"),
+  amount: -30,
+  name: "Amazon refund",
+  merchantName: "Amazon",
+  counterparty: null,
+};
+
+const cand = (over) => ({
+  id: "c",
+  label: 1,
+  date: new Date("2026-09-01"),
+  name: "Amazon Marketplace",
+  merchantName: "Amazon",
+  counterparty: null,
+  amount: 84.2,
+  ...over,
+});
+
+test("a purchase after the refund is not a candidate", () => {
+  assert.ok(scoreCandidate(base, cand({ date: new Date("2026-09-20") })) < 0);
+});
+
+test("a purchase beyond the 90 day window is not a candidate", () => {
+  assert.ok(scoreCandidate(base, cand({ date: new Date("2026-01-01") })) < 0);
+});
+
+test("a same-merchant purchase outranks a stranger on the same day", () => {
+  const same = scoreCandidate(base, cand({}));
+  const other = scoreCandidate(base, cand({ merchantName: "Shell", name: "Shell Oil" }));
+  assert.ok(same > other);
+});
+
+test("a purchase that covers the refund outranks one that cannot", () => {
+  const covers = scoreCandidate(base, cand({ amount: 84.2 }));
+  const tooSmall = scoreCandidate(base, cand({ amount: 4 }));
+  assert.ok(covers > tooSmall);
+});
+
+test("a recent purchase outranks an older identical one", () => {
+  const recent = scoreCandidate(base, cand({ date: new Date("2026-09-08") }));
+  const older = scoreCandidate(base, cand({ date: new Date("2026-07-08") }));
+  assert.ok(recent > older);
+});
+
+test("ranking drops non-candidates and caps the list", () => {
+  const rows = [
+    cand({ id: "future", date: new Date("2026-09-20") }),
+    cand({ id: "a" }),
+    cand({ id: "b", merchantName: "Shell", name: "Shell Oil" }),
+  ];
+  const out = rankCandidates(base, rows, 2);
+  assert.equal(out.length, 2);
+  assert.ok(!out.some((r) => r.id === "future"));
+  assert.equal(out[0].id, "a");
+});
