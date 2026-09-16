@@ -33,7 +33,13 @@ export async function PATCH(
     const userCategory = category ? joinCategory(category, subcategory) : null;
 
     const { count } = await prisma.transaction.updateMany({
-      where: { id },
+      // A linked row's category is owned by its link, not by this row's own
+      // fields — it must be changed by disconnecting the link first. Without
+      // this guard a category write here would win over the link (via
+      // resolveLinkedCategory's userCategory ?? linkedToCategory) while the UI
+      // still renders the row as locked, and a `category: null` write would
+      // clear userCategorySource, exposing the row to the rules engine.
+      where: { id, linkedToId: null },
       data: {
         userCategory,
         userCategorySource: userCategory ? "MANUAL" : null,
