@@ -154,6 +154,7 @@ export async function syncTransactions(
         await prisma.transaction.updateMany({
           where: {
             plaidTxId: tx.transaction_id,
+            linkedToId: null,
             OR: [{ userCategorySource: null }, { userCategorySource: "RULE" }],
           },
           data: { userCategory: ruleCat, userCategorySource: "RULE" },
@@ -173,6 +174,14 @@ export async function syncTransactions(
     cursor = next_cursor;
     hasMore = has_more;
   }
+
+  // A retracted transaction nulls linkedToId on any refund pointing at it
+  // (onDelete: SetNull), but leaves userCategorySource = "LINK" behind. That
+  // orphan would be invisible to the rules engine forever, so sweep it here.
+  await prisma.transaction.updateMany({
+    where: { linkedToId: null, userCategorySource: "LINK" },
+    data: { userCategorySource: null },
+  });
 
   // Persist the new cursor and sync timestamp
   await prisma.plaidItem.update({

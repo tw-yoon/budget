@@ -66,6 +66,7 @@ export async function applyRulesToExisting(): Promise<{ updated: number }> {
 
   const rows = await prisma.transaction.findMany({
     where: {
+      linkedToId: null,
       OR: [{ userCategorySource: null }, { userCategorySource: "RULE" }],
     },
     select: {
