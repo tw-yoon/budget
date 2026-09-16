@@ -412,8 +412,13 @@ function CategoryEditor({
       </datalist>
       <button
         type="button"
-        disabled={saving}
+        disabled={saving || locked}
         onClick={() => patch({ category: cat, subcategory: sub })}
+        title={
+          locked
+            ? "This row's category comes from the purchase it's connected to — disconnect first to set one manually"
+            : undefined
+        }
         className="rounded bg-black px-2 py-1 font-medium text-white hover:bg-black/80 disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-white/85"
       >
         {saving ? "Saving…" : "Save"}
