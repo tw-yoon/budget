@@ -183,6 +183,14 @@ new one with a different id. A link to a *pending* row is therefore dropped and
 its label burned. Linking posted transactions, which is the normal case, is
 unaffected.
 
+An offset is counted in the month the refund falls in, not the month of the
+purchase it pays back. Links may span up to 90 days, so on a one- or
+three-month analytics view the purchase can fall outside the window while the
+refund does not. The offset then subtracts from a category that shows no
+matching spend, and `aggregate`'s clamp floors the category at zero, which
+hides the discrepancy rather than surfacing it. This predates the branch, but
+linking makes the gap far easier to reach than it was before.
+
 ## Testing
 
 The repo has no JS test runner — `npm test` runs two bash suites. This adds
