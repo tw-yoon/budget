@@ -62,10 +62,16 @@ async function handleLink(id: string, label: number | null) {
   }
 
   if (label === null) {
-    await prisma.transaction.update({
-      where: { id },
-      data: { linkedToId: null, userCategorySource: null },
-    });
+    // Unlinking an already-unlinked row is a no-op. Only a linked row's
+    // provenance is ours to clear — it is "LINK" by construction. Blanking it
+    // on an unlinked row would strip a MANUAL or VENMO provenance and leave
+    // userCategory exposed to the rules engine on the next sync.
+    if (refund.linkedToId !== null) {
+      await prisma.transaction.update({
+        where: { id },
+        data: { linkedToId: null, userCategorySource: null },
+      });
+    }
     return NextResponse.json({ ok: true, linkedTo: null });
   }
 
