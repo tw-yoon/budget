@@ -58,8 +58,19 @@ curl -X POST http://localhost:3000/api/plaid/sandbox-seed
 (If you set `BUDGET_PORT`, use that port instead of 3000 — here and below.)
 
 This mints a Plaid sandbox item (a fake bank called "First Platypus Bank")
-and syncs its accounts and transactions in. It only works while
-`PLAID_ENV=sandbox`, which is the default.
+and syncs it in. It only works while `PLAID_ENV=sandbox`, which is the
+default.
+
+Accounts show up immediately. Transactions usually don't — Plaid is still
+generating them while the seed's own sync runs, so that first pass reports
+`"added":0`. Pull them with a second call once it has caught up:
+
+```bash
+curl -X POST http://localhost:3000/api/plaid/sync
+```
+
+That brings in a few dozen transactions across the sandbox accounts. It's
+idempotent, so running it again when nothing is new adds nothing.
 
 ## Turn it OFF
 

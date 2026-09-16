@@ -448,7 +448,14 @@ main() {
   if ! server_running; then
     echo "Starting Budget…"
     : > "$LOG"
-    nohup npm run start >>"$LOG" 2>&1 &
+    # Hand the server the same port this script watches. `next start` binds
+    # 3000 unless told otherwise -- its --port default, env `PORT`, per next's
+    # CLI reference -- while $PORT above only drove the lsof check, the kill
+    # and the URL. Without this, BUDGET_PORT split the two: the server bound
+    # 3000 (or failed, if something already held it) while the wait below
+    # watched a port nothing was listening on and reported that the server
+    # never started.
+    PORT="$PORT" nohup npm run start >>"$LOG" 2>&1 &
 
     for i in $(seq 1 240); do
       server_running && break

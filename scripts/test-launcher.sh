@@ -220,6 +220,59 @@ else
        "install=$install_line ensure_db=$ensure_db_line build=$build_line"
 fi
 
+echo "launcher: the server starts on the port the launcher watches"
+# $PORT drove the lsof check, the kill and the printed URL -- but the server
+# was launched with a bare `npm run start`, and `next start` binds 3000 unless
+# told otherwise (its --port default; "env: PORT" per next's own CLI
+# reference). With BUDGET_PORT set, the server listened on 3000 while the
+# launcher waited on the override and then announced "Server didn't start".
+# Worse: every fixture here aims at 39173 precisely so a test can never touch
+# the real 3000, and this defect pointed all of them straight at it. They
+# stayed harmless only because a real server already held that port. Nothing
+# in this suite asserted a server ever came up, so 51 tests passed over it.
+#
+# Stubbing `npm` on PATH cannot test this -- Budget.command exports its own
+# PATH after whatever the harness sets, so the real npm always wins (recorded
+# under the plan's Task 7 corrections). The fixture's own package.json is
+# stubbed instead: `build` writes a BUILD_ID so needs_build is satisfied
+# without a multi-minute next build, and `start` records the port it was
+# handed, then listens on it. That is the contract under test -- does the
+# launcher tell the server which port to use -- with none of next in the way.
+# Rewriting package.json is safe for the shared node_modules: needs_install
+# compares package-lock.json only, which run_update backdates.
+#
+# The stub deliberately does NOT fall back to 3000 when PORT is unset, the way
+# next does. Reproducing the bug faithfully would mean a failing test binds
+# the user's real port. It records "unset" and takes an ephemeral port
+# instead, so the launcher fails its wait and .port-seen says why.
+port_fx=$(make_fixture)
+echo 'DATABASE_URL="file:./dev.db"' > "$port_fx/app/.env"
+cp "$port_fx/app/.env.example" "$port_fx/app/.env.local"
+printf 'PLAID_CLIENT_ID=x\nPLAID_SECRET=y\n' >> "$port_fx/app/.env.local"
+cat > "$port_fx/app/stub-server.js" <<'STUB'
+const fs = require('fs');
+const http = require('http');
+const port = process.env.PORT;
+fs.writeFileSync('.port-seen', port ? String(port) : 'unset');
+http.createServer((_req, res) => res.end('ok')).listen(port ? Number(port) : 0);
+STUB
+node -e '
+  const fs = require("fs");
+  const f = process.argv[1] + "/package.json";
+  const pkg = JSON.parse(fs.readFileSync(f, "utf8"));
+  pkg.scripts.build = "mkdir -p .next && date +%s > .next/BUILD_ID";
+  pkg.scripts.start = "node stub-server.js";
+  fs.writeFileSync(f, JSON.stringify(pkg, null, 2) + "\n");
+' "$port_fx/app"
+# run_update is the only helper that drives the real launch path; with no extra
+# arguments it is an ordinary launch, not an update.
+out=$(run_update "$port_fx/app")
+seen=$(cat "$port_fx/app/.port-seen" 2>/dev/null)
+[ "$seen" = "39173" ] && pass "hands the server the port the launcher watches" \
+                      || fail "hands the server the port the launcher watches" \
+                              "server saw: ${seen:-<never started>}"
+assert_has "$out" "ready at http://localhost:39173" "reports ready on the override port"
+
 echo "launcher: update detection"
 tmp=$(make_fixture)
 run_app "$tmp/app" >/dev/null
