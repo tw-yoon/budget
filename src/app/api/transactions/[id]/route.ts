@@ -61,7 +61,7 @@ export async function PATCH(
 async function handleLink(id: string, label: number | null) {
   const refund = await prisma.transaction.findUnique({
     where: { id },
-    select: { id: true, amount: true, linkedToId: true },
+    select: { id: true, amount: true, linkedToId: true, isFee: true, pending: true },
   });
   if (!refund) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -87,6 +87,8 @@ async function handleLink(id: string, label: number | null) {
       id: true,
       amount: true,
       linkedToId: true,
+      isFee: true,
+      pending: true,
       label: true,
       name: true,
       merchantName: true,
@@ -99,7 +101,14 @@ async function handleLink(id: string, label: number | null) {
     );
   }
 
-  const problem = validateLink(refund, target);
+  const poolsOthers =
+    (await prisma.transaction.count({ where: { fundsCashoutId: id } })) > 0;
+  // A link's target must be money-out (validated below), and only money-in
+  // rows can pool other transactions, so the target never pools anything.
+  const problem = validateLink(
+    { ...refund, poolsOthers },
+    { ...target, poolsOthers: false }
+  );
   if (problem) {
     return NextResponse.json({ error: problem }, { status: 400 });
   }

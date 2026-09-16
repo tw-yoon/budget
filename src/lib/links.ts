@@ -13,6 +13,14 @@ export interface LinkSide {
   id: string;
   amount: number;
   linkedToId: string | null;
+  isFee: boolean;
+  pending: boolean;
+  /**
+   * True when other transactions were pooled into this row — a Venmo cash-out
+   * deposit. Its constituent payments are imported and counted individually, so
+   * offsetting the lump as well would double-count them.
+   */
+  poolsOthers: boolean;
 }
 
 /**
@@ -25,6 +33,12 @@ export function validateLink(refund: LinkSide, target: LinkSide): string | null 
   if (refund.amount >= 0) return "Only a money-in transaction can be linked to a purchase";
   if (target.amount <= 0) return "A refund can only be linked to a purchase (money out)";
   if (target.linkedToId !== null) return "That transaction is itself linked to another purchase";
+  if (refund.poolsOthers)
+    return "That deposit pools other payments, which are already counted individually";
+  if (refund.isFee || target.isFee)
+    return "Fees cannot be linked";
+  if (refund.pending || target.pending)
+    return "Pending transactions cannot be linked — they are replaced when they post";
   return null;
 }
 

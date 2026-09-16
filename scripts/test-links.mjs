@@ -12,8 +12,8 @@ test("next label follows the current maximum", () => {
 
 import { validateLink } from "../src/lib/links.ts";
 
-const purchase = { id: "p1", amount: 84.2, linkedToId: null };
-const refund = { id: "r1", amount: -30, linkedToId: null };
+const purchase = { id: "p1", amount: 84.2, linkedToId: null, isFee: false, pending: false, poolsOthers: false };
+const refund = { id: "r1", amount: -30, linkedToId: null, isFee: false, pending: false, poolsOthers: false };
 
 test("a refund may link to a purchase", () => {
   assert.equal(validateLink(refund, purchase), null);
@@ -28,18 +28,44 @@ test("a purchase may not be linked to a purchase", () => {
 });
 
 test("a refund may not link to another refund", () => {
-  assert.match(validateLink(refund, { id: "r2", amount: -5, linkedToId: null }), /money out/);
+  assert.match(
+    validateLink(refund, { id: "r2", amount: -5, linkedToId: null, isFee: false, pending: false, poolsOthers: false }),
+    /money out/
+  );
 });
 
 test("chains are refused", () => {
   assert.match(
-    validateLink(refund, { id: "p2", amount: 10, linkedToId: "p9" }),
+    validateLink(refund, { id: "p2", amount: 10, linkedToId: "p9", isFee: false, pending: false, poolsOthers: false }),
     /itself linked/
   );
 });
 
+test("a deposit that pools other payments cannot be linked as a refund", () => {
+  assert.match(
+    validateLink({ ...refund, poolsOthers: true }, purchase),
+    /pools other payments/
+  );
+});
+
+test("a fee on the refund side cannot be linked", () => {
+  assert.match(validateLink({ ...refund, isFee: true }, purchase), /Fees cannot be linked/);
+});
+
+test("a fee on the target side cannot be linked", () => {
+  assert.match(validateLink(refund, { ...purchase, isFee: true }), /Fees cannot be linked/);
+});
+
+test("a pending refund cannot be linked", () => {
+  assert.match(validateLink({ ...refund, pending: true }, purchase), /Pending transactions/);
+});
+
+test("a pending target cannot be linked", () => {
+  assert.match(validateLink(refund, { ...purchase, pending: true }), /Pending transactions/);
+});
+
 function purchase2() {
-  return { id: "p2", amount: 12, linkedToId: null };
+  return { id: "p2", amount: 12, linkedToId: null, isFee: false, pending: false, poolsOthers: false };
 }
 
 import { resolveLinkedCategory } from "../src/lib/links.ts";
