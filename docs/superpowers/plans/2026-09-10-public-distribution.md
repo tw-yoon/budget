@@ -4,7 +4,7 @@
 
 **Goal:** Make Budget Claude something another developer can clone, run against their own data, and keep current — without the maintainer's data, keys, or private monorepo going with it.
 
-**Architecture:** `budget-claude/` stays in a private monorepo and is mirrored to a public repo via `git subtree push`. All new behavior lands in `Budget.command`: a bootstrap step that makes a fresh clone boot, and an update step that fetches on launch but only pulls when asked. No application code changes.
+**Architecture:** `budget-claude/` stays in a private monorepo and is mirrored to a public repo by a deliberate release step (planned here as `git subtree push`, which turned out not to work -- see the correction in Task 9). All new behavior lands in `Budget.command`: a bootstrap step that makes a fresh clone boot, and an update step that fetches on launch but only pulls when asked. No application code changes.
 
 **Tech Stack:** Bash (launcher + tests), Next.js 16.2.9, Prisma 5 / SQLite, git subtree.
 
@@ -873,7 +873,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 **Interfaces:**
 - Consumes: a clean working tree with Tasks 1-8 committed
-- Produces: the public repo `tw-yoon/budget`, and the `git subtree push` workflow used for every future release
+- Produces: the public repo `tw-yoon/budget`, and the release workflow used for every future release
 
 - [ ] **Step 1: Build the publishable tree — squash, do not preserve history**
 
@@ -958,13 +958,20 @@ Verify on GitHub that the history and README render correctly, then consider lea
 
 Every future release from the monorepo:
 
-```bash
-git subtree push --prefix=budget-claude https://github.com/tw-yoon/budget.git main
-```
+**Corrected 2026-09-16: the command written here -- `git subtree push
+--prefix=budget-claude <public-url> main` -- cannot work, and was never run.**
+`git subtree split` rebuilds the subfolder's full private history and roots it
+at that history's first commit, which is unrelated to the squashed `Initial
+commit` this repo is rooted at. The push is rejected as unrelated history, and
+forcing it would publish the very history Step 1 squashed away. The procedure
+that does work -- replaying new commits with `git format-patch --relative` and
+`git am` onto a clone of the published tip -- is recorded in the spec's
+Repository section, which is the single source of truth for it. No command is
+left here, so that there is nothing to copy-paste by mistake.
 
 - [ ] **Step 6: Commit the workflow note**
 
-Add the `git subtree push` command to the spec's Repository section as the recorded release procedure, so it is not rediscovered later.
+Add the release procedure to the spec's Repository section as the recorded one, so it is not rediscovered later.
 
 ```bash
 git add docs/superpowers/specs/2026-09-10-public-distribution-design.md

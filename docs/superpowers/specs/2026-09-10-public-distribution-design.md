@@ -76,14 +76,60 @@ current, scrubbed tree. Nothing personal is recoverable because no prior state
 exists to recover. The full history stays intact and private in the monorepo,
 which is where it was always going to be read from anyway.
 
-Ongoing publication is a deliberate command run from the private monorepo:
+Ongoing publication is a deliberate sequence run from the private monorepo.
+
+**Superseded 2026-09-16: `git subtree push` cannot publish this repo.** The
+command recorded here was `git subtree push --prefix=budget-claude budget main`,
+and it was never actually run. It cannot work, for the same reason the squash
+was chosen in the first place: `git subtree split --prefix=budget-claude`
+rebuilds the subfolder's *full* private history and roots it at that history's
+first commit. The public repo is rooted at the squashed `Initial commit`, which
+exists nowhere in the monorepo. The two histories are unrelated, so the push is
+rejected -- and forcing it would replace the public repo with the entire private
+history, which is precisely what squashing existed to prevent.
+
+A release instead replays the new commits onto the published tip, one public
+commit per private commit, with the `budget-claude/` prefix stripped. Begin by
+finding which monorepo commit the public tip actually holds, rather than
+trusting a guess -- run this from the monorepo:
 
 ```bash
-git subtree push --prefix=budget-claude budget main
+PUB=$(mktemp -d)
+git clone https://github.com/tw-yoon/budget.git "$PUB"
+pub_tree=$(git -C "$PUB" rev-parse HEAD^{tree})
+git log --format='%H' -- budget-claude | while read -r c; do
+  [ "$(git rev-parse "$c:budget-claude")" = "$pub_tree" ] && echo "$c" && break
+done
+```
+
+Call that commit `LAST`. Cut the patches, stripping the prefix as they are cut,
+and apply them:
+
+```bash
+git format-patch --relative=budget-claude -o "$PUB/patches" LAST..HEAD -- budget-claude
+git -C "$PUB" am "$PUB/patches"/*.patch
+```
+
+`--relative` is what makes the patches apply at the public repo's root, and
+`git am` preserves each commit's message, author and author date -- so the
+public history reads as the same commits, not as a re-dated import.
+
+Confirm the applied result is identical to what is meant to be published before
+anything leaves the machine. These two must print the same tree:
+
+```bash
+git rev-parse HEAD:budget-claude
+git -C "$PUB" rev-parse HEAD^{tree}
+```
+
+Then run `npm test` in the monorepo, and only once it is green:
+
+```bash
+git -C "$PUB" push origin main
 ```
 
 The monorepo stays private and the day-to-day workflow is unchanged. Nothing
-reaches the public repo except by running that push.
+reaches the public repo except by running that sequence.
 
 ### Card presets ship
 
