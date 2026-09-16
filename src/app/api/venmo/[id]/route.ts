@@ -16,7 +16,10 @@ export async function PATCH(
     }
 
     const { count } = await prisma.transaction.updateMany({
-      where: { id, source: "VENMO" },
+      // A linked row derives its category from its purchase — refuse to
+      // overwrite it here. (This route sets userCategory with no source guard,
+      // so without this the derived category would be silently replaced.)
+      where: { id, source: "VENMO", linkedToId: null },
       data: { userCategory: category },
     });
     if (count === 0) {

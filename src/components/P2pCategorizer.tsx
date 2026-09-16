@@ -2,15 +2,18 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { formatCurrency, formatDate } from "@/lib/format";
+import { TransactionLinkPicker } from "./TransactionLinkPicker";
 
 interface P2pTx {
   id: string;
+  label: number | null;
   date: string;
   note: string;
   counterparty: string | null;
   direction: "in" | "out";
   amount: number;
   category: string;
+  linkedTo: { id: string; label: number | null; name: string; category: string } | null;
 }
 
 interface P2pResponse {
@@ -164,6 +167,7 @@ export function P2pCategorizer({ title, subtitle, endpoint, showImport, emptyHin
             <table className="w-full border-collapse text-sm">
               <thead>
                 <tr className="border-b border-black/10 text-left text-xs uppercase tracking-wide text-black/50 dark:border-white/10 dark:text-white/50">
+                  <th className="px-4 py-3 font-medium">#</th>
                   <th className="px-4 py-3 font-medium">Date</th>
                   <th className="px-4 py-3 font-medium">Who</th>
                   <th className="px-4 py-3 font-medium">Note</th>
@@ -177,6 +181,9 @@ export function P2pCategorizer({ title, subtitle, endpoint, showImport, emptyHin
                     key={t.id}
                     className="border-b border-black/[0.06] last:border-0 hover:bg-black/[0.02] dark:border-white/[0.06] dark:hover:bg-white/[0.03]"
                   >
+                    <td className="whitespace-nowrap px-4 py-3 font-mono text-xs tabular-nums text-black/35 dark:text-white/35">
+                      {t.label ?? "—"}
+                    </td>
                     <td className="whitespace-nowrap px-4 py-3 text-black/55 dark:text-white/55">
                       {formatDate(t.date)}
                     </td>
@@ -197,8 +204,9 @@ export function P2pCategorizer({ title, subtitle, endpoint, showImport, emptyHin
                     <td className="px-4 py-3">
                       <select
                         value={t.category}
+                        disabled={t.linkedTo !== null}
                         onChange={(e) => updateCategory(t.id, e.target.value)}
-                        className={`rounded-md border border-black/15 bg-transparent px-2 py-1 text-sm outline-none focus:border-black/40 dark:border-white/15 dark:focus:border-white/40 ${
+                        className={`rounded-md border border-black/15 bg-transparent px-2 py-1 text-sm outline-none focus:border-black/40 disabled:opacity-60 dark:border-white/15 dark:focus:border-white/40 ${
                           IGNORED.has(t.category)
                             ? "text-black/40 dark:text-white/40"
                             : ""
@@ -209,7 +217,21 @@ export function P2pCategorizer({ title, subtitle, endpoint, showImport, emptyHin
                             {c}
                           </option>
                         ))}
+                        {/* A linked row shows an inherited category that may not
+                            be in this page's fixed list. */}
+                        {!data.categories.includes(t.category) && (
+                          <option value={t.category}>{t.category}</option>
+                        )}
                       </select>
+                      {t.direction === "in" && (
+                        <div className="mt-1">
+                          <TransactionLinkPicker
+                            transactionId={t.id}
+                            linkedTo={t.linkedTo}
+                            onLinked={load}
+                          />
+                        </div>
+                      )}
                     </td>
                   </tr>
                 ))}
