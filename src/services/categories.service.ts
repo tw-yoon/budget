@@ -32,8 +32,8 @@ export class CategoryInUseError extends Error {
 
 /** Thrown when a reassign target does not resolve to another existing category. */
 export class UnknownCategoryError extends Error {
-  constructor(readonly name: string) {
-    super(`No category named "${name}"`);
+  constructor(readonly categoryName: string) {
+    super(`No category named "${categoryName}"`);
     this.name = "UnknownCategoryError";
   }
 }
