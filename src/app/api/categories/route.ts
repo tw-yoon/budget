@@ -31,6 +31,12 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+    if (trimmed.toLowerCase() === "uncategorized") {
+      return NextResponse.json(
+        { error: "\"Uncategorized\" is reserved — it means a row has no category" },
+        { status: 400 }
+      );
+    }
     return NextResponse.json({ category: await createCategory(trimmed) });
   } catch (err) {
     if (err && typeof err === "object" && (err as { code?: string }).code === "P2002") {

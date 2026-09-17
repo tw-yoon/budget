@@ -31,6 +31,12 @@ export async function PATCH(
           { status: 400 }
         );
       }
+      if (trimmed.toLowerCase() === "uncategorized") {
+        return NextResponse.json(
+          { error: "\"Uncategorized\" is reserved — it means a row has no category" },
+          { status: 400 }
+        );
+      }
       result = await renameCategory(id, trimmed);
     }
     return NextResponse.json({ ok: true, ...result });

@@ -15,6 +15,7 @@ const NAV = [
   { href: "/subscriptions", label: "Subscriptions", code: "SUB" },
   { href: "/rules", label: "Rules", code: "RUL" },
   { href: "/income", label: "Income", code: "INC" },
+  { href: "/settings", label: "Settings", code: "SET" },
 ];
 
 const STORAGE_KEY = "sidebar-collapsed";
