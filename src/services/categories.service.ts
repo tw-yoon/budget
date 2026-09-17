@@ -30,6 +30,14 @@ export class CategoryInUseError extends Error {
   }
 }
 
+/** Thrown when a reassign target does not resolve to another existing category. */
+export class UnknownCategoryError extends Error {
+  constructor(readonly name: string) {
+    super(`No category named "${name}"`);
+    this.name = "UnknownCategoryError";
+  }
+}
+
 /**
  * WHERE fragments matching a category used as a whole value or as a parent:
  * "Home Improvement" and "Home Improvement > Furniture" both count.
@@ -177,7 +185,12 @@ export async function deleteCategory(id: string, reassignTo?: string): Promise<v
   if (!cat) throw new Error("Category not found");
 
   if (reassignTo) {
-    await renameCategory(id, reassignTo); // merge; deletes this row
+    // Reassigning is a merge into an EXISTING category. Without this check
+    // renameCategory would take its plain-rename branch and quietly rename this
+    // row instead of deleting it, while the caller believed the delete happened.
+    const target = await prisma.category.findUnique({ where: { name: reassignTo } });
+    if (!target || target.id === id) throw new UnknownCategoryError(reassignTo);
+    await renameCategory(id, reassignTo); // merges into target, deleting this row
     return;
   }
 
