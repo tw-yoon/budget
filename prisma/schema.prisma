@@ -221,6 +221,34 @@ model CategoryRule {
   @@index([enabled, priority])
 }
 
+// A spending category the user can assign. Seeded from the lists that used to
+// be hardcoded in src/lib/rules.ts, and editable from /settings.
+//
+// Transactions store their category as TEXT, not a relation — so a category is
+// a name, not an identity. Renaming rewrites that text everywhere it appears;
+// deleting is refused while text still references it.
+model Category {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+
+  plaidMappings CategoryMapping[]
+}
+
+// Which of Plaid's personal-finance-category primaries resolve to this
+// category, for transactions the user has not categorized by hand. A primary
+// resolves to exactly one category; the unique constraint makes that
+// structural rather than something the API has to remember to enforce.
+model CategoryMapping {
+  id         String @id @default(cuid())
+  pfcPrimary String @unique // e.g. FOOD_AND_DRINK
+  categoryId String
+
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@index([categoryId])
+}
+
 model SyncLog {
   id       String   @id @default(cuid())
   itemId   String

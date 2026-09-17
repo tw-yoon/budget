@@ -52,7 +52,7 @@ export const MATCH_TYPE_LABELS: Record<RuleMatchType, string> = {
 // PFC primaries the bank-side data uses, humanized, unioned with the P2P
 // categories — the set a rule can assign. Deduped, alphabetical, with the
 // exclusion sentinel "Transfer" kept available.
-const PFC_PRIMARIES = [
+export const PFC_PRIMARIES = [
   "INCOME",
   "TRANSFER_IN",
   "TRANSFER_OUT",
