@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { humanizePfc } from "@/lib/format";
 import { splitCategory } from "@/lib/categories";
 import { getCashoutBreakdowns } from "@/services/venmo.service";
+import { loadPlaidCategoryMap } from "@/services/categories.service";
 import { netAmount, resolveLinkedCategory } from "@/lib/links";
 import type { LinkedTargetDTO, RefundDTO } from "@/types";
 import type { Prisma } from "@prisma/client";
@@ -132,6 +133,9 @@ export async function GET(req: NextRequest) {
         : Promise.resolve([]),
     ]);
 
+    const plaidMap = await loadPlaidCategoryMap();
+    const plaidName = (primary: string) => plaidMap.get(primary) ?? humanizePfc(primary);
+
     const refundsByPurchase = new Map<string, RefundDTO[]>();
     for (const r of refundRows) {
       const list = refundsByPurchase.get(r.linkedToId!) ?? [];
@@ -157,7 +161,7 @@ export async function GET(req: NextRequest) {
           // splitCategory derives both the parent category and the subcategory
           // for a linked row. Splitting it here would strip the subcategory a
           // linked refund inherits.
-          category: t.userCategory ?? humanizePfc(t.pfcPrimary),
+          category: t.userCategory ?? plaidName(t.pfcPrimary),
         },
       ])
     );
@@ -185,16 +189,16 @@ export async function GET(req: NextRequest) {
         date: t.date.toISOString(),
         name: t.name,
         merchantName: t.merchantName,
-        category: uc ? uc.parent : humanizePfc(t.pfcPrimary),
+        category: uc ? uc.parent : plaidName(t.pfcPrimary),
         categoryDetailed: uc
           ? uc.sub
           : t.pfcDetailed
-            ? humanizePfc(t.pfcDetailed)
+            ? plaidName(t.pfcDetailed)
             : null,
         userCategory: t.userCategory,
         // Plaid's own categorization, kept alongside the effective one so the
         // client can preview/revert overrides without refetching.
-        plaidCategory: humanizePfc(t.pfcPrimary),
+        plaidCategory: plaidName(t.pfcPrimary),
         plaidCategoryDetailed: t.pfcDetailed ? humanizePfc(t.pfcDetailed) : null,
         logoUrl: t.logoUrl,
         pending: t.pending,

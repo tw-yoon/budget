@@ -12,6 +12,7 @@ import { humanizePfc } from "@/lib/format";
 import { splitCategory } from "@/lib/categories";
 import { isP2p } from "@/lib/zelle";
 import { resolveLinkedCategory } from "@/lib/links";
+import { loadPlaidCategoryMap } from "@/services/categories.service";
 import type {
   AnalyticsResult,
   CashflowMonth,
@@ -184,11 +185,17 @@ async function fetchTxInputs(start: Date): Promise<TxInput[]> {
     },
   });
 
+  // Plaid's primaries resolve through the user's own mapping, so an
+  // uncategorized row reports the category they chose rather than Plaid's
+  // wording. Loaded once per query, not per row.
+  const plaidMap = await loadPlaidCategoryMap();
+  const plaidName = (primary: string) => plaidMap.get(primary) ?? humanizePfc(primary);
+
   return rows.flatMap((r) => {
     // The linked purchase's own effective category, humanized the same way a
     // top-level row's would be.
     const linkedToCategory = r.linkedTo
-      ? r.linkedTo.userCategory ?? humanizePfc(r.linkedTo.pfcPrimary)
+      ? r.linkedTo.userCategory ?? plaidName(r.linkedTo.pfcPrimary)
       : null;
     const { raw, isOffset } = resolveLinkedCategory({
       amount: r.amount,
@@ -208,7 +215,7 @@ async function fetchTxInputs(start: Date): Promise<TxInput[]> {
     return [{
       amount: r.amount,
       date: r.date,
-      category: uc ? uc.parent : humanizePfc(r.pfcPrimary),
+      category: uc ? uc.parent : plaidName(r.pfcPrimary),
       subcategory: uc?.sub ?? null,
       // P2P rows use a person as the "merchant" — keep them out of merchant totals.
       merchant: isP2p(r.source, r.name) ? null : r.merchantName ?? r.name,
