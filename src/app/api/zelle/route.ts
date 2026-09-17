@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { ZELLE_CATEGORIES, isZelleName, parseZelleCounterparty } from "@/lib/zelle";
+import { isZelleName, parseZelleCounterparty } from "@/lib/zelle";
+import { listCategoryNames } from "@/services/categories.service";
 import { humanizePfc } from "@/lib/format";
 import { resolveLinkedCategory } from "@/lib/links";
 
@@ -59,7 +60,7 @@ export async function GET() {
         };
       });
 
-    return NextResponse.json({ transactions, categories: ZELLE_CATEGORIES });
+    return NextResponse.json({ transactions, categories: await listCategoryNames() });
   } catch (err) {
     console.error("[zelle GET]", err);
     return NextResponse.json({ error: "Failed to load Zelle transactions" }, { status: 500 });

@@ -4,16 +4,17 @@ import { useMemo, useState } from "react";
 import type { TransactionDTO } from "@/types";
 import { formatSignedAmount, formatDate, formatCurrency } from "@/lib/format";
 import { splitCategory } from "@/lib/categories";
-import { RULE_CATEGORIES } from "@/lib/rules";
 import { isZelleName } from "@/lib/zelle";
 import { TransactionLinkPicker } from "./TransactionLinkPicker";
 
 export function TransactionTable({
   transactions,
   onChanged,
+  categories,
 }: {
   transactions: TransactionDTO[];
   onChanged: () => void;
+  categories: string[];
 }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [editing, setEditing] = useState<string | null>(null);
@@ -156,6 +157,7 @@ export function TransactionTable({
                         subcategory={split?.sub ?? ""}
                         knownSubs={knownSubs}
                         hasOverride={rawOverride !== null}
+                        categories={categories}
                         linkedTo={t.linkedTo}
                         onLinked={() => {
                           // A link/unlink just changed this row's category on
@@ -323,6 +325,7 @@ function CategoryEditor({
   subcategory,
   knownSubs,
   hasOverride,
+  categories,
   linkedTo,
   onLinked,
   onDone,
@@ -332,6 +335,7 @@ function CategoryEditor({
   subcategory: string;
   knownSubs: Map<string, Set<string>>;
   hasOverride: boolean;
+  categories: string[];
   linkedTo: TransactionDTO["linkedTo"];
   onLinked: (linked: { label: number | null; name: string } | null) => void;
   // raw userCategory saved, null = cleared, undefined = cancelled
@@ -343,14 +347,14 @@ function CategoryEditor({
   const [error, setError] = useState(false);
   const locked = linkedTo !== null;
 
-  // Selectable categories: the rule/P2P set, plus whatever this row already
-  // shows (e.g. a Plaid primary not in the list) so nothing gets orphaned.
+  // Selectable categories: the user's list, plus whatever this row already
+  // shows (e.g. a Plaid primary with no mapping) so nothing gets orphaned.
   const options = useMemo(() => {
-    const set = new Set(RULE_CATEGORIES);
+    const set = new Set(categories);
     set.add(category);
     set.add(transaction.plaidCategory);
     return [...set].sort((a, b) => a.localeCompare(b));
-  }, [category, transaction.plaidCategory]);
+  }, [categories, category, transaction.plaidCategory]);
 
   const subs = [...(knownSubs.get(cat) ?? [])].sort((a, b) =>
     a.localeCompare(b)

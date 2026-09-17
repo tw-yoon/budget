@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { ZELLE_CATEGORIES } from "@/lib/zelle";
+import { listCategoryNames } from "@/services/categories.service";
 
 // PATCH /api/zelle/:id — set the user category on a native Zelle transaction.
 // "Uncategorized" clears it (keeping the row excluded, like a plain transfer).
@@ -12,7 +12,10 @@ export async function PATCH(
     const { id } = await params;
     const body = (await req.json()) as { userCategory?: string };
     const category = body.userCategory;
-    if (!category || !ZELLE_CATEGORIES.includes(category as never)) {
+    // Validate against the user's own list — a hardcoded set would reject the
+    // categories they just created.
+    const names = new Set(await listCategoryNames());
+    if (!category || !names.has(category)) {
       return NextResponse.json({ error: "Invalid category" }, { status: 400 });
     }
 

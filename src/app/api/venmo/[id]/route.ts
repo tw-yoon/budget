@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { VENMO_CATEGORIES } from "@/lib/venmo";
+import { listCategoryNames } from "@/services/categories.service";
 
 // PATCH /api/venmo/:id — update the user category of one Venmo transaction.
 export async function PATCH(
@@ -11,7 +11,10 @@ export async function PATCH(
     const { id } = await params;
     const body = (await req.json()) as { userCategory?: string };
     const category = body.userCategory;
-    if (!category || !VENMO_CATEGORIES.includes(category as never)) {
+    // Validate against the user's own list — a hardcoded set would reject the
+    // categories they just created.
+    const names = new Set(await listCategoryNames());
+    if (!category || !names.has(category)) {
       return NextResponse.json({ error: "Invalid category" }, { status: 400 });
     }
 

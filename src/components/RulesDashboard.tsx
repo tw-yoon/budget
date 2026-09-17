@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from "react";
 import {
   RULE_FIELDS,
   RULE_MATCH_TYPES,
-  RULE_CATEGORIES,
   FIELD_LABELS,
   MATCH_TYPE_LABELS,
 } from "@/lib/rules";
@@ -209,9 +208,29 @@ function RuleForm({
   const [field, setField] = useState<string>("EITHER");
   const [matchType, setMatchType] = useState<string>("CONTAINS");
   const [pattern, setPattern] = useState("");
-  const [category, setCategory] = useState<string>(RULE_CATEGORIES[0] ?? "");
+  const [category, setCategory] = useState<string>("");
+  const [categories, setCategories] = useState<string[]>([]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/categories")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json) => {
+        if (json && !cancelled) {
+          const names = json.categories.map((c: { name: string }) => c.name);
+          setCategories(names);
+          // Don't stomp a selection the user already made while this was
+          // loading — only default the picker when it's still blank.
+          setCategory((prev) => (prev === "" ? (names[0] ?? "") : prev));
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -271,7 +290,7 @@ function RuleForm({
           onChange={(e) => setCategory(e.target.value)}
           className={inputCls}
         >
-          {RULE_CATEGORIES.map((c) => (
+          {categories.map((c) => (
             <option key={c} value={c}>
               {c}
             </option>

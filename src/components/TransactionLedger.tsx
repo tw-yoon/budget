@@ -18,6 +18,7 @@ export function TransactionLedger() {
   const [accountId, setAccountId] = useState("");
   const [accountGroups, setAccountGroups] = useState<AccountGroup[]>([]);
   const [page, setPage] = useState(1);
+  const [categories, setCategories] = useState<string[]>([]);
 
   // Load accounts once for the payment-account filter. If it fails the
   // dropdown just stays on "All accounts".
@@ -27,6 +28,22 @@ export function TransactionLedger() {
       .then((res) => (res.ok ? (res.json() as Promise<AccountsResponse>) : null))
       .then((json) => {
         if (json && !cancelled) setAccountGroups(json.groups);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // The editable category list, for the row editor's picker.
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/categories")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json) => {
+        if (json && !cancelled) {
+          setCategories(json.categories.map((c: { name: string }) => c.name));
+        }
       })
       .catch(() => {});
     return () => {
@@ -150,6 +167,7 @@ export function TransactionLedger() {
             <TransactionTable
               transactions={data?.transactions ?? []}
               onChanged={load}
+              categories={categories}
             />
           </div>
 

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { VENMO_CATEGORIES } from "@/lib/venmo";
+import { listCategoryNames } from "@/services/categories.service";
 import { humanizePfc } from "@/lib/format";
 import { resolveLinkedCategory } from "@/lib/links";
 
@@ -60,7 +60,7 @@ export async function GET() {
       };
     });
 
-    return NextResponse.json({ transactions, categories: VENMO_CATEGORIES });
+    return NextResponse.json({ transactions, categories: await listCategoryNames() });
   } catch (err) {
     console.error("[venmo GET]", err);
     return NextResponse.json({ error: "Failed to load Venmo transactions" }, { status: 500 });
