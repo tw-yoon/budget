@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   RULE_FIELDS,
   RULE_MATCH_TYPES,
@@ -210,27 +210,42 @@ function RuleForm({
   const [pattern, setPattern] = useState("");
   const [category, setCategory] = useState<string>("");
   const [categories, setCategories] = useState<string[]>([]);
+  const [categoriesError, setCategoriesError] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const cancelledRef = useRef(false);
 
-  useEffect(() => {
-    let cancelled = false;
+  // Pulled out of the effect so the "Retry" button below can re-run the same
+  // fetch after a failure, not just the initial mount.
+  const loadCategories = useCallback(() => {
+    setCategoriesError(false);
     fetch("/api/categories")
       .then((res) => (res.ok ? res.json() : null))
       .then((json) => {
-        if (json && !cancelled) {
-          const names = json.categories.map((c: { name: string }) => c.name);
-          setCategories(names);
-          // Don't stomp a selection the user already made while this was
-          // loading — only default the picker when it's still blank.
-          setCategory((prev) => (prev === "" ? (names[0] ?? "") : prev));
+        if (cancelledRef.current) return;
+        if (!json) {
+          setCategoriesError(true);
+          return;
         }
+        const names = json.categories.map((c: { name: string }) => c.name);
+        setCategories(names);
+        // Don't stomp a selection the user already made while this was
+        // loading — only default the picker when it's still blank.
+        setCategory((prev) => (prev === "" ? (names[0] ?? "") : prev));
       })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
+      .catch(() => {
+        if (!cancelledRef.current) setCategoriesError(true);
+      });
   }, []);
+
+  useEffect(() => {
+    cancelledRef.current = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadCategories();
+    return () => {
+      cancelledRef.current = true;
+    };
+  }, [loadCategories]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -297,6 +312,18 @@ function RuleForm({
           ))}
         </select>
       </div>
+      {categoriesError && (
+        <p className="mt-2 text-sm text-red-600 dark:text-red-400">
+          Failed to load categories.{" "}
+          <button
+            type="button"
+            onClick={loadCategories}
+            className="underline hover:no-underline"
+          >
+            Retry
+          </button>
+        </p>
+      )}
       {error && (
         <p className="mt-2 text-sm text-red-600 dark:text-red-400">{error}</p>
       )}

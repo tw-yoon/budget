@@ -12,10 +12,10 @@ export async function PATCH(
     const { id } = await params;
     const body = (await req.json()) as { userCategory?: string };
     const category = body.userCategory;
-    // Validate against the user's own list — a hardcoded set would reject the
-    // categories they just created.
+    // Validate against the user's own list, plus the "Uncategorized" sentinel
+    // that clears the category — it is deliberately not a stored Category row.
     const names = new Set(await listCategoryNames());
-    if (!category || !names.has(category)) {
+    if (!category || (category !== "Uncategorized" && !names.has(category))) {
       return NextResponse.json({ error: "Invalid category" }, { status: 400 });
     }
 

@@ -60,7 +60,11 @@ export async function GET() {
         };
       });
 
-    return NextResponse.json({ transactions, categories: await listCategoryNames() });
+    // "Uncategorized" is a sentinel, not a stored category — it is what the
+    // PATCH route turns back into a null userCategory. Offer it first so a
+    // categorized row can always be reverted.
+    const categories = ["Uncategorized", ...(await listCategoryNames())];
+    return NextResponse.json({ transactions, categories });
   } catch (err) {
     console.error("[zelle GET]", err);
     return NextResponse.json({ error: "Failed to load Zelle transactions" }, { status: 500 });
