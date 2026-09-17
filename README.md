@@ -184,13 +184,14 @@ WSL — there's no native-Windows path.
 npm test
 ```
 
-Three suites, no test framework installed. `scripts/test-scrub.sh` checks that
-no personal data or absolute home path is about to be published, and
+No test framework is installed. `scripts/test-scrub.sh` checks that no personal
+data or absolute home path is about to be published, and
 `scripts/test-launcher.sh` drives `Budget.command` against throwaway clones to
 cover setup, updating, and the cases where it must refuse — both plain Bash.
-`scripts/test-links.mjs` covers the refund-linking logic on Node's built-in
-test runner, importing the TypeScript directly (Node 22+ strips the types), so
-it needs no build step and no dependency. Run them before sending a change.
+The `scripts/test-*.mjs` suites cover pure logic — refund linking, the wording
+of a failed sync — on Node's built-in test runner, importing the TypeScript
+directly (Node 22+ strips the types), so they need no build step and no
+dependency. Run them before sending a change.
 
 ## Pages
 

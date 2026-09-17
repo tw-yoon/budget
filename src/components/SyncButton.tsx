@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { SyncResponse } from "@/types";
+import { summarizeFailures } from "@/lib/plaid-errors";
 
 type Status = "idle" | "syncing" | "done" | "error";
 
@@ -34,11 +35,9 @@ export function SyncButton({ onSynced }: { onSynced?: () => void }) {
 
       if (failed.length) {
         setStatus("error");
-        setMessage(
-          `${failed.length} item(s) failed: ${failed
-            .map((f) => f.error ?? "unknown error")
-            .join("; ")}`
-        );
+        // Name the bank, not just Plaid's code: a sync failure is item-level,
+        // so "which connection is dead" is the only actionable fact there is.
+        setMessage(summarizeFailures(failed));
       } else {
         setStatus("done");
         setMessage(
