@@ -193,7 +193,7 @@ export async function GET(req: NextRequest) {
         categoryDetailed: uc
           ? uc.sub
           : t.pfcDetailed
-            ? plaidName(t.pfcDetailed)
+            ? humanizePfc(t.pfcDetailed)
             : null,
         userCategory: t.userCategory,
         // Plaid's own categorization, kept alongside the effective one so the
