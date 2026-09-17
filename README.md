@@ -7,6 +7,12 @@ account balances and net worth, gives you a searchable transaction ledger,
 shows spending analytics (by category, by month, by merchant), and works out
 which of your credit cards earns the most for each kind of purchase.
 
+Every transaction carries a permanent number. Money that comes in but isn't
+really income — a refund, or a friend paying you back — can be connected to the
+purchase it covers by that number. It then takes on that purchase's category and
+nets against it, instead of inflating your income and leaving the spending
+overstated.
+
 ## Before you start
 
 You'll need:
@@ -178,19 +184,21 @@ WSL — there's no native-Windows path.
 npm test
 ```
 
-Two plain Bash suites, no test runner: `scripts/test-scrub.sh` checks that no
-personal data or absolute home path is about to be published, and
+Three suites, no test framework installed. `scripts/test-scrub.sh` checks that
+no personal data or absolute home path is about to be published, and
 `scripts/test-launcher.sh` drives `Budget.command` against throwaway clones to
-cover setup, updating, and the cases where it must refuse. Run them before
-sending a change.
+cover setup, updating, and the cases where it must refuse — both plain Bash.
+`scripts/test-links.mjs` covers the refund-linking logic on Node's built-in
+test runner, importing the TypeScript directly (Node 22+ strips the types), so
+it needs no build step and no dependency. Run them before sending a change.
 
 ## Pages
 
 - `/` — home
 - `/accounts` — balances, net worth, connect/disconnect/reconnect banks, due dates
-- `/transactions` — ledger with search & filters
-- `/venmo` — categorize Venmo payments; changes flow into Transactions & Analytics
-- `/zelle` — categorize Zelle payments from your bank feed the same way
+- `/transactions` — ledger with search & filters; connect a refund to the purchase it pays back
+- `/venmo` — categorize Venmo payments, or connect a payback to what it covers; changes flow into Transactions & Analytics
+- `/zelle` — categorize or connect Zelle payments from your bank feed the same way
 - `/analytics` — spending by category, monthly trend, top merchants
 - `/benefits` — card earning rates + statement credits + "best card by category"
 - `/subscriptions` — detected recurring subscriptions and their monthly total
