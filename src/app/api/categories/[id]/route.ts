@@ -20,17 +20,24 @@ export async function PATCH(
 
     let result = { merged: false, movedTransactions: 0, movedRules: 0 };
     if (body.plaidPrimaries) await setPlaidPrimaries(id, body.plaidPrimaries);
-    if (body.name) {
-      if (body.name.includes(" > ")) {
+    if (body.name !== undefined) {
+      const trimmed = body.name.trim();
+      if (!trimmed) {
+        return NextResponse.json({ error: "A name is required" }, { status: 400 });
+      }
+      if (trimmed.includes(" > ")) {
         return NextResponse.json(
           { error: "A category name cannot contain \" > \"" },
           { status: 400 }
         );
       }
-      result = await renameCategory(id, body.name);
+      result = await renameCategory(id, trimmed);
     }
     return NextResponse.json({ ok: true, ...result });
   } catch (err) {
+    if (err instanceof Error && err.message === "Category not found") {
+      return NextResponse.json({ error: "Category not found" }, { status: 404 });
+    }
     console.error("[categories PATCH]", err);
     return NextResponse.json({ error: "Failed to update category" }, { status: 500 });
   }
@@ -61,6 +68,9 @@ export async function DELETE(
     }
     if (err instanceof UnknownCategoryError) {
       return NextResponse.json({ error: err.message }, { status: 400 });
+    }
+    if (err instanceof Error && err.message === "Category not found") {
+      return NextResponse.json({ error: "Category not found" }, { status: 404 });
     }
     console.error("[categories DELETE]", err);
     return NextResponse.json({ error: "Failed to delete category" }, { status: 500 });
