@@ -120,7 +120,13 @@ export function TransactionTable({
                           {isOpen ? "▾" : "▸"}
                         </span>
                       )}
-                      <span className="font-medium">
+                      {/* wrap-anywhere, not break-words: bank transfer memos
+                          carry unbreakable 35-character reference tokens, and
+                          only `overflow-wrap: anywhere` lowers the cell's
+                          intrinsic minimum width. `break-word` wraps the text
+                          but leaves the minimum intact, so the table would
+                          still force the page into a horizontal scroll. */}
+                      <span className="wrap-anywhere font-medium">
                         {t.merchantName ?? t.name}
                       </span>
                       {t.source === "VENMO" && <Badge tone="violet">Venmo</Badge>}
