@@ -38,6 +38,18 @@ export class UnknownCategoryError extends Error {
   }
 }
 
+/** Thrown when a rename would merge into an existing category without confirmation. */
+export class MergeNotConfirmedError extends Error {
+  constructor(
+    readonly targetName: string,
+    readonly movingTransactions: number,
+    readonly movingRules: number
+  ) {
+    super(`Renaming would merge into "${targetName}"`);
+    this.name = "MergeNotConfirmedError";
+  }
+}
+
 /**
  * WHERE fragments matching a category used as a whole value or as a parent:
  * "Home Improvement" and "Home Improvement > Furniture" both count.
@@ -112,7 +124,8 @@ export async function createCategory(name: string): Promise<CategoryDTO> {
  */
 export async function renameCategory(
   id: string,
-  newName: string
+  newName: string,
+  allowMerge = false
 ): Promise<{ merged: boolean; movedTransactions: number; movedRules: number }> {
   const to = newName.trim();
   const source = await prisma.category.findUnique({ where: { id } });
@@ -129,6 +142,13 @@ export async function renameCategory(
     where: ruleUsing(source.name),
     select: { id: true, category: true },
   });
+
+  // A merge moves references and deletes a category — the caller has to have
+  // said yes to that. Deciding here rather than in the client is what makes the
+  // confirmation trustworthy: the client's list can be stale, this cannot.
+  if (existing && !allowMerge) {
+    throw new MergeNotConfirmedError(existing.name, txs.length, rules.length);
+  }
 
   await prisma.$transaction(async (tx) => {
     for (const t of txs) {
@@ -190,7 +210,7 @@ export async function deleteCategory(id: string, reassignTo?: string): Promise<v
     // row instead of deleting it, while the caller believed the delete happened.
     const target = await prisma.category.findUnique({ where: { name: reassignTo } });
     if (!target || target.id === id) throw new UnknownCategoryError(reassignTo);
-    await renameCategory(id, reassignTo); // merges into target, deleting this row
+    await renameCategory(id, reassignTo, true); // merges into target, deleting this row
     return;
   }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 interface Category {
   id: string;
@@ -19,6 +19,9 @@ export function SettingsCategories() {
   const [adding, setAdding] = useState("");
   const [editing, setEditing] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
+  // Set when Escape cancels an edit, so the blur that fires as the input
+  // unmounts does not save the draft the user just abandoned.
+  const cancelledEdit = useRef(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -59,33 +62,51 @@ export function SettingsCategories() {
   };
 
   const rename = (c: Category, name: string) => {
-    if (!name.trim() || name.trim() === c.name) return setEditing(null);
-    const target = categories.find((x) => x.name === name.trim() && x.id !== c.id);
-    if (
-      target &&
-      !confirm(
-        `Merge "${c.name}" into "${target.name}"?\n\n${c.transactionCount} transaction(s) and ${c.ruleCount} rule(s) will move, and "${c.name}" will be removed.`
-      )
-    ) {
-      return setEditing(null);
-    }
+    const trimmedName = name.trim();
+    if (!trimmedName || trimmedName === c.name) return setEditing(null);
     setEditing(null);
-    void call(
-      `/api/categories/${c.id}`,
-      {
+
+    // Whether this rename merges into an existing category is a decision only
+    // the server can make correctly — this page's own category list can be
+    // stale (another tab may have created a collision since the last load).
+    // So the PATCH is sent unconfirmed first; a 409 carrying `merge: true`
+    // means the server found a collision and is asking before it moves
+    // anything, with counts fresh as of that request.
+    const attempt = async (allowMerge: boolean) => {
+      setError(null);
+      setNotice(null);
+      const res = await fetch(`/api/categories/${c.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim() }),
-      },
-      (b) => {
-        const r = b as { merged: boolean; movedTransactions: number };
-        setNotice(
-          r.merged
-            ? `Merged into "${name.trim()}" — ${r.movedTransactions} transaction(s) moved.`
-            : `Renamed — ${r.movedTransactions} transaction(s) updated.`
-        );
+        body: JSON.stringify({ name: trimmedName, allowMerge }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        if (res.status === 409 && body.merge) {
+          if (
+            confirm(
+              `Merge "${c.name}" into "${body.targetName}"?\n\n${body.movingTransactions} transaction(s) and ${body.movingRules} rule(s) will move, and "${c.name}" will be removed.`
+            )
+          ) {
+            await attempt(true);
+          }
+          return;
+        }
+        // A rename's only other failure shapes are plain { error } — the
+        // transactionCount/ruleCount/mappingCount shape is DELETE-only.
+        setError(body.error ?? "Something went wrong");
+        return;
       }
-    );
+      const r = body as { merged: boolean; movedTransactions: number };
+      setNotice(
+        r.merged
+          ? `Merged into "${trimmedName}" — ${r.movedTransactions} transaction(s) moved.`
+          : `Renamed — ${r.movedTransactions} transaction(s) updated.`
+      );
+      await load();
+    };
+
+    void attempt(false);
   };
 
   const togglePrimary = (c: Category, primary: string) => {
@@ -174,10 +195,19 @@ export function SettingsCategories() {
                         autoFocus
                         value={draft}
                         onChange={(e) => setDraft(e.target.value)}
-                        onBlur={() => rename(c, draft)}
+                        onBlur={() => {
+                          if (cancelledEdit.current) {
+                            cancelledEdit.current = false;
+                            return;
+                          }
+                          rename(c, draft);
+                        }}
                         onKeyDown={(e) => {
                           if (e.key === "Enter") rename(c, draft);
-                          if (e.key === "Escape") setEditing(null);
+                          if (e.key === "Escape") {
+                            cancelledEdit.current = true;
+                            setEditing(null);
+                          }
                         }}
                         className="w-44 rounded border border-black/15 bg-white px-1.5 py-1 dark:border-white/20 dark:bg-neutral-900"
                       />

@@ -5,6 +5,7 @@ import {
   deleteCategory,
   CategoryInUseError,
   UnknownCategoryError,
+  MergeNotConfirmedError,
 } from "@/services/categories.service";
 
 // PATCH /api/categories/:id — body: { name?, plaidPrimaries? }
@@ -16,7 +17,11 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
-    const body = (await req.json()) as { name?: string; plaidPrimaries?: string[] };
+    const body = (await req.json()) as {
+      name?: string;
+      plaidPrimaries?: string[];
+      allowMerge?: boolean;
+    };
 
     let result = { merged: false, movedTransactions: 0, movedRules: 0 };
     if (body.plaidPrimaries) await setPlaidPrimaries(id, body.plaidPrimaries);
@@ -37,10 +42,22 @@ export async function PATCH(
           { status: 400 }
         );
       }
-      result = await renameCategory(id, trimmed);
+      result = await renameCategory(id, trimmed, body.allowMerge === true);
     }
     return NextResponse.json({ ok: true, ...result });
   } catch (err) {
+    if (err instanceof MergeNotConfirmedError) {
+      return NextResponse.json(
+        {
+          error: err.message,
+          merge: true,
+          targetName: err.targetName,
+          movingTransactions: err.movingTransactions,
+          movingRules: err.movingRules,
+        },
+        { status: 409 }
+      );
+    }
     if (err instanceof Error && err.message === "Category not found") {
       return NextResponse.json({ error: "Category not found" }, { status: 404 });
     }
