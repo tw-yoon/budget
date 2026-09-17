@@ -175,10 +175,15 @@ never validated.
 
 ## Testing
 
+A category name may not contain `" > "`; that sequence separates a subcategory,
+and allowing it in a name would make the stored text ambiguous. Both the create
+and rename endpoints reject it.
+
 `scripts/test-categories.mjs` on `node:test`, covering the pure rename rewriter:
 an exact match, a parent carrying a subcategory, a non-match, a name that is a
-prefix of another (`Home` must not rewrite `Home Improvement`), and a category
-name that itself contains the separator.
+prefix of another (`Home` must not rewrite `Home Improvement`), case
+sensitivity, and a value holding more than one separator — only the first is the
+parent boundary.
 
 A seed assertion that every Plaid primary resolves, after migration, to the same
 string the current code produces — the behaviour-preserving property above.
