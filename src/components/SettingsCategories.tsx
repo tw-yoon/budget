@@ -203,7 +203,14 @@ export function SettingsCategories() {
                           rename(c, draft);
                         }}
                         onKeyDown={(e) => {
-                          if (e.key === "Enter") rename(c, draft);
+                          if (e.key === "Enter") {
+                            // rename() unmounts this input, and that unmount
+                            // fires blur — without this the save would run
+                            // twice, and on a merge the second attempt hits the
+                            // just-deleted row and reports a false failure.
+                            cancelledEdit.current = true;
+                            rename(c, draft);
+                          }
                           if (e.key === "Escape") {
                             cancelledEdit.current = true;
                             setEditing(null);
