@@ -1,37 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import type { AccountsResponse } from "@/types";
 import { PlaidLink } from "./PlaidLink";
 import { ConnectedBanks } from "./ConnectedBanks";
 import { DebitCards } from "./DebitCards";
+import { useAccountsData } from "./useAccountsData";
 
 export function SettingsConnections() {
-  const [data, setData] = useState<AccountsResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  // Same endpoint Accounts reads: the response already carries `banks` and
-  // `debitCards`, so administering connections needs no endpoint of its own.
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/accounts");
-      if (!res.ok) throw new Error(`Failed to load (HTTP ${res.status})`);
-      setData((await res.json()) as AccountsResponse);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    // Intentional data-fetch effect on mount.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    load();
-  }, [load]);
+  const { data, loading, error, reload } = useAccountsData();
 
   if (error) {
     return (
@@ -41,13 +16,15 @@ export function SettingsConnections() {
     );
   }
 
-  if (!data) {
+  if (loading && !data) {
     return (
       <div className="rounded-lg border border-black/10 px-4 py-6 text-center text-sm text-black/50 dark:border-white/10 dark:text-white/50">
         Loading…
       </div>
     );
   }
+
+  if (!data) return null;
 
   return (
     <div
@@ -61,25 +38,27 @@ export function SettingsConnections() {
         </p>
       </header>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <PlaidLink onConnected={load} />
-        <PlaidLink
-          product="investments"
-          label="+ Connect investments (brokerage, 401k, HSA)"
-          variant="link"
-          onConnected={load}
-        />
-      </div>
+      {data.banks.length === 0 && (
+        <div className="flex flex-wrap items-center gap-3">
+          <PlaidLink onConnected={reload} />
+          <PlaidLink
+            product="investments"
+            label="+ Connect investments (brokerage, 401k, HSA)"
+            variant="link"
+            onConnected={reload}
+          />
+        </div>
+      )}
 
       <DebitCards
         debitCards={data.debitCards}
         checkingAccounts={
           data.groups.find((g) => g.type === "DEPOSITORY")?.accounts ?? []
         }
-        onChanged={load}
+        onChanged={reload}
       />
 
-      <ConnectedBanks banks={data.banks} onChanged={load} />
+      <ConnectedBanks banks={data.banks} onChanged={reload} />
     </div>
   );
 }

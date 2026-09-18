@@ -1,36 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import type { AccountsResponse } from "@/types";
 import { formatCurrency } from "@/lib/format";
 import { NetWorthCard } from "./NetWorthCard";
 import { AccountCard } from "./AccountCard";
+import { useAccountsData } from "./useAccountsData";
 
 export function AccountsDashboard() {
-  const [data, setData] = useState<AccountsResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/accounts");
-      if (!res.ok) throw new Error(`Failed to load (HTTP ${res.status})`);
-      setData((await res.json()) as AccountsResponse);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    // Intentional data-fetch effect on mount.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    load();
-  }, [load]);
+  const { data, loading, error, reload } = useAccountsData();
 
   if (error) {
     return (
@@ -71,7 +48,7 @@ export function AccountsDashboard() {
 
   return (
     <div className={`flex flex-col gap-5 ${loading ? "opacity-60 transition-opacity" : ""}`}>
-      <NetWorthCard summary={data.summary} onRefreshed={load} />
+      <NetWorthCard summary={data.summary} onRefreshed={reload} />
 
       <div className="flex flex-col gap-4">
         {data.groups.map((group) => (
@@ -89,7 +66,7 @@ export function AccountsDashboard() {
             </div>
             <div className="divide-y divide-black/[0.06] dark:divide-white/[0.06]">
               {group.accounts.map((account) => (
-                <AccountCard key={account.id} account={account} onChanged={load} />
+                <AccountCard key={account.id} account={account} onChanged={reload} />
               ))}
             </div>
           </section>
