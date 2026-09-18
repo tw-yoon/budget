@@ -15,6 +15,10 @@ export function TransactionLedger() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [hideInternal, setHideInternal] = useState(true);
+  // Phrased as "show", so the unticked default is the quiet ledger: a
+  // connected payment is the child side of a link, and its parent already
+  // lists it and nets it out. Ticking the box brings the children back.
+  const [showLinked, setShowLinked] = useState(false);
   const [accountId, setAccountId] = useState("");
   const [accountGroups, setAccountGroups] = useState<AccountGroup[]>([]);
   const [page, setPage] = useState(1);
@@ -68,6 +72,7 @@ export function TransactionLedger() {
         page: String(page),
         limit: String(PAGE_SIZE),
         hideInternal: String(hideInternal),
+        hideLinked: String(!showLinked),
       });
       if (debouncedSearch) params.set("search", debouncedSearch);
       if (accountId) params.set("accountId", accountId);
@@ -80,7 +85,7 @@ export function TransactionLedger() {
     } finally {
       setLoading(false);
     }
-  }, [page, hideInternal, debouncedSearch, accountId]);
+  }, [page, hideInternal, showLinked, debouncedSearch, accountId]);
 
   useEffect(() => {
     // Intentional data-fetch effect: refetch whenever page/filters change.
@@ -106,6 +111,7 @@ export function TransactionLedger() {
             {total} {total === 1 ? "entry" : "entries"}
             {selectedAccount && ` · ${selectedAccount.displayName ?? selectedAccount.name}`}
             {hideInternal && " · transfers & fees hidden"}
+            {!showLinked && " · connected payments hidden"}
           </p>
         </div>
         <SyncButton onSynced={load} />
@@ -150,6 +156,18 @@ export function TransactionLedger() {
             className="h-4 w-4 accent-current"
           />
           Hide transfers &amp; fees
+        </label>
+        <label className="flex cursor-pointer select-none items-center gap-2 text-sm text-black/70 dark:text-white/70">
+          <input
+            type="checkbox"
+            checked={showLinked}
+            onChange={(e) => {
+              setShowLinked(e.target.checked);
+              setPage(1);
+            }}
+            className="h-4 w-4 accent-current"
+          />
+          Show connected payments
         </label>
       </div>
 

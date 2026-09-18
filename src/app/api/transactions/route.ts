@@ -14,6 +14,8 @@ import type { Prisma } from "@prisma/client";
 //   &search=<text>            matches name OR merchantName
 //   &from=<ISO>&to=<ISO>      date range (inclusive of the `to` timestamp)
 //   &hideInternal=true        exclude rows flagged isTransfer or isFee
+//   &hideLinked=true          exclude rows linked to a purchase (the children
+//                             of a connected payment; the purchase itself stays)
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
@@ -26,6 +28,7 @@ export async function GET(req: NextRequest) {
     const accountId = searchParams.get("accountId") ?? undefined;
     const search = searchParams.get("search")?.trim();
     const hideInternal = searchParams.get("hideInternal") === "true";
+    const hideLinked = searchParams.get("hideLinked") === "true";
 
     const and: Prisma.TransactionWhereInput[] = [];
     if (accountId) and.push({ accountId });
@@ -65,6 +68,15 @@ export async function GET(req: NextRequest) {
         ],
       });
     }
+
+    // Hide the child side of a connection: a row whose linkedToId is set is a
+    // payback or contribution belonging to some other purchase, and the
+    // purchase already shows it in its own refund panel and nets it out of its
+    // amount. The purchase itself is never hidden — only rows that point at
+    // one. Deliberately placed after the hideInternal block, so when both are
+    // on this AND clause overrides hideInternal's "keep anything linked"
+    // exception: asking for linked rows to go means they go.
+    if (hideLinked) and.push({ linkedToId: null });
 
     const dateFilter: Prisma.DateTimeFilter = {};
     const from = parseDate(searchParams.get("from"));
