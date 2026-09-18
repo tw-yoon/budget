@@ -1,13 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import type { AccountsResponse } from "@/types";
 import { formatCurrency } from "@/lib/format";
 import { NetWorthCard } from "./NetWorthCard";
 import { AccountCard } from "./AccountCard";
-import { PlaidLink } from "./PlaidLink";
-import { ConnectedBanks } from "./ConnectedBanks";
-import { DebitCards } from "./DebitCards";
 
 export function AccountsDashboard() {
   const [data, setData] = useState<AccountsResponse | null>(null);
@@ -55,17 +53,16 @@ export function AccountsDashboard() {
       <div className="flex flex-col items-center gap-3 rounded-lg border border-black/10 px-6 py-16 text-center dark:border-white/10">
         <p className="text-sm font-medium">No accounts connected</p>
         <p className="mx-auto max-w-md text-sm text-black/55 dark:text-white/55">
-          Connect a bank to import accounts and transactions. In sandbox, log in
-          with <span className="font-medium">user_good</span> /{" "}
+          Connect a bank under Settings to import accounts and transactions. In
+          sandbox, log in with <span className="font-medium">user_good</span> /{" "}
           <span className="font-medium">pass_good</span>.
         </p>
-        <PlaidLink onConnected={load} />
-        <PlaidLink
-          product="investments"
-          label="+ Connect investments (brokerage, 401k, HSA)"
-          variant="link"
-          onConnected={load}
-        />
+        <Link
+          href="/settings/connections"
+          className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90"
+        >
+          Connect a bank
+        </Link>
       </div>
     );
   }
@@ -98,16 +95,6 @@ export function AccountsDashboard() {
           </section>
         ))}
       </div>
-
-      <DebitCards
-        debitCards={data.debitCards}
-        checkingAccounts={
-          data.groups.find((g) => g.type === "DEPOSITORY")?.accounts ?? []
-        }
-        onChanged={load}
-      />
-
-      <ConnectedBanks banks={data.banks} onChanged={load} />
     </div>
   );
 }
