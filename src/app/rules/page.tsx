@@ -1,13 +1,7 @@
-import { RulesDashboard } from "@/components/RulesDashboard";
+import { permanentRedirect } from "next/navigation";
 
-export const metadata = {
-  title: "Rules · Budget Claude",
-};
-
+// /rules was a top-level page and may be bookmarked. The move under Settings is
+// permanent, so say so with a 308 rather than a 307.
 export default function RulesPage() {
-  return (
-    <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">
-      <RulesDashboard />
-    </main>
-  );
+  permanentRedirect("/settings/rules");
 }
