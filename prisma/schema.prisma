@@ -222,7 +222,7 @@ model CategoryRule {
 }
 
 // A spending category the user can assign. Seeded from the lists that used to
-// be hardcoded in src/lib/rules.ts, and editable from /settings.
+// be hardcoded in src/lib/rules.ts, and editable from /settings/categories.
 //
 // Transactions store their category as TEXT, not a relation — so a category is
 // a name, not an identity. Renaming rewrites that text everywhere it appears;

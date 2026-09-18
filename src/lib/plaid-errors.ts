@@ -14,12 +14,12 @@
 const MEANINGS: Record<string, string> = {
   // The saved connection is no longer valid — the usual cause is a changed
   // password or an expired consent. Re-auth is the only fix.
-  ITEM_LOGIN_REQUIRED: "needs you to sign in again — reconnect it on Accounts",
-  INVALID_CREDENTIALS: "rejected the saved sign-in — reconnect it on Accounts",
-  INVALID_MFA: "needs another verification step — reconnect it on Accounts",
-  ITEM_LOCKED: "has locked the account — unlock it with the bank, then reconnect it on Accounts",
-  USER_PERMISSION_REVOKED: "had its access revoked — reconnect it on Accounts",
-  PENDING_EXPIRATION: "is about to expire — reconnect it on Accounts to keep it alive",
+  ITEM_LOGIN_REQUIRED: "needs you to sign in again — reconnect it under Settings → Connections",
+  INVALID_CREDENTIALS: "rejected the saved sign-in — reconnect it under Settings → Connections",
+  INVALID_MFA: "needs another verification step — reconnect it under Settings → Connections",
+  ITEM_LOCKED: "has locked the account — unlock it with the bank, then reconnect it under Settings → Connections",
+  USER_PERMISSION_REVOKED: "had its access revoked — reconnect it under Settings → Connections",
+  PENDING_EXPIRATION: "is about to expire — reconnect it under Settings → Connections to keep it alive",
 
   // Nothing to fix here; these clear up on their own.
   INSTITUTION_DOWN: "is down at the bank's end — this should clear on its own",

@@ -6,7 +6,7 @@ test("a login-required item names the bank and says what to do", () => {
   const s = describePlaidError("ITEM_LOGIN_REQUIRED", "Marcus by Goldman Sachs");
   assert.match(s, /Marcus by Goldman Sachs/);
   assert.match(s, /sign in again/);
-  assert.match(s, /Accounts/);
+  assert.match(s, /Settings → Connections/);
 });
 
 test("the raw code is kept so it stays searchable", () => {

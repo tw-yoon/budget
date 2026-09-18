@@ -88,9 +88,12 @@ export default function SideNav() {
           const active =
             pathname === item.href || pathname.startsWith(item.href + "/");
           // A parent is never itself the destination — /settings redirects to
-          // its first child — so it takes the quieter accent-text treatment and
-          // leaves the filled highlight to whichever child is open.
-          const filled = active && !item.children;
+          // its first child — so when expanded it takes the quieter
+          // accent-text treatment and leaves the filled highlight to whichever
+          // child is open. Collapsed, children aren't rendered at all, so the
+          // parent carries the filled highlight itself, same as every other
+          // entry.
+          const filled = active && (collapsed || !item.children);
           return (
             <Fragment key={item.href}>
               <Link

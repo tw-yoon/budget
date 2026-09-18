@@ -132,9 +132,9 @@ export function SettingsCategories() {
   return (
     <div className="flex flex-col gap-5">
       <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Categories</h1>
         <p className="text-sm text-black/55 dark:text-white/55">
-          Categories — used by the ledger, Rules, Venmo and Zelle. Renaming one onto
+          Used by the ledger, Rules, Venmo and Zelle. Renaming one onto
           another merges them.
         </p>
       </header>

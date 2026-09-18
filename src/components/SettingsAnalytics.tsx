@@ -1,12 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { loadSynced, pushSynced } from "@/lib/ui-state";
-import {
-  ANALYTICS_MODE_KEY,
-  resolveAnalyticsMode,
-  type AnalyticsMode,
-} from "@/lib/analytics-mode";
+import { useAnalyticsMode } from "./useAnalyticsMode";
+import type { AnalyticsMode } from "@/lib/analytics-mode";
 
 const MODES: { value: AnalyticsMode; label: string; blurb: string }[] = [
   {
@@ -23,25 +18,7 @@ const MODES: { value: AnalyticsMode; label: string; blurb: string }[] = [
 ];
 
 export function SettingsAnalytics() {
-  // Normal until the stored value arrives, which is also the default if it
-  // never does.
-  const [mode, setMode] = useState<AnalyticsMode>("normal");
-
-  useEffect(() => {
-    let cancelled = false;
-    void loadSynced(ANALYTICS_MODE_KEY).then((stored) => {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      if (!cancelled) setMode(resolveAnalyticsMode(stored));
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  function choose(next: AnalyticsMode) {
-    setMode(next);
-    pushSynced(ANALYTICS_MODE_KEY, next);
-  }
+  const { mode, choose } = useAnalyticsMode();
 
   return (
     <div className="flex flex-col gap-5">
