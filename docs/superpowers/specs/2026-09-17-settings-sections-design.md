@@ -44,7 +44,7 @@ and closes like a dropdown:
 **A closed section does not mount its component.** This is the decision that
 makes the page viable rather than merely possible. The rules editor is ~350
 lines and the category editor ~280, and each fetches on mount — the category
-editor's list endpoint runs roughly two count queries per category. Rendering
+editor's list endpoint runs up to three count queries per category. Rendering
 all four eagerly would fire four independent fetches and build the whole page to
 show you four headers. Mounting a section the first time it opens means opening
 Connections costs nothing in the other three.
