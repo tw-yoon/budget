@@ -115,7 +115,11 @@ export function TransactionTable({
                     {formatDate(t.date)}
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
+                    {/* flex-wrap, so a narrow viewport stacks the badges onto
+                        their own lines instead of squeezing every flex item —
+                        description text included — down to one character per
+                        row. */}
+                    <div className="flex flex-wrap items-center gap-2">
                       {isExpandable && (
                         <span className="text-black/40 dark:text-white/40">
                           {isOpen ? "▾" : "▸"}
@@ -135,8 +139,11 @@ export function TransactionTable({
                         <Badge tone="violet">Zelle</Badge>
                       )}
                       {t.linkedTo && (
-                        <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
-                          → #{t.linkedTo.label ?? "?"} {t.linkedTo.name}
+                        <span
+                          title={`Linked to #${t.linkedTo.label ?? "?"} ${t.linkedTo.name}`}
+                          className="shrink-0 whitespace-nowrap rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300"
+                        >
+                          → #{t.linkedTo.label ?? "?"}
                         </span>
                       )}
                       {t.pending && <Badge tone="amber">Pending</Badge>}
@@ -189,7 +196,10 @@ export function TransactionTable({
                           e.stopPropagation();
                           setEditing(t.id);
                         }}
-                        className="group/cat mt-0.5 flex items-center gap-1 text-xs text-black/45 hover:text-black/70 dark:text-white/45 dark:hover:text-white/70"
+                        // text-left because a <button> centres its text by
+                        // default, which only shows once the category name is
+                        // long enough to wrap.
+                        className="group/cat mt-0.5 flex items-center gap-1 text-left text-xs text-black/45 hover:text-black/70 dark:text-white/45 dark:hover:text-white/70"
                         title="Edit category"
                       >
                         <span>
@@ -200,7 +210,7 @@ export function TransactionTable({
                             : categoryDetailed ?? category}
                         </span>
                         {rawOverride !== null && (
-                          <span className="rounded bg-sky-100 px-1 text-[9px] font-medium uppercase tracking-wide text-sky-700 dark:bg-sky-500/15 dark:text-sky-300">
+                          <span className="shrink-0 whitespace-nowrap rounded bg-sky-100 px-1 text-[9px] font-medium uppercase tracking-wide text-sky-700 dark:bg-sky-500/15 dark:text-sky-300">
                             custom
                           </span>
                         )}
@@ -485,7 +495,7 @@ function Badge({
   };
   return (
     <span
-      className={`rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide ${tones[tone]}`}
+      className={`shrink-0 whitespace-nowrap rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide ${tones[tone]}`}
     >
       {children}
     </span>
