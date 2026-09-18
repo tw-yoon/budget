@@ -259,7 +259,11 @@ export function SettingsCategories() {
                           setEditing(c.id);
                           setDraft(c.name);
                         }}
-                        className="hover:underline"
+                        // text-left because a <button> centres its text by
+                        // default, which only shows on names long enough to
+                        // wrap — they sat centred while their neighbours
+                        // stayed flush left.
+                        className="text-left hover:underline"
                         title="Rename (renaming onto another category merges them)"
                       >
                         {c.name}
