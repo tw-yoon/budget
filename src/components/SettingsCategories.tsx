@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { humanizePfc } from "@/lib/format";
 
 interface Category {
   id: string;
@@ -8,11 +9,18 @@ interface Category {
   plaidPrimaries: string[];
   transactionCount: number;
   ruleCount: number;
+  resolvedTransactionCount: number;
+}
+
+interface UnmappedPrimary {
+  pfcPrimary: string;
+  transactionCount: number;
 }
 
 export function SettingsCategories() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [primaries, setPrimaries] = useState<string[]>([]);
+  const [unmappedPrimaries, setUnmappedPrimaries] = useState<UnmappedPrimary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -31,6 +39,7 @@ export function SettingsCategories() {
       const json = await res.json();
       setCategories(json.categories);
       setPrimaries(json.primaries);
+      setUnmappedPrimaries(json.unmappedPrimaries ?? []);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load");
@@ -52,7 +61,7 @@ export function SettingsCategories() {
     if (!res.ok) {
       setError(
         body.transactionCount !== undefined
-          ? `Still used by ${body.transactionCount} transaction(s), ${body.ruleCount} rule(s) and ${body.mappingCount} Plaid label(s) — reassign them first.`
+          ? `Still used by ${body.transactionCount} transaction(s), ${body.ruleCount} rule(s) and ${body.mappingCount} Plaid label(s) — rename this category onto another one to merge them first.`
           : (body.error ?? "Something went wrong")
       );
       return;
@@ -85,7 +94,7 @@ export function SettingsCategories() {
         if (res.status === 409 && body.merge) {
           if (
             confirm(
-              `Merge "${c.name}" into "${body.targetName}"?\n\n${body.movingTransactions} transaction(s) and ${body.movingRules} rule(s) will move, and "${c.name}" will be removed.`
+              `Merge "${c.name}" into "${body.targetName}"?\n\n${body.movingResolved} transaction(s) will report as "${body.targetName}" instead, and "${c.name}" will be removed.`
             )
           ) {
             await attempt(true);
@@ -141,6 +150,23 @@ export function SettingsCategories() {
         </div>
       )}
 
+      {unmappedPrimaries.length > 0 && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-400">
+          <p className="font-medium">
+            {unmappedPrimaries.length} Plaid label
+            {unmappedPrimaries.length === 1 ? "" : "s"} not mapped to a category:{" "}
+            {unmappedPrimaries
+              .map((u) => `${humanizePfc(u.pfcPrimary)} (${u.transactionCount})`)
+              .join(", ")}
+            .
+          </p>
+          <p className="mt-1 text-amber-700 dark:text-amber-400/80">
+            Those transactions report under Plaid&rsquo;s own wording instead of one of your
+            categories, and won&rsquo;t follow if you rename a category later.
+          </p>
+        </div>
+      )}
+
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -184,13 +210,21 @@ export function SettingsCategories() {
               </tr>
             </thead>
             <tbody>
-              {categories.map((c) => (
+              {categories.map((c) => {
+                const isReserved = c.name === "Transfer";
+                return (
                 <tr
                   key={c.id}
                   className="border-b border-black/[0.06] align-top last:border-0 dark:border-white/[0.06]"
                 >
                   <td className="px-4 py-3 font-medium">
-                    {editing === c.id ? (
+                    {isReserved ? (
+                      <span
+                        title='"Transfer" controls how transactions are excluded from spending — it cannot be renamed or deleted'
+                      >
+                        {c.name}
+                      </span>
+                    ) : editing === c.id ? (
                       <input
                         autoFocus
                         value={draft}
@@ -233,7 +267,14 @@ export function SettingsCategories() {
                     )}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-black/55 dark:text-white/55">
-                    {c.transactionCount} tx · {c.ruleCount} rule
+                    {c.resolvedTransactionCount} tx
+                    {c.resolvedTransactionCount !== c.transactionCount && (
+                      <span className="text-black/35 dark:text-white/35">
+                        {" "}
+                        ({c.transactionCount} direct)
+                      </span>
+                    )}{" "}
+                    · {c.ruleCount} rule
                     {c.ruleCount === 1 ? "" : "s"}
                   </td>
                   <td className="px-4 py-3">
@@ -260,17 +301,24 @@ export function SettingsCategories() {
                   <td className="px-4 py-3 text-right">
                     <button
                       type="button"
+                      disabled={isReserved}
                       onClick={() => {
                         if (!confirm(`Delete "${c.name}"?`)) return;
                         void call(`/api/categories/${c.id}`, { method: "DELETE" });
                       }}
-                      className="rounded px-2 py-1 text-xs text-black/50 hover:bg-black/[0.06] dark:text-white/50 dark:hover:bg-white/10"
+                      title={
+                        isReserved
+                          ? '"Transfer" controls how transactions are excluded from spending — it cannot be renamed or deleted'
+                          : undefined
+                      }
+                      className="rounded px-2 py-1 text-xs text-black/50 hover:bg-black/[0.06] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent dark:text-white/50 dark:hover:bg-white/10"
                     >
                       Delete
                     </button>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>

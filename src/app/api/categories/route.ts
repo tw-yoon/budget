@@ -1,15 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
-import { listCategories, createCategory } from "@/services/categories.service";
+import {
+  listCategories,
+  createCategory,
+  listUnmappedPrimaries,
+} from "@/services/categories.service";
 import { PFC_PRIMARIES } from "@/lib/rules";
 
 // GET /api/categories — the editable list, with how many transactions and rules
 // use each, plus the Plaid primaries available to map. The counts are what let
-// the UI disable a delete and explain the refusal.
+// the UI disable a delete and explain the refusal. `unmappedPrimaries` is the
+// set of real Plaid primaries in use that `primaries` doesn't cover and that
+// therefore resolve to no category — see listUnmappedPrimaries.
 export async function GET() {
   try {
     return NextResponse.json({
       categories: await listCategories(),
       primaries: [...PFC_PRIMARIES].sort(),
+      unmappedPrimaries: await listUnmappedPrimaries(),
     });
   } catch (err) {
     console.error("[categories GET]", err);

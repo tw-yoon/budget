@@ -92,11 +92,16 @@ export function P2pCategorizer({ title, subtitle, endpoint, showImport, emptyHin
         : prev
     );
     try {
-      await fetch(`${endpoint}/${id}`, {
+      const res = await fetch(`${endpoint}/${id}`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ userCategory }),
       });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setError(body.error ?? "Failed to save category — reloading.");
+        load();
+      }
     } catch {
       setError("Failed to save category — reloading.");
       load();

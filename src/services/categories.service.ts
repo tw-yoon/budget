@@ -16,6 +16,7 @@ export interface CategoryDTO {
   plaidPrimaries: string[];
   transactionCount: number;
   ruleCount: number;
+  resolvedTransactionCount: number;
 }
 
 /** Thrown when a delete would strand references. */
@@ -38,12 +39,31 @@ export class UnknownCategoryError extends Error {
   }
 }
 
+/**
+ * Categories whose exact name carries behaviour elsewhere in the app, so
+ * renaming or deleting one would silently change what it means rather than
+ * just what it is called. "Transfer" is the exclusion marker that keeps a row
+ * out of spending analytics and hides it behind "Hide transfers & fees".
+ */
+const RESERVED_NAMES = new Set(["Transfer"]);
+
+/** Thrown when an edit would change a name the app's behaviour depends on. */
+export class ReservedCategoryError extends Error {
+  constructor(readonly categoryName: string) {
+    super(
+      `"${categoryName}" controls how transactions are excluded from spending — it cannot be renamed or deleted`
+    );
+    this.name = "ReservedCategoryError";
+  }
+}
+
 /** Thrown when a rename would merge into an existing category without confirmation. */
 export class MergeNotConfirmedError extends Error {
   constructor(
     readonly targetName: string,
     readonly movingTransactions: number,
-    readonly movingRules: number
+    readonly movingRules: number,
+    readonly movingResolved: number
   ) {
     super(`Renaming would merge into "${targetName}"`);
     this.name = "MergeNotConfirmedError";
@@ -68,6 +88,27 @@ function ruleUsing(name: string) {
   return {
     OR: [{ category: name }, { category: { startsWith: name + " > " } }],
   };
+}
+
+/**
+ * Transactions that would be re-labelled by a change to this category: those
+ * naming it directly, plus those with no category of their own that resolve
+ * through one of its Plaid mappings. The second group is usually much larger,
+ * and it is the group a merge confirmation must not omit.
+ */
+async function resolvedCount(categoryId: string, name: string): Promise<number> {
+  const direct = await prisma.transaction.count({ where: txUsing(name) });
+  const primaries = (
+    await prisma.categoryMapping.findMany({
+      where: { categoryId },
+      select: { pfcPrimary: true },
+    })
+  ).map((m) => m.pfcPrimary);
+  if (primaries.length === 0) return direct;
+  const viaPlaid = await prisma.transaction.count({
+    where: { userCategory: null, pfcPrimary: { in: primaries } },
+  });
+  return direct + viaPlaid;
 }
 
 /** Just the names, for the pickers — one cheap query, no usage counts. */
@@ -101,6 +142,7 @@ export async function listCategories(): Promise<CategoryDTO[]> {
       ruleCount: await prisma.categoryRule.count({
         where: ruleUsing(c.name),
       }),
+      resolvedTransactionCount: await resolvedCount(c.id, c.name),
     }))
   );
 }
@@ -113,6 +155,7 @@ export async function createCategory(name: string): Promise<CategoryDTO> {
     plaidPrimaries: [],
     transactionCount: 0,
     ruleCount: 0,
+    resolvedTransactionCount: 0,
   };
 }
 
@@ -126,11 +169,18 @@ export async function renameCategory(
   id: string,
   newName: string,
   allowMerge = false
-): Promise<{ merged: boolean; movedTransactions: number; movedRules: number }> {
+): Promise<{
+  merged: boolean;
+  movedTransactions: number;
+  movedRules: number;
+  movedResolved: number;
+}> {
   const to = newName.trim();
   const source = await prisma.category.findUnique({ where: { id } });
   if (!source) throw new Error("Category not found");
-  if (source.name === to) return { merged: false, movedTransactions: 0, movedRules: 0 };
+  if (RESERVED_NAMES.has(source.name)) throw new ReservedCategoryError(source.name);
+  if (source.name === to)
+    return { merged: false, movedTransactions: 0, movedRules: 0, movedResolved: 0 };
 
   const existing = await prisma.category.findUnique({ where: { name: to } });
 
@@ -142,12 +192,14 @@ export async function renameCategory(
     where: ruleUsing(source.name),
     select: { id: true, category: true },
   });
+  // Computed before the transaction below runs, since a merge deletes `source`.
+  const resolved = await resolvedCount(source.id, source.name);
 
   // A merge moves references and deletes a category — the caller has to have
   // said yes to that. Deciding here rather than in the client is what makes the
   // confirmation trustworthy: the client's list can be stale, this cannot.
   if (existing && !allowMerge) {
-    throw new MergeNotConfirmedError(existing.name, txs.length, rules.length);
+    throw new MergeNotConfirmedError(existing.name, txs.length, rules.length, resolved);
   }
 
   await prisma.$transaction(async (tx) => {
@@ -178,7 +230,12 @@ export async function renameCategory(
     }
   });
 
-  return { merged: Boolean(existing), movedTransactions: txs.length, movedRules: rules.length };
+  return {
+    merged: Boolean(existing),
+    movedTransactions: txs.length,
+    movedRules: rules.length,
+    movedResolved: resolved,
+  };
 }
 
 /**
@@ -203,6 +260,7 @@ export async function setPlaidPrimaries(id: string, primaries: string[]): Promis
 export async function deleteCategory(id: string, reassignTo?: string): Promise<void> {
   const cat = await prisma.category.findUnique({ where: { id } });
   if (!cat) throw new Error("Category not found");
+  if (RESERVED_NAMES.has(cat.name)) throw new ReservedCategoryError(cat.name);
 
   if (reassignTo) {
     // Reassigning is a merge into an EXISTING category. Without this check
@@ -224,6 +282,33 @@ export async function deleteCategory(id: string, reassignTo?: string): Promise<v
   }
 
   await prisma.category.delete({ where: { id } });
+}
+
+/**
+ * Real Plaid primaries seen on transactions that resolve to no category
+ * mapping. `PFC_PRIMARIES` (the fixed catalog offered as togglable Plaid
+ * labels in Settings) does not cover every primary Plaid has ever returned —
+ * a transaction carrying one of the others can never be mapped through the
+ * UI, so it silently reports Plaid's own wording forever and will not follow
+ * if a category is later renamed. Surfacing these is Settings' job; widening
+ * the catalog is a seed decision left to the user.
+ */
+export async function listUnmappedPrimaries(): Promise<
+  { pfcPrimary: string; transactionCount: number }[]
+> {
+  const mapped = new Set(
+    (await prisma.categoryMapping.findMany({ select: { pfcPrimary: true } })).map(
+      (m) => m.pfcPrimary
+    )
+  );
+  const grouped = await prisma.transaction.groupBy({
+    by: ["pfcPrimary"],
+    _count: { _all: true },
+  });
+  return grouped
+    .filter((g) => !mapped.has(g.pfcPrimary))
+    .map((g) => ({ pfcPrimary: g.pfcPrimary, transactionCount: g._count._all }))
+    .sort((a, b) => b.transactionCount - a.transactionCount);
 }
 
 /** pfcPrimary → category name, for resolving rows the user has not categorized. */

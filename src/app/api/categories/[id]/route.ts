@@ -6,6 +6,7 @@ import {
   CategoryInUseError,
   UnknownCategoryError,
   MergeNotConfirmedError,
+  ReservedCategoryError,
 } from "@/services/categories.service";
 
 // PATCH /api/categories/:id — body: { name?, plaidPrimaries? }
@@ -23,7 +24,7 @@ export async function PATCH(
       allowMerge?: boolean;
     };
 
-    let result = { merged: false, movedTransactions: 0, movedRules: 0 };
+    let result = { merged: false, movedTransactions: 0, movedRules: 0, movedResolved: 0 };
     if (body.plaidPrimaries) await setPlaidPrimaries(id, body.plaidPrimaries);
     if (body.name !== undefined) {
       const trimmed = body.name.trim();
@@ -54,9 +55,13 @@ export async function PATCH(
           targetName: err.targetName,
           movingTransactions: err.movingTransactions,
           movingRules: err.movingRules,
+          movingResolved: err.movingResolved,
         },
         { status: 409 }
       );
+    }
+    if (err instanceof ReservedCategoryError) {
+      return NextResponse.json({ error: err.message }, { status: 409 });
     }
     if (err instanceof Error && err.message === "Category not found") {
       return NextResponse.json({ error: "Category not found" }, { status: 404 });
@@ -91,6 +96,9 @@ export async function DELETE(
     }
     if (err instanceof UnknownCategoryError) {
       return NextResponse.json({ error: err.message }, { status: 400 });
+    }
+    if (err instanceof ReservedCategoryError) {
+      return NextResponse.json({ error: err.message }, { status: 409 });
     }
     if (err instanceof Error && err.message === "Category not found") {
       return NextResponse.json({ error: "Category not found" }, { status: 404 });
