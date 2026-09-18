@@ -96,6 +96,15 @@ function ruleUsing(name: string) {
  * through one of its Plaid mappings. The second group is usually much larger,
  * and it is the group a merge confirmation must not omit.
  */
+async function addResolved(direct: number, primaries: string[]): Promise<number> {
+  if (primaries.length === 0) return direct;
+  const viaPlaid = await prisma.transaction.count({
+    where: { userCategory: null, pfcPrimary: { in: primaries } },
+  });
+  return direct + viaPlaid;
+}
+
+/** The same figure for a caller holding neither the direct count nor the mappings. */
 async function resolvedCount(categoryId: string, name: string): Promise<number> {
   const direct = await prisma.transaction.count({ where: txUsing(name) });
   const primaries = (
@@ -104,11 +113,7 @@ async function resolvedCount(categoryId: string, name: string): Promise<number> 
       select: { pfcPrimary: true },
     })
   ).map((m) => m.pfcPrimary);
-  if (primaries.length === 0) return direct;
-  const viaPlaid = await prisma.transaction.count({
-    where: { userCategory: null, pfcPrimary: { in: primaries } },
-  });
-  return direct + viaPlaid;
+  return addResolved(direct, primaries);
 }
 
 /** Just the names, for the pickers — one cheap query, no usage counts. */
@@ -121,9 +126,9 @@ export async function listCategoryNames(): Promise<string[]> {
 }
 
 /**
- * The full list with usage counts. Two counts per category is a couple of dozen
- * queries on a list this size — fine for the Settings page, which is the only
- * caller that needs the counts. Pickers use listCategoryNames instead.
+ * The full list with usage counts. Up to three counts per category is a few
+ * dozen queries on a list this size — fine for the Settings page, which is the
+ * only caller that needs the counts. Pickers use listCategoryNames instead.
  */
 export async function listCategories(): Promise<CategoryDTO[]> {
   const rows = await prisma.category.findMany({
@@ -132,18 +137,25 @@ export async function listCategories(): Promise<CategoryDTO[]> {
   });
 
   return Promise.all(
-    rows.map(async (c) => ({
-      id: c.id,
-      name: c.name,
-      plaidPrimaries: c.plaidMappings.map((m) => m.pfcPrimary).sort(),
-      transactionCount: await prisma.transaction.count({
+    rows.map(async (c) => {
+      const plaidPrimaries = c.plaidMappings.map((m) => m.pfcPrimary).sort();
+      // The direct count is also the first half of the resolved count, and the
+      // mappings came back with the row: hand both to addResolved rather than
+      // letting resolvedCount fetch them again.
+      const transactionCount = await prisma.transaction.count({
         where: txUsing(c.name),
-      }),
-      ruleCount: await prisma.categoryRule.count({
-        where: ruleUsing(c.name),
-      }),
-      resolvedTransactionCount: await resolvedCount(c.id, c.name),
-    }))
+      });
+      return {
+        id: c.id,
+        name: c.name,
+        plaidPrimaries,
+        transactionCount,
+        ruleCount: await prisma.categoryRule.count({
+          where: ruleUsing(c.name),
+        }),
+        resolvedTransactionCount: await addResolved(transactionCount, plaidPrimaries),
+      };
+    })
   );
 }
 
@@ -301,8 +313,12 @@ export async function listUnmappedPrimaries(): Promise<
       (m) => m.pfcPrimary
     )
   );
+  // Only rows with no category of their own fall through to Plaid's label. A
+  // row that already carries a category is unaffected by the missing mapping —
+  // counting it would make the banner claim a problem the user does not have.
   const grouped = await prisma.transaction.groupBy({
     by: ["pfcPrimary"],
+    where: { userCategory: null },
     _count: { _all: true },
   });
   return grouped
