@@ -16,6 +16,8 @@ import type { Prisma } from "@prisma/client";
 //   &hideInternal=true        exclude rows flagged isTransfer or isFee
 //   &hideLinked=true          exclude rows linked to a purchase (the children
 //                             of a connected payment; the purchase itself stays)
+//   &sort=date|label          ordering column (default date)
+//   &dir=asc|desc             ordering direction (default desc)
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
@@ -29,6 +31,11 @@ export async function GET(req: NextRequest) {
     const search = searchParams.get("search")?.trim();
     const hideInternal = searchParams.get("hideInternal") === "true";
     const hideLinked = searchParams.get("hideLinked") === "true";
+    // Anything unrecognised falls back to the default rather than erroring —
+    // these arrive from the querystring and are not worth a 400.
+    const sort = searchParams.get("sort") === "label" ? "label" : "date";
+    const dir: Prisma.SortOrder =
+      searchParams.get("dir") === "asc" ? "asc" : "desc";
 
     const and: Prisma.TransactionWhereInput[] = [];
     if (accountId) and.push({ accountId });
@@ -96,11 +103,19 @@ export async function GET(req: NextRequest) {
 
     const where: Prisma.TransactionWhereInput = and.length ? { AND: and } : {};
 
+    // Sorting by label is sorting by insertion order, which is NOT the same as
+    // by date: a Venmo import backfills old transactions with fresh, high
+    // numbers. That divergence is the reason both orderings are offered.
+    // createdAt follows the same direction as date so the tiebreaker inside a
+    // single day reads the same way round as the column being sorted.
+    const orderBy: Prisma.TransactionOrderByWithRelationInput[] =
+      sort === "label" ? [{ label: dir }] : [{ date: dir }, { createdAt: dir }];
+
     const [rows, total] = await Promise.all([
       prisma.transaction.findMany({
         where,
         include: { account: { select: { name: true, mask: true } } },
-        orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+        orderBy: orderBy,
         skip: (page - 1) * limit,
         take: limit,
       }),

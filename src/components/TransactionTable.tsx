@@ -7,14 +7,64 @@ import { splitCategory } from "@/lib/categories";
 import { isZelleName } from "@/lib/zelle";
 import { TransactionLinkPicker } from "./TransactionLinkPicker";
 
+export type SortColumn = "date" | "label";
+export type SortDir = "asc" | "desc";
+
+// A sortable column header. Clicking the active column flips direction;
+// clicking the other one switches to it and starts descending — newest, and
+// highest-numbered, is what you want on arrival either way.
+function SortableTh({
+  column,
+  label,
+  sort,
+  dir,
+  onSort,
+}: {
+  column: SortColumn;
+  label: string;
+  sort: SortColumn;
+  dir: SortDir;
+  onSort: (column: SortColumn) => void;
+}) {
+  const active = sort === column;
+  return (
+    <th
+      className="px-4 py-3 font-medium"
+      aria-sort={active ? (dir === "asc" ? "ascending" : "descending") : "none"}
+    >
+      <button
+        type="button"
+        onClick={() => onSort(column)}
+        className={`group/th flex items-center gap-1 uppercase tracking-wide ${
+          active
+            ? "text-black/80 dark:text-white/80"
+            : "hover:text-black/70 dark:hover:text-white/70"
+        }`}
+        title={`Sort by ${column === "label" ? "number" : "date"}`}
+      >
+        {label}
+        <span className={active ? "" : "opacity-0 group-hover/th:opacity-40"}>
+          {active && dir === "asc" ? "▲" : "▼"}
+        </span>
+      </button>
+    </th>
+  );
+}
+
 export function TransactionTable({
   transactions,
   onChanged,
   categories,
+  sort,
+  dir,
+  onSort,
 }: {
   transactions: TransactionDTO[];
   onChanged: () => void;
   categories: string[];
+  sort: SortColumn;
+  dir: SortDir;
+  onSort: (column: SortColumn) => void;
 }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [editing, setEditing] = useState<string | null>(null);
@@ -63,8 +113,8 @@ export function TransactionTable({
       <table className="w-full border-collapse text-sm">
         <thead>
           <tr className="border-b border-black/10 text-left text-xs uppercase tracking-wide text-black/50 dark:border-white/10 dark:text-white/50">
-            <th className="px-4 py-3 font-medium">#</th>
-            <th className="px-4 py-3 font-medium">Date</th>
+            <SortableTh column="label" label="#" sort={sort} dir={dir} onSort={onSort} />
+            <SortableTh column="date" label="Date" sort={sort} dir={dir} onSort={onSort} />
             <th className="px-4 py-3 font-medium">Description</th>
             <th className="px-4 py-3 font-medium">Account</th>
             <th className="px-4 py-3 text-right font-medium">Amount</th>

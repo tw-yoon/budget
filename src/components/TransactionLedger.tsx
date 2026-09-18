@@ -2,7 +2,11 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { AccountGroup, AccountsResponse, TransactionsResponse } from "@/types";
-import { TransactionTable } from "./TransactionTable";
+import {
+  TransactionTable,
+  type SortColumn,
+  type SortDir,
+} from "./TransactionTable";
 import { SyncButton } from "./SyncButton";
 
 const PAGE_SIZE = 50;
@@ -22,6 +26,8 @@ export function TransactionLedger() {
   const [accountId, setAccountId] = useState("");
   const [accountGroups, setAccountGroups] = useState<AccountGroup[]>([]);
   const [page, setPage] = useState(1);
+  const [sort, setSort] = useState<SortColumn>("date");
+  const [dir, setDir] = useState<SortDir>("desc");
   const [categories, setCategories] = useState<string[]>([]);
 
   // Load accounts once for the payment-account filter. If it fails the
@@ -73,6 +79,8 @@ export function TransactionLedger() {
         limit: String(PAGE_SIZE),
         hideInternal: String(hideInternal),
         hideLinked: String(!showLinked),
+        sort,
+        dir,
       });
       if (debouncedSearch) params.set("search", debouncedSearch);
       if (accountId) params.set("accountId", accountId);
@@ -85,7 +93,7 @@ export function TransactionLedger() {
     } finally {
       setLoading(false);
     }
-  }, [page, hideInternal, showLinked, debouncedSearch, accountId]);
+  }, [page, hideInternal, showLinked, debouncedSearch, accountId, sort, dir]);
 
   useEffect(() => {
     // Intentional data-fetch effect: refetch whenever page/filters change.
@@ -94,6 +102,18 @@ export function TransactionLedger() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
   }, [load]);
+
+  // Server-side sort over a paged list: a change has to return to page 1, or
+  // you land on page 7 of a completely different ordering.
+  const handleSort = (column: SortColumn) => {
+    if (column === sort) {
+      setDir((d) => (d === "desc" ? "asc" : "desc"));
+    } else {
+      setSort(column);
+      setDir("desc");
+    }
+    setPage(1);
+  };
 
   const total = data?.total ?? 0;
   const totalPages = data?.totalPages ?? 1;
@@ -186,6 +206,9 @@ export function TransactionLedger() {
               transactions={data?.transactions ?? []}
               onChanged={load}
               categories={categories}
+              sort={sort}
+              dir={dir}
+              onSort={handleSort}
             />
           </div>
 
