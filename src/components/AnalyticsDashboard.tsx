@@ -1,12 +1,19 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import type { AnalyticsResult } from "@/types";
 import { SummaryCards } from "./SummaryCards";
 import { CategoryChart } from "./charts/CategoryChart";
 import { MonthlyTrendChart } from "./charts/MonthlyTrendChart";
 import { CashFlowSankey } from "./charts/CashFlowSankey";
 import { SpendingGraph } from "./charts/SpendingGraph";
+import { loadSynced } from "@/lib/ui-state";
+import {
+  ANALYTICS_MODE_KEY,
+  resolveAnalyticsMode,
+  type AnalyticsMode,
+} from "@/lib/analytics-mode";
 
 const RANGES = [3, 6, 12] as const;
 
@@ -17,6 +24,9 @@ export function AnalyticsDashboard() {
   const [data, setData] = useState<AnalyticsResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Normal until the stored preference arrives; Normal for good if it never
+  // does, or if what it holds is not a mode we recognise.
+  const [mode, setMode] = useState<AnalyticsMode>("normal");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -37,6 +47,17 @@ export function AnalyticsDashboard() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
   }, [load]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void loadSynced(ANALYTICS_MODE_KEY).then((stored) => {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      if (!cancelled) setMode(resolveAnalyticsMode(stored));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <div className="flex flex-col gap-5">
@@ -78,12 +99,30 @@ export function AnalyticsDashboard() {
         </div>
       ) : null}
 
-      <CashFlowSankey />
-      <SpendingGraph />
+      {mode === "pro" && (
+        <>
+          <CashFlowSankey />
+          <SpendingGraph />
+        </>
+      )}
+
       <div className="grid gap-4 lg:grid-cols-2">
         <CategoryChart />
         <MonthlyTrendChart />
       </div>
+
+      {mode === "normal" && (
+        <p className="text-center text-xs text-black/45 dark:text-white/45">
+          Cash flow and cumulative spending are hidden in Normal mode —{" "}
+          <Link
+            href="/settings/analytics"
+            className="underline underline-offset-2 hover:text-foreground"
+          >
+            switch to Pro in Settings
+          </Link>
+          .
+        </p>
+      )}
     </div>
   );
 }
