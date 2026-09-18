@@ -189,22 +189,26 @@ data or absolute home path is about to be published, and
 `scripts/test-launcher.sh` drives `Budget.command` against throwaway clones to
 cover setup, updating, and the cases where it must refuse — both plain Bash.
 The `scripts/test-*.mjs` suites cover pure logic — refund linking, the wording
-of a failed sync — on Node's built-in test runner, importing the TypeScript
+of a failed sync, category renaming, the analytics detail mode — on Node's
+built-in test runner, importing the TypeScript
 directly (Node 22+ strips the types), so they need no build step and no
 dependency. Run them before sending a change.
 
 ## Pages
 
 - `/` — home
-- `/accounts` — balances, net worth, connect/disconnect/reconnect banks, due dates
+- `/accounts` — balances, net worth, due dates
 - `/transactions` — ledger with search & filters; connect a refund to the purchase it pays back
 - `/venmo` — categorize Venmo payments, or connect a payback to what it covers; changes flow into Transactions & Analytics
 - `/zelle` — categorize or connect Zelle payments from your bank feed the same way
 - `/analytics` — spending by category, monthly trend, top merchants
 - `/benefits` — card earning rates + statement credits + "best card by category"
 - `/subscriptions` — detected recurring subscriptions and their monthly total
-- `/rules` — auto-assign a category when a transaction matches a rule
 - `/income` — income and tax organizer
+- `/settings/categories` — rename, merge and delete categories
+- `/settings/rules` — auto-assign a category when a transaction matches a rule
+- `/settings/connections` — connect/disconnect banks, reconnect, manage debit cards
+- `/settings/analytics` — how much detail the Analytics page shows
 
 ## Configuration
 

@@ -2,10 +2,21 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
+
+type NavItem = {
+  href: string;
+  label: string;
+  code: string;
+  children?: { href: string; label: string }[];
+};
 
 // Collapsed mode shows terminal-style three-letter codes instead of icons.
-const NAV = [
+// Settings is the one entry with children: they are configuration you set once,
+// so they nest rather than competing with the daily-use pages above. They get no
+// codes of their own — collapsed, the parent stands for all of them, and
+// clicking it lands on Categories via the redirect at /settings.
+const NAV: NavItem[] = [
   { href: "/accounts", label: "Accounts", code: "ACC" },
   { href: "/transactions", label: "Transactions", code: "TRX" },
   { href: "/venmo", label: "Venmo", code: "VNM" },
@@ -13,9 +24,18 @@ const NAV = [
   { href: "/analytics", label: "Analytics", code: "ANL" },
   { href: "/benefits", label: "Benefits", code: "BEN" },
   { href: "/subscriptions", label: "Subscriptions", code: "SUB" },
-  { href: "/rules", label: "Rules", code: "RUL" },
   { href: "/income", label: "Income", code: "INC" },
-  { href: "/settings", label: "Settings", code: "SET" },
+  {
+    href: "/settings",
+    label: "Settings",
+    code: "SET",
+    children: [
+      { href: "/settings/categories", label: "Categories" },
+      { href: "/settings/rules", label: "Rules" },
+      { href: "/settings/connections", label: "Connections" },
+      { href: "/settings/analytics", label: "Analytics" },
+    ],
+  },
 ];
 
 const STORAGE_KEY = "sidebar-collapsed";
@@ -67,22 +87,47 @@ export default function SideNav() {
         {NAV.map((item) => {
           const active =
             pathname === item.href || pathname.startsWith(item.href + "/");
+          // A parent is never itself the destination — /settings redirects to
+          // its first child — so it takes the quieter accent-text treatment and
+          // leaves the filled highlight to whichever child is open.
+          const filled = active && !item.children;
           return (
-            <Link
-              key={item.href}
-              href={item.href}
-              title={collapsed ? item.label : undefined}
-              aria-current={active ? "page" : undefined}
-              className={`flex items-center whitespace-nowrap border-b border-line py-[11px] text-[11px] uppercase tracking-[.12em] ${
-                collapsed ? "justify-center px-0" : "px-[18px]"
-              } ${
-                active
-                  ? "bg-accent text-accent-contrast"
-                  : "text-muted2 hover:text-accent"
-              }`}
-            >
-              {collapsed ? item.code : item.label}
-            </Link>
+            <Fragment key={item.href}>
+              <Link
+                href={item.href}
+                title={collapsed ? item.label : undefined}
+                aria-current={filled ? "page" : undefined}
+                className={`flex items-center whitespace-nowrap border-b border-line py-[11px] text-[11px] uppercase tracking-[.12em] ${
+                  collapsed ? "justify-center px-0" : "px-[18px]"
+                } ${
+                  filled
+                    ? "bg-accent text-accent-contrast"
+                    : active
+                      ? "text-accent"
+                      : "text-muted2 hover:text-accent"
+                }`}
+              >
+                {collapsed ? item.code : item.label}
+              </Link>
+              {!collapsed &&
+                item.children?.map((child) => {
+                  const childActive = pathname === child.href;
+                  return (
+                    <Link
+                      key={child.href}
+                      href={child.href}
+                      aria-current={childActive ? "page" : undefined}
+                      className={`flex items-center whitespace-nowrap border-b border-line py-[9px] pl-[34px] pr-[18px] text-[10px] uppercase tracking-[.12em] ${
+                        childActive
+                          ? "bg-accent text-accent-contrast"
+                          : "text-muted2 hover:text-accent"
+                      }`}
+                    >
+                      {child.label}
+                    </Link>
+                  );
+                })}
+            </Fragment>
           );
         })}
       </nav>
