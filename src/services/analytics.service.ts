@@ -30,6 +30,10 @@ export interface TxInput {
   // A negative-amount row that offsets its own category instead of counting as
   // income — used for Venmo reimbursements ("got paid back for the dinner").
   isOffset: boolean;
+  // False for every slice of a split row but one, so a transaction sliced into
+  // several categories is still one transaction in the headline count.
+  // Optional — missing (e.g. from a producer that never splits) means true.
+  countsAsTransaction?: boolean;
 }
 
 /** First day of the month, `monthsBack` months before `from`. */
@@ -68,7 +72,9 @@ export function aggregate(
 
   for (const t of transactions) {
     if (t.date < start) continue;
-    txCount++;
+    // A split row is several TxInputs but one transaction; only the slice
+    // marked as the counting one bumps the headline count.
+    if (t.countsAsTransaction !== false) txCount++;
 
     const bucket = buckets.get(monthKey(t.date));
     const cat = t.category || "Uncategorized";
@@ -183,7 +189,7 @@ async function fetchTxInputs(start: Date): Promise<TxInput[]> {
       source: true,
       userCategory: true,
       linkedTo: { select: { userCategory: true, pfcPrimary: true } },
-      splits: { select: { id: true, amount: true, userCategory: true } },
+      splits: { select: { amount: true, userCategory: true } },
     },
   });
 
@@ -216,27 +222,45 @@ async function fetchTxInputs(start: Date): Promise<TxInput[]> {
     // P2P rows use a person as the "merchant" — keep them out of merchant totals.
     const merchant = isP2p(r.source, r.name) ? null : r.merchantName ?? r.name;
 
-    return sliceTransaction({ amount: r.amount, effectiveCategory: effective }, r.splits)
-      .flatMap((slice) => {
-        // A part can be tagged Transfer independently of its row, and the
-        // WHERE clause's string match cannot see parts at all — so the
-        // exclusion is applied per slice here.
-        if (slice.userCategory === "Transfer" || slice.userCategory.startsWith("Transfer > "))
-          return [];
-        // Subcategorized values ("Parent > Sub") roll up to their parent; the
-        // sub travels alongside for drill-down views (single-month Sankey).
-        const { parent, sub } = splitCategory(slice.userCategory);
-        return [{
-          amount: slice.amount,
-          date: r.date,
-          category: parent,
-          subcategory: sub,
-          merchant,
-          // Parts are slices of a money-out row, so only the whole-row
-          // money-in case can be an offset. A split row is never money-in.
-          isOffset,
-        }];
-      });
+    // A part can be tagged Transfer independently of its row, and the WHERE
+    // clause's string match cannot see parts at all — so the exclusion is
+    // applied per slice here. Filtered before the count is assigned below, so
+    // a row never loses its count just because its first surviving slice
+    // isn't index 0 of the raw slice list.
+    const kept = sliceTransaction({ amount: r.amount, effectiveCategory: effective }, r.splits)
+      .filter(
+        (slice) =>
+          slice.userCategory !== "Transfer" && !slice.userCategory.startsWith("Transfer > ")
+      );
+
+    // Only a row that actually carries carve-outs can produce a negative
+    // remainder (a later Plaid amount revision dropping the row below what
+    // was already carved out — validateNewSplit refuses splitting a money-in
+    // row in the first place, so this can only happen on a money-out row).
+    // An UNSPLIT row's sole slice is its whole amount, and for a plain income
+    // row that amount is negative too — that slice must stay real income, not
+    // be swept into this net-against-category treatment. So the guard checks
+    // r.splits.length, not just the slice's sign.
+    const hasParts = r.splits.length > 0;
+
+    return kept.map((slice, i) => {
+      // Subcategorized values ("Parent > Sub") roll up to their parent; the
+      // sub travels alongside for drill-down views (single-month Sankey).
+      const { parent, sub } = splitCategory(slice.userCategory);
+      return {
+        amount: slice.amount,
+        date: r.date,
+        category: parent,
+        subcategory: sub,
+        merchant,
+        // A revision-shrunk remainder nets against its own category instead
+        // of reading as fabricated income.
+        isOffset: isOffset || (hasParts && slice.amount < 0),
+        // One slice per row counts toward the headline transaction total,
+        // however many categories it was carved into.
+        countsAsTransaction: i === 0,
+      };
+    });
   });
 }
 

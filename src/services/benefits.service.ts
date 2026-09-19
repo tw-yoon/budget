@@ -341,7 +341,7 @@ export async function getUserCardsWithProgress(
         userCategory: true,
         name: true,
         merchantName: true,
-        splits: { select: { id: true, amount: true, userCategory: true } },
+        splits: { select: { amount: true, userCategory: true } },
       },
     });
     for (const t of txs) {
