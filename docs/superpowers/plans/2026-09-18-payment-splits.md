@@ -18,6 +18,9 @@
 - **Money rounds to cents** via `Math.round(n * 100) / 100`. A tolerance of `CENT = 0.005` decides whether a remainder is zero.
 - **Splits are money-out, non-pending rows only.**
 - **Stored preference key migration is additive.** The old `analytics-mode` key is read as a fallback and left in place, never deleted.
+- **Start `npm run dev` in the background**, never in the foreground — a
+  foreground dev server never returns and hangs the task. Use the Bash tool's
+  `run_in_background`, verify with curl, and stop it when the step is done.
 - **Run `bash Budget.command --no-open` after code changes** — Budget serves a prebuilt bundle and this rebuilds it.
 - **Commit messages end with:** `Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>`
 - **Branch:** all work lands on `payment-splits`, already created off `main`.
@@ -343,7 +346,7 @@ export function validateNewSplit(
 node --test scripts/test-splits.mjs
 ```
 
-Expected: PASS, 18 tests.
+Expected: PASS, 17 tests.
 
 - [ ] **Step 5: Register the suite**
 
@@ -413,7 +416,16 @@ In the `Transaction` model, alongside `refunds`:
   splits   TransactionSplit[]
 ```
 
-- [ ] **Step 3: Generate and apply the migration**
+- [ ] **Step 3: Back up the live database**
+
+This migration runs against real financial data. The repo already keeps
+point-in-time copies under `prisma/backups/` for exactly this:
+
+```bash
+cp prisma/dev.db "prisma/backups/pre-payment-splits-$(date -u +%Y%m%dT%H%M%S).db"
+```
+
+- [ ] **Step 4: Generate and apply the migration**
 
 ```bash
 npx prisma migrate dev --name payment_splits
@@ -421,7 +433,7 @@ npx prisma migrate dev --name payment_splits
 
 Expected: a new folder under `prisma/migrations/`, a `CREATE TABLE "TransactionSplit"` in its `migration.sql`, and the client regenerated.
 
-- [ ] **Step 4: Verify the cascade**
+- [ ] **Step 5: Verify the cascade**
 
 `onDelete: Cascade` is the reason a retracted Plaid transaction cannot leave orphaned parts — `sync.service.ts` deletes removed rows outright. Confirm the generated SQL carries it:
 
@@ -431,7 +443,7 @@ grep -A2 "REFERENCES \"Transaction\"" prisma/migrations/*_payment_splits/migrati
 
 Expected: `ON DELETE CASCADE` present.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
 git add prisma/schema.prisma prisma/migrations
@@ -574,7 +586,7 @@ npm run dev
 ```
 
 ```bash
-ID=$(sqlite3 data/budget.db "SELECT id FROM \"Transaction\" WHERE amount > 50 AND pending = 0 LIMIT 1;") && \
+ID=$(sqlite3 prisma/dev.db "SELECT id FROM \"Transaction\" WHERE amount > 50 AND pending = 0 LIMIT 1;") && \
 curl -s -X POST "http://localhost:3000/api/transactions/$ID/splits" \
   -H 'Content-Type: application/json' \
   -d '{"amount":30,"category":"Food"}'
@@ -594,7 +606,7 @@ Expected: `400` with `"That is more than the amount left to split"`.
 Then remove it:
 
 ```bash
-SPLIT=$(sqlite3 data/budget.db "SELECT id FROM \"TransactionSplit\" LIMIT 1;") && \
+SPLIT=$(sqlite3 prisma/dev.db "SELECT id FROM \"TransactionSplit\" LIMIT 1;") && \
 curl -s -X DELETE "http://localhost:3000/api/transactions/$ID/splits/$SPLIT"
 ```
 
@@ -833,7 +845,7 @@ npm run dev
 Add a carve-out under a renameable category, rename that category in Settings, and confirm the part followed:
 
 ```bash
-sqlite3 data/budget.db "SELECT userCategory FROM \"TransactionSplit\";"
+sqlite3 prisma/dev.db "SELECT userCategory FROM \"TransactionSplit\";"
 ```
 
 Expected: the new name. Then try deleting a category that only a part references.
