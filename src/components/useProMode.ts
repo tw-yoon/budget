@@ -18,6 +18,10 @@ export function useProMode() {
   // Normal until the stored value arrives, which is also the default if it
   // never does.
   const [mode, setMode] = useState<ProMode>("normal");
+  // True until that read settles. Until then "normal" is a placeholder, not a
+  // fact about the user, so a caller that renders one thing per mode — rather
+  // than merely hiding a control — must wait rather than assert the default.
+  const [loading, setLoading] = useState(true);
   // A deliberate choice outlives the mount that was loading when it happened,
   // so it lives in a ref; "this effect run was torn down" is per-run state and
   // stays a local. Sharing one flag for both would let a cleanup suppress a
@@ -47,7 +51,11 @@ export function useProMode() {
         setMode(migratedMode);
         pushSynced(PRO_MODE_KEY, migratedMode);
       }
-    })();
+    })().finally(() => {
+      // Every path out of the block above has settled the question, including
+      // the two that return early, so this is the one place loading clears.
+      if (!cancelled) setLoading(false);
+    });
     return () => {
       cancelled = true;
     };
@@ -56,8 +64,11 @@ export function useProMode() {
   const choose = useCallback((next: ProMode) => {
     chosen.current = true;
     setMode(next);
+    // A deliberate choice settles the question too, even mid-load — the same
+    // reason `chosen` makes the in-flight read stop short of overwriting it.
+    setLoading(false);
     pushSynced(PRO_MODE_KEY, next);
   }, []);
 
-  return { mode, choose };
+  return { mode, loading, choose };
 }
