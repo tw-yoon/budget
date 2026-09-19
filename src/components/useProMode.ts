@@ -3,20 +3,21 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { loadSynced, pushSynced } from "@/lib/ui-state";
 import {
-  ANALYTICS_MODE_KEY,
-  resolveAnalyticsMode,
-  type AnalyticsMode,
-} from "@/lib/analytics-mode";
+  PRO_MODE_KEY,
+  LEGACY_ANALYTICS_MODE_KEY,
+  resolveProMode,
+  type ProMode,
+} from "@/lib/pro-mode";
 
-// Shared by SettingsAnalytics and AnalyticsDashboard: both need the current
+// Shared by SettingsMode and AnalyticsDashboard: both need the current
 // mode, but only Settings lets the user change it. `choose` sets state and
 // pushes the choice, and also marks that a deliberate choice has been made —
 // without that, a user click before the load resolves could be silently
 // overwritten by the stale value once it arrives.
-export function useAnalyticsMode() {
+export function useProMode() {
   // Normal until the stored value arrives, which is also the default if it
   // never does.
-  const [mode, setMode] = useState<AnalyticsMode>("normal");
+  const [mode, setMode] = useState<ProMode>("normal");
   // A deliberate choice outlives the mount that was loading when it happened,
   // so it lives in a ref; "this effect run was torn down" is per-run state and
   // stays a local. Sharing one flag for both would let a cleanup suppress a
@@ -25,18 +26,29 @@ export function useAnalyticsMode() {
 
   useEffect(() => {
     let cancelled = false;
-    void loadSynced(ANALYTICS_MODE_KEY).then((stored) => {
-      if (!cancelled && !chosen.current) setMode(resolveAnalyticsMode(stored));
-    });
+    void (async () => {
+      const stored = await loadSynced(PRO_MODE_KEY);
+      if (stored != null) {
+        if (!cancelled && !chosen.current) setMode(resolveProMode(stored));
+        return;
+      }
+      // One-time migration from the Analytics-only era. Read the old key, adopt
+      // it, and push it forward under the new one. The old key is left alone.
+      const legacy = await loadSynced(LEGACY_ANALYTICS_MODE_KEY);
+      if (legacy == null) return;
+      const mode = resolveProMode(legacy);
+      if (!cancelled && !chosen.current) setMode(mode);
+      pushSynced(PRO_MODE_KEY, mode);
+    })();
     return () => {
       cancelled = true;
     };
   }, []);
 
-  const choose = useCallback((next: AnalyticsMode) => {
+  const choose = useCallback((next: ProMode) => {
     chosen.current = true;
     setMode(next);
-    pushSynced(ANALYTICS_MODE_KEY, next);
+    pushSynced(PRO_MODE_KEY, next);
   }, []);
 
   return { mode, choose };
