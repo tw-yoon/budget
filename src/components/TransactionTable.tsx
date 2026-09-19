@@ -1,11 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import type { TransactionDTO } from "@/types";
 import { formatSignedAmount, formatDate, formatCurrency } from "@/lib/format";
 import { splitCategory } from "@/lib/categories";
+import { remainderOf } from "@/lib/splits";
 import { isZelleName } from "@/lib/zelle";
 import { TransactionLinkPicker } from "./TransactionLinkPicker";
+import { useProMode } from "./useProMode";
 
 export type SortColumn = "date" | "label";
 export type SortDir = "asc" | "desc";
@@ -125,7 +128,8 @@ export function TransactionTable({
             const { text, isOutflow } = formatSignedAmount(t.amount);
             const hasBreakdown = t.breakdown !== null;
             const hasRefunds = t.refunds.length > 0;
-            const isExpandable = hasBreakdown || hasRefunds;
+            const hasSplits = t.splits.length > 0;
+            const isExpandable = hasBreakdown || hasRefunds || hasSplits;
             const isOpen = expanded.has(t.id);
             // Effective category/sub: session override wins, then the
             // server-computed values (which already fold in stored overrides).
@@ -205,6 +209,11 @@ export function TransactionTable({
                           {t.breakdown!.slices.length} categories
                         </Badge>
                       )}
+                      {hasSplits && (
+                        <Badge tone="slate">
+                          Split {t.splits.length + (t.splitRemainder === null ? 0 : 1)} ways
+                        </Badge>
+                      )}
                       {t.isFee && <Badge tone="slate">Fee</Badge>}
                     </div>
                     {isEditing ? (
@@ -228,6 +237,14 @@ export function TransactionTable({
                             next.delete(t.id);
                             return next;
                           });
+                          setEditing(null);
+                          onChanged();
+                        }}
+                        onSplit={() => {
+                          // The row becomes expandable only now, so open it —
+                          // otherwise the new carve-out lands behind a marker
+                          // the user never saw appear.
+                          setExpanded((prev) => new Set(prev).add(t.id));
                           setEditing(null);
                           onChanged();
                         }}
@@ -299,6 +316,13 @@ export function TransactionTable({
                     <td colSpan={5} className="px-4 py-3">
                       {hasBreakdown && <BreakdownPanel breakdown={t.breakdown!} />}
                       {hasRefunds && <RefundPanel refunds={t.refunds} />}
+                      {hasSplits && (
+                        <SplitPanel
+                          transaction={t}
+                          categories={categories}
+                          onChanged={onChanged}
+                        />
+                      )}
                     </td>
                   </tr>
                 )}
@@ -371,6 +395,179 @@ function RefundPanel({ refunds }: { refunds: TransactionDTO["refunds"] }) {
   );
 }
 
+// The third expandable panel, beside the cash-out breakdown and the refund
+// list. Pro gates the controls only: the carve-outs and the leftover are shown
+// in Normal too, because they are what the row now reports to every total.
+function SplitPanel({
+  transaction: t,
+  categories,
+  onChanged,
+}: {
+  transaction: TransactionDTO;
+  categories: string[];
+  onChanged: () => void;
+}) {
+  const { mode } = useProMode();
+  const isPro = mode === "pro";
+  const [busy, setBusy] = useState(false);
+
+  const remove = async (splitId: string) => {
+    setBusy(true);
+    try {
+      await fetch(`/api/transactions/${t.id}/splits/${splitId}`, { method: "DELETE" });
+      onChanged();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="pl-6">
+      <p className="mb-2 text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
+        Split across categories
+      </p>
+      <ul className="space-y-1">
+        {t.splits.map((s) => (
+          <li key={s.id} className="flex items-center justify-between gap-4 text-sm">
+            <span className="text-black/70 dark:text-white/70">
+              {s.subcategory ? `${s.category} › ${s.subcategory}` : s.category}
+            </span>
+            <span className="flex items-center gap-3">
+              <span className="font-mono tabular-nums">{formatCurrency(s.amount)}</span>
+              {isPro && (
+                <button
+                  type="button"
+                  onClick={() => void remove(s.id)}
+                  disabled={busy}
+                  aria-label={`Remove the ${s.category} split`}
+                  className="text-xs text-black/40 hover:text-red-600 disabled:opacity-40 dark:text-white/40 dark:hover:text-red-400"
+                >
+                  ✕
+                </button>
+              )}
+            </span>
+          </li>
+        ))}
+        {t.splitRemainder !== null && (
+          <li className="flex items-center justify-between gap-4 text-sm text-black/45 dark:text-white/45">
+            {/* The leftover is a part among equals, distinguished only by being
+                the one you cannot remove — it is derived, not stored. */}
+            <span>{t.category} (rest)</span>
+            <span
+              className={`font-mono tabular-nums ${
+                t.splitRemainder < 0 ? "text-red-600 dark:text-red-400" : ""
+              }`}
+            >
+              {formatCurrency(t.splitRemainder)}
+            </span>
+          </li>
+        )}
+      </ul>
+
+      {t.splitRemainder !== null && t.splitRemainder < 0 && (
+        <p className="mt-2 text-xs text-red-600 dark:text-red-400">
+          This transaction&rsquo;s amount changed and is now smaller than its
+          splits. Remove or re-add a split to fix it.
+        </p>
+      )}
+
+      {isPro ? (
+        // Keyed on the part count so a successful add remounts the form: its
+        // prefill is the amount left, and that has just changed.
+        <AddSplitForm
+          key={t.splits.length}
+          transaction={t}
+          categories={categories}
+          onChanged={onChanged}
+        />
+      ) : (
+        <p className="mt-2 text-xs text-black/45 dark:text-white/45">
+          Splits still count toward your totals in Normal mode —{" "}
+          <Link href="/settings/mode" className="underline underline-offset-2 hover:text-foreground">
+            switch to Pro in Settings
+          </Link>{" "}
+          to change them.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function AddSplitForm({
+  transaction: t,
+  categories,
+  onChanged,
+}: {
+  transaction: TransactionDTO;
+  categories: string[];
+  onChanged: () => void;
+}) {
+  // The amount left is the natural default: splitting a row in two is then a
+  // single category pick with no arithmetic.
+  const left = t.splitRemainder ?? remainderOf(t.amount, t.splits);
+  const [amount, setAmount] = useState(left > 0 ? left.toFixed(2) : "");
+  const [category, setCategory] = useState(categories[0] ?? "");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const submit = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/transactions/${t.id}/splits`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: Number(amount), category }),
+      });
+      if (!res.ok) {
+        // The server owns validation; showing its message keeps the two from
+        // drifting apart as the rules change.
+        const { error: message } = (await res.json()) as { error?: string };
+        setError(message ?? "Could not add that split");
+        return;
+      }
+      onChanged();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-2">
+      <input
+        type="number"
+        step="0.01"
+        min="0"
+        value={amount}
+        onChange={(e) => setAmount(e.target.value)}
+        aria-label="Split amount"
+        className="w-24 rounded border border-black/15 px-2 py-1 text-sm dark:border-white/15 dark:bg-transparent"
+      />
+      <select
+        value={category}
+        onChange={(e) => setCategory(e.target.value)}
+        aria-label="Split category"
+        className="rounded border border-black/15 px-2 py-1 text-sm dark:border-white/15 dark:bg-transparent"
+      >
+        {categories.map((c) => (
+          <option key={c} value={c}>
+            {c}
+          </option>
+        ))}
+      </select>
+      <button
+        type="button"
+        onClick={() => void submit()}
+        disabled={busy || amount === ""}
+        className="rounded bg-black px-3 py-1 text-sm text-white disabled:opacity-40 dark:bg-white dark:text-black"
+      >
+        Add split
+      </button>
+      {error && <span className="text-xs text-red-600 dark:text-red-400">{error}</span>}
+    </div>
+  );
+}
+
 function FragmentRow({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
@@ -388,6 +585,7 @@ function CategoryEditor({
   categories,
   linkedTo,
   onLinked,
+  onSplit,
   onDone,
 }: {
   transaction: TransactionDTO;
@@ -398,6 +596,8 @@ function CategoryEditor({
   categories: string[];
   linkedTo: TransactionDTO["linkedTo"];
   onLinked: (linked: { label: number | null; name: string } | null) => void;
+  // A first carve-out was added and the row needs refetching.
+  onSplit: () => void;
   // raw userCategory saved, null = cleared, undefined = cancelled
   onDone: (raw?: string | null) => void;
 }) {
@@ -405,7 +605,14 @@ function CategoryEditor({
   const [sub, setSub] = useState(subcategory);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(false);
+  const [splitting, setSplitting] = useState(false);
+  const { mode } = useProMode();
   const locked = linkedTo !== null;
+  // An unsplit row is not expandable, so the first carve-out has nowhere else
+  // to be started from. The guard repeats validateNewSplit's first two
+  // refusals, so the control is absent exactly where the server would refuse.
+  const canSplit =
+    mode === "pro" && transaction.amount > 0 && !transaction.pending;
 
   // Selectable categories: the user's list, plus whatever this row already
   // shows (e.g. a Plaid primary with no mapping) so nothing gets orphaned.
@@ -522,6 +729,26 @@ function CategoryEditor({
             linkedTo={linkedTo}
             onLinked={onLinked}
           />
+        </div>
+      )}
+      {canSplit && (
+        <div className="mt-1 w-full border-t border-black/[0.06] pt-1.5 dark:border-white/[0.06]">
+          {splitting ? (
+            <AddSplitForm
+              transaction={transaction}
+              categories={categories}
+              onChanged={onSplit}
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => setSplitting(true)}
+              title="Put part of this transaction under its own category"
+              className="rounded border border-black/15 px-2 py-1 text-black/60 hover:bg-black/[0.04] dark:border-white/20 dark:text-white/60 dark:hover:bg-white/[0.06]"
+            >
+              Split this
+            </button>
+          )}
         </div>
       )}
     </div>

@@ -15,6 +15,15 @@ export interface RefundDTO {
   name: string;
 }
 
+/** One carve-out of a split transaction, as shown under its row. */
+export interface SplitPartDTO {
+  id: string;
+  amount: number; // positive
+  category: string; // parent, for display
+  subcategory: string | null;
+  userCategory: string; // raw, possibly "Parent > Sub"
+}
+
 export interface TransactionDTO {
   id: string;
   externalId: string;
@@ -42,6 +51,12 @@ export interface TransactionDTO {
   linkedTo: LinkedTargetDTO | null;
   refunds: RefundDTO[]; // on a purchase: the refunds linked to it
   netAmount: number; // amount less any linked refunds; equals amount when none
+  // Carve-outs placed under their own categories. Empty on an unsplit row.
+  splits: SplitPartDTO[];
+  // What is left after the carve-outs, wearing this row's own `category`.
+  // Null when the row is unsplit, and also when the parts consume it exactly —
+  // both mean "there is no leftover line to draw".
+  splitRemainder: number | null;
   // Present on bank-side Venmo cash-out deposits: the categorized Venmo
   // payments pooled into this lump sum, plus any unaccounted prior balance.
   breakdown: CashoutBreakdown | null;
