@@ -24,7 +24,8 @@ export class CategoryInUseError extends Error {
   constructor(
     readonly transactionCount: number,
     readonly ruleCount: number,
-    readonly mappingCount: number
+    readonly mappingCount: number,
+    readonly splitCount: number
   ) {
     super("Category is still in use");
     this.name = "CategoryInUseError";
@@ -63,7 +64,8 @@ export class MergeNotConfirmedError extends Error {
     readonly targetName: string,
     readonly movingTransactions: number,
     readonly movingRules: number,
-    readonly movingResolved: number
+    readonly movingResolved: number,
+    readonly movingSplits: number
   ) {
     super(`Renaming would merge into "${targetName}"`);
     this.name = "MergeNotConfirmedError";
@@ -87,6 +89,12 @@ function txUsing(name: string) {
 function ruleUsing(name: string) {
   return {
     OR: [{ category: name }, { category: { startsWith: name + " > " } }],
+  };
+}
+
+function splitUsing(name: string) {
+  return {
+    OR: [{ userCategory: name }, { userCategory: { startsWith: name + " > " } }],
   };
 }
 
@@ -204,6 +212,10 @@ export async function renameCategory(
     where: ruleUsing(source.name),
     select: { id: true, category: true },
   });
+  const splits = await prisma.transactionSplit.findMany({
+    where: splitUsing(source.name),
+    select: { id: true, userCategory: true },
+  });
   // Computed before the transaction below runs, since a merge deletes `source`.
   const resolved = await resolvedCount(source.id, source.name);
 
@@ -211,7 +223,13 @@ export async function renameCategory(
   // said yes to that. Deciding here rather than in the client is what makes the
   // confirmation trustworthy: the client's list can be stale, this cannot.
   if (existing && !allowMerge) {
-    throw new MergeNotConfirmedError(existing.name, txs.length, rules.length, resolved);
+    throw new MergeNotConfirmedError(
+      existing.name,
+      txs.length,
+      rules.length,
+      resolved,
+      splits.length
+    );
   }
 
   await prisma.$transaction(async (tx) => {
@@ -225,6 +243,12 @@ export async function renameCategory(
       const next = renameCategoryIn(r.category, source.name, to);
       if (next !== null) {
         await tx.categoryRule.update({ where: { id: r.id }, data: { category: next } });
+      }
+    }
+    for (const s of splits) {
+      const next = renameCategoryIn(s.userCategory, source.name, to);
+      if (next !== null) {
+        await tx.transactionSplit.update({ where: { id: s.id }, data: { userCategory: next } });
       }
     }
 
@@ -284,13 +308,14 @@ export async function deleteCategory(id: string, reassignTo?: string): Promise<v
     return;
   }
 
-  const [transactionCount, ruleCount, mappingCount] = await Promise.all([
+  const [transactionCount, ruleCount, mappingCount, splitCount] = await Promise.all([
     prisma.transaction.count({ where: txUsing(cat.name) }),
     prisma.categoryRule.count({ where: ruleUsing(cat.name) }),
     prisma.categoryMapping.count({ where: { categoryId: id } }),
+    prisma.transactionSplit.count({ where: splitUsing(cat.name) }),
   ]);
-  if (transactionCount || ruleCount || mappingCount) {
-    throw new CategoryInUseError(transactionCount, ruleCount, mappingCount);
+  if (transactionCount || ruleCount || mappingCount || splitCount) {
+    throw new CategoryInUseError(transactionCount, ruleCount, mappingCount, splitCount);
   }
 
   await prisma.category.delete({ where: { id } });

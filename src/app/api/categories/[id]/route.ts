@@ -56,6 +56,7 @@ export async function PATCH(
           movingTransactions: err.movingTransactions,
           movingRules: err.movingRules,
           movingResolved: err.movingResolved,
+          movingSplits: err.movingSplits,
         },
         { status: 409 }
       );
@@ -90,6 +91,7 @@ export async function DELETE(
           transactionCount: err.transactionCount,
           ruleCount: err.ruleCount,
           mappingCount: err.mappingCount,
+          splitCount: err.splitCount,
         },
         { status: 409 }
       );

@@ -61,7 +61,7 @@ export function SettingsCategories() {
     if (!res.ok) {
       setError(
         body.transactionCount !== undefined
-          ? `Still used by ${body.transactionCount} transaction(s), ${body.ruleCount} rule(s) and ${body.mappingCount} Plaid label(s) — rename this category onto another one to merge them first.`
+          ? `Still used by ${body.transactionCount} transaction(s), ${body.ruleCount} rule(s), ${body.mappingCount} Plaid label(s) and ${body.splitCount} split(s) — rename this category onto another one to merge them first.`
           : (body.error ?? "Something went wrong")
       );
       return;
