@@ -36,9 +36,17 @@ export function useProMode() {
       // it, and push it forward under the new one. The old key is left alone.
       const legacy = await loadSynced(LEGACY_ANALYTICS_MODE_KEY);
       if (legacy == null) return;
-      const mode = resolveProMode(legacy);
-      if (!cancelled && !chosen.current) setMode(mode);
-      pushSynced(PRO_MODE_KEY, mode);
+      const migratedMode = resolveProMode(legacy);
+      // Both the read above and choose()'s push are unawaited network calls
+      // racing each other. If the user clicks the toggle while this legacy
+      // read is still in flight, `chosen.current` is now true by the time we
+      // get here: setMode is correctly skipped below, and the push must be
+      // skipped too, or this stale migrated value can land in the store
+      // after — and overwrite — the value the user just deliberately chose.
+      if (!cancelled && !chosen.current) {
+        setMode(migratedMode);
+        pushSynced(PRO_MODE_KEY, migratedMode);
+      }
     })();
     return () => {
       cancelled = true;
