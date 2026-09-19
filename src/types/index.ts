@@ -17,7 +17,7 @@ export interface RefundDTO {
 
 export interface TransactionDTO {
   id: string;
-  plaidTxId: string;
+  externalId: string;
   accountId: string;
   accountName: string;
   accountMask: string | null;

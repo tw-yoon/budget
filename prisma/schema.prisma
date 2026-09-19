@@ -50,7 +50,13 @@ model Account {
 
 model Transaction {
   id           String   @id @default(cuid())
-  plaidTxId    String   @unique
+  // The source's own id for this transaction, namespaced by source: Plaid's
+  // raw transaction_id for a bank row, "venmo:<id>" for a CSV import. Named
+  // externalId rather than plaidTxId because Plaid stopped being the only
+  // source when Venmo arrived. This is the dedupe key every importer upserts
+  // on -- it is what makes re-running a sync, or re-importing an overlapping
+  // Venmo CSV, idempotent. Distinct from `label`, which is the human handle.
+  externalId   String   @unique
   accountId    String
   amount       Float
   date         DateTime

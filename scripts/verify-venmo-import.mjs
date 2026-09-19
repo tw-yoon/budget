@@ -77,13 +77,13 @@ for (const e of events) {
 // Upsert payments (preserve existing userCategory).
 let imported = 0;
 for (const p of payments) {
-  const plaidTxId = `venmo:${p.venmoId}`;
+  const externalId = `venmo:${p.venmoId}`;
   const amount = p.direction === "out" ? p.amount : -p.amount;
   const name = p.note || `Venmo ${p.direction === "out" ? "payment" : "received"}`;
   await prisma.transaction.upsert({
-    where: { plaidTxId },
+    where: { externalId },
     create: {
-      plaidTxId,
+      externalId,
       accountId,
       amount,
       date: new Date(p.datetime),

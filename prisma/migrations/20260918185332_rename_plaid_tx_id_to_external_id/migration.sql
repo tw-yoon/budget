@@ -1,0 +1,12 @@
+-- Rename Transaction.plaidTxId to Transaction.externalId.
+--
+-- The column has held non-Plaid values since the Venmo CSV importer landed
+-- ("venmo:<id>"), so the old name misdescribed 122 of its rows. Nothing about
+-- its role changes: it is still the unique, per-source dedupe key.
+--
+-- Written by hand rather than generated. Prisma's SQLite differ does not
+-- detect renames and would emit a drop-and-recreate of the whole table, which
+-- on a populated database means rebuilding every row and every index for a
+-- change that SQLite can do in place. ALTER TABLE ... RENAME COLUMN (SQLite
+-- 3.25+) preserves the data, the UNIQUE index and every foreign key.
+ALTER TABLE "Transaction" RENAME COLUMN "plaidTxId" TO "externalId";

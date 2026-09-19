@@ -93,9 +93,9 @@ export async function syncTransactions(
       // unused — no number is burned, since the maximum is unchanged.
       const label = await nextLabel();
       await prisma.transaction.upsert({
-        where: { plaidTxId: tx.transaction_id },
+        where: { externalId: tx.transaction_id },
         create: {
-          plaidTxId: tx.transaction_id,
+          externalId: tx.transaction_id,
           accountId: account.id,
           amount: tx.amount,
           date: new Date(tx.date),
@@ -130,7 +130,7 @@ export async function syncTransactions(
     for (const tx of modifiedTxs) {
       const c = classify(tx);
       await prisma.transaction.updateMany({
-        where: { plaidTxId: tx.transaction_id },
+        where: { externalId: tx.transaction_id },
         data: {
           amount: tx.amount,
           date: new Date(tx.date),
@@ -153,7 +153,7 @@ export async function syncTransactions(
       if (ruleCat) {
         await prisma.transaction.updateMany({
           where: {
-            plaidTxId: tx.transaction_id,
+            externalId: tx.transaction_id,
             linkedToId: null,
             OR: [{ userCategorySource: null }, { userCategorySource: "RULE" }],
           },
@@ -166,7 +166,7 @@ export async function syncTransactions(
     // ── Removed ───────────────────────────────────────────────────────────────
     for (const tx of removedTxs) {
       await prisma.transaction.deleteMany({
-        where: { plaidTxId: tx.transaction_id },
+        where: { externalId: tx.transaction_id },
       });
       removed++;
     }

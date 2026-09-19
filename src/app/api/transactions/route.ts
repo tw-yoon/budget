@@ -208,7 +208,7 @@ export async function GET(req: NextRequest) {
       const uc = raw ? splitCategory(raw) : null;
       return {
         id: t.id,
-        plaidTxId: t.plaidTxId,
+        externalId: t.externalId,
         accountId: t.accountId,
         accountName: t.source === "VENMO" ? "Venmo" : t.account.name,
         accountMask: t.source === "VENMO" ? null : t.account.mask,

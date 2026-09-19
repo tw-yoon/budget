@@ -109,7 +109,7 @@ export async function importVenmoStatements(): Promise<ImportResult> {
   // ── Upsert payment rows (preserve any user category already set) ───────────
   let imported = 0;
   for (const p of payments) {
-    const plaidTxId = `venmo:${p.venmoId}`;
+    const externalId = `venmo:${p.venmoId}`;
     // Plaid sign convention: positive = outflow. Sent => +, received => -.
     const amount = p.direction === "out" ? p.amount : -p.amount;
     const name = p.note || `Venmo ${p.direction === "out" ? "payment" : "received"}`;
@@ -120,9 +120,9 @@ export async function importVenmoStatements(): Promise<ImportResult> {
     const label = await nextLabel();
 
     await prisma.transaction.upsert({
-      where: { plaidTxId },
+      where: { externalId },
       create: {
-        plaidTxId,
+        externalId,
         accountId,
         amount,
         date: new Date(p.datetime),
