@@ -24,7 +24,13 @@ export async function PATCH(
       allowMerge?: boolean;
     };
 
-    let result = { merged: false, movedTransactions: 0, movedRules: 0, movedResolved: 0 };
+    let result = {
+      merged: false,
+      movedTransactions: 0,
+      movedRules: 0,
+      movedResolved: 0,
+      movedSplits: 0,
+    };
     if (body.plaidPrimaries) await setPlaidPrimaries(id, body.plaidPrimaries);
     if (body.name !== undefined) {
       const trimmed = body.name.trim();

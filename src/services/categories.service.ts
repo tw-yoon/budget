@@ -1,10 +1,11 @@
 /**
  * Reads and writes for the user's category list.
  *
- * A category is stored as text on transactions and rules, not as a relation, so
- * renaming means rewriting every reference and deleting means refusing while
- * references exist. Both of those live here rather than in a route, because the
- * rewrite has to happen in one transaction with the row it renames.
+ * A category is stored as text on transactions, rules, and splits, not as a
+ * relation, so renaming means rewriting every reference and deleting means
+ * refusing while references exist. Both of those live here rather than in a
+ * route, because the rewrite has to happen in one transaction with the row it
+ * renames.
  */
 
 import { prisma } from "@/lib/prisma";
@@ -17,6 +18,7 @@ export interface CategoryDTO {
   transactionCount: number;
   ruleCount: number;
   resolvedTransactionCount: number;
+  splitCount: number;
 }
 
 /** Thrown when a delete would strand references. */
@@ -162,6 +164,9 @@ export async function listCategories(): Promise<CategoryDTO[]> {
           where: ruleUsing(c.name),
         }),
         resolvedTransactionCount: await addResolved(transactionCount, plaidPrimaries),
+        splitCount: await prisma.transactionSplit.count({
+          where: splitUsing(c.name),
+        }),
       };
     })
   );
@@ -176,6 +181,7 @@ export async function createCategory(name: string): Promise<CategoryDTO> {
     transactionCount: 0,
     ruleCount: 0,
     resolvedTransactionCount: 0,
+    splitCount: 0,
   };
 }
 
@@ -194,13 +200,20 @@ export async function renameCategory(
   movedTransactions: number;
   movedRules: number;
   movedResolved: number;
+  movedSplits: number;
 }> {
   const to = newName.trim();
   const source = await prisma.category.findUnique({ where: { id } });
   if (!source) throw new Error("Category not found");
   if (RESERVED_NAMES.has(source.name)) throw new ReservedCategoryError(source.name);
   if (source.name === to)
-    return { merged: false, movedTransactions: 0, movedRules: 0, movedResolved: 0 };
+    return {
+      merged: false,
+      movedTransactions: 0,
+      movedRules: 0,
+      movedResolved: 0,
+      movedSplits: 0,
+    };
 
   const existing = await prisma.category.findUnique({ where: { name: to } });
 
@@ -271,6 +284,7 @@ export async function renameCategory(
     movedTransactions: txs.length,
     movedRules: rules.length,
     movedResolved: resolved,
+    movedSplits: splits.length,
   };
 }
 
