@@ -12,6 +12,7 @@ import { humanizePfc } from "@/lib/format";
 import { splitCategory } from "@/lib/categories";
 import { isP2p } from "@/lib/zelle";
 import { resolveLinkedCategory } from "@/lib/links";
+import { sliceTransaction } from "@/lib/splits";
 import { loadPlaidCategoryMap } from "@/services/categories.service";
 import type {
   AnalyticsResult,
@@ -182,6 +183,7 @@ async function fetchTxInputs(start: Date): Promise<TxInput[]> {
       source: true,
       userCategory: true,
       linkedTo: { select: { userCategory: true, pfcPrimary: true } },
+      splits: { select: { id: true, amount: true, userCategory: true } },
     },
   });
 
@@ -209,18 +211,32 @@ async function fetchTxInputs(start: Date): Promise<TxInput[]> {
     if (raw === "Transfer" || raw?.startsWith("Transfer > ")) return [];
 
     // A user category (Venmo/Zelle/manual/inherited) wins over Plaid's PFC
-    // primary. Subcategorized values ("Parent > Sub") roll up to their parent;
-    // the sub travels alongside for drill-down views (single-month Sankey).
-    const uc = raw ? splitCategory(raw) : null;
-    return [{
-      amount: r.amount,
-      date: r.date,
-      category: uc ? uc.parent : plaidName(r.pfcPrimary),
-      subcategory: uc?.sub ?? null,
-      // P2P rows use a person as the "merchant" — keep them out of merchant totals.
-      merchant: isP2p(r.source, r.name) ? null : r.merchantName ?? r.name,
-      isOffset,
-    }];
+    // primary, and is what the remainder wears.
+    const effective = raw ?? plaidName(r.pfcPrimary);
+    // P2P rows use a person as the "merchant" — keep them out of merchant totals.
+    const merchant = isP2p(r.source, r.name) ? null : r.merchantName ?? r.name;
+
+    return sliceTransaction({ amount: r.amount, effectiveCategory: effective }, r.splits)
+      .flatMap((slice) => {
+        // A part can be tagged Transfer independently of its row, and the
+        // WHERE clause's string match cannot see parts at all — so the
+        // exclusion is applied per slice here.
+        if (slice.userCategory === "Transfer" || slice.userCategory.startsWith("Transfer > "))
+          return [];
+        // Subcategorized values ("Parent > Sub") roll up to their parent; the
+        // sub travels alongside for drill-down views (single-month Sankey).
+        const { parent, sub } = splitCategory(slice.userCategory);
+        return [{
+          amount: slice.amount,
+          date: r.date,
+          category: parent,
+          subcategory: sub,
+          merchant,
+          // Parts are slices of a money-out row, so only the whole-row
+          // money-in case can be an offset. A split row is never money-in.
+          isOffset,
+        }];
+      });
   });
 }
 
