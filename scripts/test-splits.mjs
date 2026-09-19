@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   remainderOf,
+  sliceForAnalytics,
   sliceTransaction,
   validateNewSplit,
 } from "../src/lib/splits.ts";
@@ -68,6 +69,74 @@ test("slices always sum back to the transaction", () => {
   const parts = [part(30, "Food", "a"), part(25, "Travel", "b")];
   const total = sliceTransaction(row, parts).reduce((s, x) => s + x.amount, 0);
   assert.equal(Math.round(total * 100) / 100, row.amount);
+});
+
+// sliceForAnalytics — the per-row logic analytics uses, extracted here so a
+// regression like the one below is caught by node:test rather than by a
+// human eyeballing a dashboard number.
+
+test("an ordinary income row stays income, not an offset", () => {
+  // Regression test: a reviewer's first proposed fix for the income-
+  // fabrication bug was `isOffset: isOffset || slice.amount < 0`. An unsplit
+  // income row's sole slice is its whole (negative) amount, so that line
+  // would have flipped isOffset to true here and wiped the row out of
+  // totalIncome. This must stay false.
+  const income = { amount: -500, effectiveCategory: "Paychecks", isOffset: false };
+  assert.deepEqual(sliceForAnalytics(income, []), [
+    { amount: -500, userCategory: "Paychecks", isOffset: false, countsAsTransaction: true },
+  ]);
+});
+
+test("a reimbursement stays an offset", () => {
+  const reimbursement = { amount: -20, effectiveCategory: "Food and Drink", isOffset: true };
+  assert.deepEqual(sliceForAnalytics(reimbursement, []), [
+    { amount: -20, userCategory: "Food and Drink", isOffset: true, countsAsTransaction: true },
+  ]);
+});
+
+test("an over-allocated row's negative remainder nets as an offset", () => {
+  const shrunk = { amount: 100, effectiveCategory: "General Merchandise", isOffset: false };
+  assert.deepEqual(sliceForAnalytics(shrunk, [part(150, "Food")]), [
+    { amount: 150, userCategory: "Food", isOffset: false, countsAsTransaction: true },
+    { amount: -50, userCategory: "General Merchandise", isOffset: true, countsAsTransaction: false },
+  ]);
+});
+
+test("carve-out slices on a normal split stay non-offset", () => {
+  const normal = { amount: 100, effectiveCategory: "General Merchandise", isOffset: false };
+  assert.deepEqual(sliceForAnalytics(normal, [part(30, "Food")]), [
+    { amount: 30, userCategory: "Food", isOffset: false, countsAsTransaction: true },
+    { amount: 70, userCategory: "General Merchandise", isOffset: false, countsAsTransaction: false },
+  ]);
+});
+
+test("a slice tagged Transfer is filtered out entirely", () => {
+  const normal = { amount: 100, effectiveCategory: "General Merchandise", isOffset: false };
+  const parts = [part(30, "Transfer", "a"), part(20, "Transfer > Venmo", "b")];
+  assert.deepEqual(sliceForAnalytics(normal, parts), [
+    { amount: 50, userCategory: "General Merchandise", isOffset: false, countsAsTransaction: true },
+  ]);
+});
+
+test("a row whose first carve-out is Transfer still gets counted via the next slice", () => {
+  const normal = { amount: 100, effectiveCategory: "General Merchandise", isOffset: false };
+  const parts = [part(30, "Transfer", "a"), part(20, "Food", "b")];
+  assert.deepEqual(sliceForAnalytics(normal, parts), [
+    { amount: 20, userCategory: "Food", isOffset: false, countsAsTransaction: true },
+    { amount: 50, userCategory: "General Merchandise", isOffset: false, countsAsTransaction: false },
+  ]);
+});
+
+test("a row whose every slice is Transfer-tagged yields nothing", () => {
+  const normal = { amount: 30, effectiveCategory: "General Merchandise", isOffset: false };
+  assert.deepEqual(sliceForAnalytics(normal, [part(30, "Transfer > Venmo")]), []);
+});
+
+test("an unsplit row yields exactly one slice, counted", () => {
+  const normal = { amount: 100, effectiveCategory: "General Merchandise", isOffset: false };
+  assert.deepEqual(sliceForAnalytics(normal, []), [
+    { amount: 100, userCategory: "General Merchandise", isOffset: false, countsAsTransaction: true },
+  ]);
 });
 
 test("remainderOf reports what is left", () => {

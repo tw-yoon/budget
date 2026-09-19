@@ -90,6 +90,68 @@ export function sliceTransaction(row: SliceRow, parts: SplitPart[]): Slice[] {
   return slices;
 }
 
+/** One slice as analytics needs to report it: still-raw category, plus the two
+ * flags that determine which bucket it lands in. */
+export interface AnalyticsSlice {
+  amount: number;
+  /** Raw, possibly "Parent > Sub" — the caller rolls this up for display. */
+  userCategory: string;
+  isOffset: boolean;
+  /** True on exactly one surviving slice per row (see `sliceForAnalytics`). */
+  countsAsTransaction: boolean;
+}
+
+/**
+ * A row's slices as analytics reports them: Transfer-tagged parts dropped,
+ * a revision-shrunk remainder netted against its category instead of read as
+ * income, and exactly one surviving slice per row marked as the one that
+ * counts toward the headline transaction total.
+ *
+ * Kept here, alongside `sliceTransaction`, rather than inline in the caller:
+ * this logic once fabricated income when a Plaid amount revision dropped a
+ * split row below what was already carved out, and that is exactly the kind
+ * of bug a `node:test`-under-plain-Node suite catches only if the code lives
+ * somewhere that suite can load — which means no path-aliased imports here,
+ * same as the rest of this file. The caller still owns `splitCategory`
+ * (parent/sub roll-up) and attaching `date`/`merchant`, since neither belongs
+ * in a module that cannot import `@/lib/categories`.
+ */
+export function sliceForAnalytics(
+  row: { amount: number; effectiveCategory: string; isOffset: boolean },
+  parts: SplitPart[]
+): AnalyticsSlice[] {
+  // A part can be tagged Transfer independently of its row, and the caller's
+  // WHERE clause (a string match) cannot see parts at all — so the exclusion
+  // is applied per slice here, before a count is assigned below, so a row
+  // never loses its count just because its first raw slice is a Transfer
+  // carve-out.
+  const kept = sliceTransaction({ amount: row.amount, effectiveCategory: row.effectiveCategory }, parts)
+    .filter(
+      (slice) => slice.userCategory !== "Transfer" && !slice.userCategory.startsWith("Transfer > ")
+    );
+
+  // Only a row that actually carries carve-outs can produce a negative
+  // remainder (a later Plaid amount revision dropping the row below what was
+  // already carved out — validateNewSplit refuses splitting a money-in row in
+  // the first place, so this can only happen on a money-out row). An UNSPLIT
+  // row's sole slice is its whole amount, and for a plain income row that
+  // amount is negative too — that slice must stay real income, not be swept
+  // into this net-against-category treatment. So the guard checks
+  // `parts.length`, not just the slice's sign.
+  const hasParts = parts.length > 0;
+
+  return kept.map((slice, i) => ({
+    amount: slice.amount,
+    userCategory: slice.userCategory,
+    // A revision-shrunk remainder nets against its own category instead of
+    // reading as fabricated income.
+    isOffset: row.isOffset || (hasParts && slice.amount < 0),
+    // One slice per row counts toward the headline transaction total,
+    // however many categories it was carved into.
+    countsAsTransaction: i === 0,
+  }));
+}
+
 /**
  * Why a proposed carve-out cannot be added, or null if it is fine.
  *

@@ -12,7 +12,7 @@ import { humanizePfc } from "@/lib/format";
 import { splitCategory } from "@/lib/categories";
 import { isP2p } from "@/lib/zelle";
 import { resolveLinkedCategory } from "@/lib/links";
-import { sliceTransaction } from "@/lib/splits";
+import { sliceForAnalytics } from "@/lib/splits";
 import { loadPlaidCategoryMap } from "@/services/categories.service";
 import type {
   AnalyticsResult,
@@ -222,45 +222,27 @@ async function fetchTxInputs(start: Date): Promise<TxInput[]> {
     // P2P rows use a person as the "merchant" — keep them out of merchant totals.
     const merchant = isP2p(r.source, r.name) ? null : r.merchantName ?? r.name;
 
-    // A part can be tagged Transfer independently of its row, and the WHERE
-    // clause's string match cannot see parts at all — so the exclusion is
-    // applied per slice here. Filtered before the count is assigned below, so
-    // a row never loses its count just because its first surviving slice
-    // isn't index 0 of the raw slice list.
-    const kept = sliceTransaction({ amount: r.amount, effectiveCategory: effective }, r.splits)
-      .filter(
-        (slice) =>
-          slice.userCategory !== "Transfer" && !slice.userCategory.startsWith("Transfer > ")
-      );
-
-    // Only a row that actually carries carve-outs can produce a negative
-    // remainder (a later Plaid amount revision dropping the row below what
-    // was already carved out — validateNewSplit refuses splitting a money-in
-    // row in the first place, so this can only happen on a money-out row).
-    // An UNSPLIT row's sole slice is its whole amount, and for a plain income
-    // row that amount is negative too — that slice must stay real income, not
-    // be swept into this net-against-category treatment. So the guard checks
-    // r.splits.length, not just the slice's sign.
-    const hasParts = r.splits.length > 0;
-
-    return kept.map((slice, i) => {
-      // Subcategorized values ("Parent > Sub") roll up to their parent; the
-      // sub travels alongside for drill-down views (single-month Sankey).
-      const { parent, sub } = splitCategory(slice.userCategory);
-      return {
-        amount: slice.amount,
-        date: r.date,
-        category: parent,
-        subcategory: sub,
-        merchant,
-        // A revision-shrunk remainder nets against its own category instead
-        // of reading as fabricated income.
-        isOffset: isOffset || (hasParts && slice.amount < 0),
-        // One slice per row counts toward the headline transaction total,
-        // however many categories it was carved into.
-        countsAsTransaction: i === 0,
-      };
-    });
+    // The Transfer-slice filter, the revision-shrunk-remainder offset guard,
+    // and the one-slice-per-row counting rule are pure logic and live in
+    // src/lib/splits.ts (sliceForAnalytics) so they can be unit-tested
+    // directly under node:test. What's left here is contextual: rolling a
+    // raw "Parent > Sub" category up for display, and attaching this row's
+    // date and merchant to every surviving slice.
+    return sliceForAnalytics({ amount: r.amount, effectiveCategory: effective, isOffset }, r.splits)
+      .map((slice) => {
+        // Subcategorized values ("Parent > Sub") roll up to their parent; the
+        // sub travels alongside for drill-down views (single-month Sankey).
+        const { parent, sub } = splitCategory(slice.userCategory);
+        return {
+          amount: slice.amount,
+          date: r.date,
+          category: parent,
+          subcategory: sub,
+          merchant,
+          isOffset: slice.isOffset,
+          countsAsTransaction: slice.countsAsTransaction,
+        };
+      });
   });
 }
 
