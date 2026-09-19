@@ -195,7 +195,9 @@ The switch gates controls, never data. In Normal, with splits already recorded:
 - The row still shows its Split badge and still expands, read-only, so the
   ledger can always account for a number Analytics is showing. Counting a split
   while hiding it would be the worst of both.
-- No "Add part" control, and existing parts cannot be edited or deleted.
+- No "Add part" control, and existing parts cannot be removed. A part is
+  never edited in place anywhere — changing one is removing it and adding
+  it back, which keeps the write surface to two operations.
 - Nothing is deleted, ever. Switching back to Pro restores the controls over the
   same data.
 
