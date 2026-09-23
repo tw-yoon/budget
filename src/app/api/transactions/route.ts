@@ -5,6 +5,7 @@ import { splitCategory } from "@/lib/categories";
 import { getCashoutBreakdowns } from "@/services/venmo.service";
 import { loadPlaidCategoryMap } from "@/services/categories.service";
 import { netAmount, resolveLinkedCategory } from "@/lib/links";
+import { remainderOf } from "@/lib/splits";
 import type { LinkedTargetDTO, RefundDTO } from "@/types";
 import type { Prisma } from "@prisma/client";
 
@@ -114,7 +115,13 @@ export async function GET(req: NextRequest) {
     const [rows, total] = await Promise.all([
       prisma.transaction.findMany({
         where,
-        include: { account: { select: { name: true, mask: true } } },
+        include: {
+          account: { select: { name: true, mask: true } },
+          splits: {
+            select: { id: true, amount: true, userCategory: true },
+            orderBy: { createdAt: "asc" },
+          },
+        },
         orderBy: orderBy,
         skip: (page - 1) * limit,
         take: limit,
@@ -206,6 +213,12 @@ export async function GET(req: NextRequest) {
       // A userCategory override may carry a "Parent > Sub" subcategory; the
       // parent is the category, the sub replaces Plaid's detailed label.
       const uc = raw ? splitCategory(raw) : null;
+      // Derived, never stored: the leftover follows the row's amount and its
+      // category without anything having to write it down. Below a cent it is
+      // float noise from summing the parts, not a leftover.
+      const left = remainderOf(t.amount, t.splits);
+      const splitRemainder =
+        t.splits.length > 0 && Math.abs(left) >= 0.005 ? left : null;
       return {
         id: t.id,
         externalId: t.externalId,
@@ -237,6 +250,17 @@ export async function GET(req: NextRequest) {
         linkedTo,
         refunds,
         netAmount: netAmount(t.amount, refunds),
+        splits: t.splits.map((s) => {
+          const sc = splitCategory(s.userCategory);
+          return {
+            id: s.id,
+            amount: s.amount,
+            category: sc.parent,
+            subcategory: sc.sub,
+            userCategory: s.userCategory,
+          };
+        }),
+        splitRemainder,
         breakdown: bd && (bd.slices.length > 0 || bd.priorBalance > 0)
           ? { slices: bd.slices, priorBalance: bd.priorBalance }
           : null,

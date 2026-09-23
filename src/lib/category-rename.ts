@@ -1,9 +1,10 @@
 /**
  * Rewriting a stored category string when its parent category is renamed.
  *
- * A category is stored as text — either a bare name or `"Parent > Sub"` — in
- * both Transaction.userCategory and CategoryRule.category. Renaming has to
- * rewrite the parent while leaving the subcategory intact.
+ * A category is stored as text — either a bare name or `"Parent > Sub"` —
+ * across Transaction.userCategory, CategoryRule.category, and
+ * TransactionSplit.userCategory. Renaming has to rewrite the parent while
+ * leaving the subcategory intact.
  *
  * Deliberately free of imports so `node:test` can load it directly under
  * Node's native type stripping.

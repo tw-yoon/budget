@@ -13,6 +13,7 @@ import { prisma } from "@/lib/prisma";
 import { humanizePfc } from "@/lib/format";
 import { REWARD_CATEGORY_LABELS, effectiveRate, formatRate } from "@/lib/rewards";
 import { rewardCategoryFor } from "@/lib/reward-categories";
+import { sliceTransaction } from "@/lib/splits";
 import type {
   BenefitDTO,
   EarningsDTO,
@@ -190,15 +191,37 @@ type SimpleRateWithUnit = { category: string; multiplier: number; unit: string }
 function computeEarnings(
   card: { rewardRates: SimpleRateWithUnit[]; pointValueCents: number; id: string },
   others: { name: string | null; issuer: string; rewardRates: SimpleRateWithUnit[]; pointValueCents: number }[],
-  txns: { amount: number; date: Date; pfcPrimary: string; pfcDetailed: string | null; userCategory: string | null }[],
+  txns: {
+    amount: number;
+    date: Date;
+    pfcPrimary: string;
+    pfcDetailed: string | null;
+    userCategory: string | null;
+    splits: { amount: number; userCategory: string }[];
+  }[],
   start: Date,
   end: Date
 ): EarningsDTO {
   const spend = new Map<string, number>();
   for (const t of txns) {
     if (t.amount <= 0 || t.date < start || t.date >= end) continue;
-    const c = rewardCategoryFor(t);
-    spend.set(c, (spend.get(c) ?? 0) + t.amount);
+    // A split transaction earns per part: a grocery carve-out at a big-box
+    // store earns the grocery rate, and the rest earns the row's own rate.
+    // rewardCategoryFor needs nothing but a category and the two Plaid
+    // fallbacks, which is exactly what a slice plus its row supplies.
+    for (const slice of sliceTransaction(
+      { amount: t.amount, effectiveCategory: t.userCategory ?? "" },
+      t.splits
+    )) {
+      const c = rewardCategoryFor({
+        // An empty effectiveCategory means the row had no override, so the
+        // remainder must fall through to Plaid exactly as the row did.
+        userCategory: slice.userCategory || null,
+        pfcPrimary: t.pfcPrimary,
+        pfcDetailed: t.pfcDetailed,
+      });
+      spend.set(c, (spend.get(c) ?? 0) + slice.amount);
+    }
   }
 
   const unit = card.rewardRates.find((r) => r.category === "OTHER")?.unit ?? "X";
@@ -294,6 +317,7 @@ export async function getUserCardsWithProgress(
       userCategory: string | null;
       name: string;
       merchantName: string | null;
+      splits: { amount: number; userCategory: string }[];
     }[]
   >();
   if (linkedIds.length) {
@@ -317,6 +341,7 @@ export async function getUserCardsWithProgress(
         userCategory: true,
         name: true,
         merchantName: true,
+        splits: { select: { amount: true, userCategory: true } },
       },
     });
     for (const t of txs) {
@@ -329,6 +354,7 @@ export async function getUserCardsWithProgress(
         userCategory: t.userCategory,
         name: t.name,
         merchantName: t.merchantName,
+        splits: t.splits,
       });
       txByAccount.set(t.accountId, arr);
     }

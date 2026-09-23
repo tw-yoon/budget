@@ -12,6 +12,7 @@ import { humanizePfc } from "@/lib/format";
 import { splitCategory } from "@/lib/categories";
 import { isP2p } from "@/lib/zelle";
 import { resolveLinkedCategory } from "@/lib/links";
+import { sliceForAnalytics } from "@/lib/splits";
 import { loadPlaidCategoryMap } from "@/services/categories.service";
 import type {
   AnalyticsResult,
@@ -29,6 +30,10 @@ export interface TxInput {
   // A negative-amount row that offsets its own category instead of counting as
   // income — used for Venmo reimbursements ("got paid back for the dinner").
   isOffset: boolean;
+  // False for every slice of a split row but one, so a transaction sliced into
+  // several categories is still one transaction in the headline count.
+  // Optional — missing (e.g. from a producer that never splits) means true.
+  countsAsTransaction?: boolean;
 }
 
 /** First day of the month, `monthsBack` months before `from`. */
@@ -67,7 +72,9 @@ export function aggregate(
 
   for (const t of transactions) {
     if (t.date < start) continue;
-    txCount++;
+    // A split row is several TxInputs but one transaction; only the slice
+    // marked as the counting one bumps the headline count.
+    if (t.countsAsTransaction !== false) txCount++;
 
     const bucket = buckets.get(monthKey(t.date));
     const cat = t.category || "Uncategorized";
@@ -182,6 +189,7 @@ async function fetchTxInputs(start: Date): Promise<TxInput[]> {
       source: true,
       userCategory: true,
       linkedTo: { select: { userCategory: true, pfcPrimary: true } },
+      splits: { select: { amount: true, userCategory: true } },
     },
   });
 
@@ -209,18 +217,32 @@ async function fetchTxInputs(start: Date): Promise<TxInput[]> {
     if (raw === "Transfer" || raw?.startsWith("Transfer > ")) return [];
 
     // A user category (Venmo/Zelle/manual/inherited) wins over Plaid's PFC
-    // primary. Subcategorized values ("Parent > Sub") roll up to their parent;
-    // the sub travels alongside for drill-down views (single-month Sankey).
-    const uc = raw ? splitCategory(raw) : null;
-    return [{
-      amount: r.amount,
-      date: r.date,
-      category: uc ? uc.parent : plaidName(r.pfcPrimary),
-      subcategory: uc?.sub ?? null,
-      // P2P rows use a person as the "merchant" — keep them out of merchant totals.
-      merchant: isP2p(r.source, r.name) ? null : r.merchantName ?? r.name,
-      isOffset,
-    }];
+    // primary, and is what the remainder wears.
+    const effective = raw ?? plaidName(r.pfcPrimary);
+    // P2P rows use a person as the "merchant" — keep them out of merchant totals.
+    const merchant = isP2p(r.source, r.name) ? null : r.merchantName ?? r.name;
+
+    // The Transfer-slice filter, the revision-shrunk-remainder offset guard,
+    // and the one-slice-per-row counting rule are pure logic and live in
+    // src/lib/splits.ts (sliceForAnalytics) so they can be unit-tested
+    // directly under node:test. What's left here is contextual: rolling a
+    // raw "Parent > Sub" category up for display, and attaching this row's
+    // date and merchant to every surviving slice.
+    return sliceForAnalytics({ amount: r.amount, effectiveCategory: effective, isOffset }, r.splits)
+      .map((slice) => {
+        // Subcategorized values ("Parent > Sub") roll up to their parent; the
+        // sub travels alongside for drill-down views (single-month Sankey).
+        const { parent, sub } = splitCategory(slice.userCategory);
+        return {
+          amount: slice.amount,
+          date: r.date,
+          category: parent,
+          subcategory: sub,
+          merchant,
+          isOffset: slice.isOffset,
+          countsAsTransaction: slice.countsAsTransaction,
+        };
+      });
   });
 }
 

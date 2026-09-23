@@ -11,6 +11,7 @@ interface Category {
   ruleCount: number;
   resolvedTransactionCount: number;
   subcategories: Subcategory[];
+  splitCount: number;
 }
 
 interface Subcategory {
@@ -76,7 +77,7 @@ export function SettingsCategories() {
     if (!res.ok) {
       setError(
         body.transactionCount !== undefined
-          ? `Still used by ${body.transactionCount} transaction(s), ${body.ruleCount} rule(s) and ${body.mappingCount} Plaid label(s) — rename this category onto another one to merge them first.`
+          ? `Still used by ${body.transactionCount} transaction(s), ${body.ruleCount} rule(s), ${body.mappingCount} Plaid label(s) and ${body.splitCount} split(s) — rename this category onto another one to merge them first.`
           : (body.error ?? "Something went wrong")
       );
       return;
@@ -107,9 +108,15 @@ export function SettingsCategories() {
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
         if (res.status === 409 && body.merge) {
+          // movingResolved already contains movingTransactions (it is the same
+          // direct count plus the Plaid-fallthrough group), so headlining it
+          // loses nothing. movingSplits is disjoint from that figure — a
+          // split-only category would otherwise read as "0 transactions" and
+          // approving the merge would silently relabel every carve-out.
+          const splitsNote = body.movingSplits ? ` and ${body.movingSplits} split(s)` : "";
           if (
             confirm(
-              `Merge "${c.name}" into "${body.targetName}"?\n\n${body.movingResolved} transaction(s) will report as "${body.targetName}" instead, and "${c.name}" will be removed.`
+              `Merge "${c.name}" into "${body.targetName}"?\n\n${body.movingResolved} transaction(s)${splitsNote} will report as "${body.targetName}" instead, and "${c.name}" will be removed.`
             )
           ) {
             await attempt(true);
@@ -117,15 +124,16 @@ export function SettingsCategories() {
           return;
         }
         // A rename's only other failure shapes are plain { error } — the
-        // transactionCount/ruleCount/mappingCount shape is DELETE-only.
+        // transactionCount/ruleCount/mappingCount/splitCount shape is DELETE-only.
         setError(body.error ?? "Something went wrong");
         return;
       }
-      const r = body as { merged: boolean; movedTransactions: number };
+      const r = body as { merged: boolean; movedTransactions: number; movedSplits: number };
+      const movedSplitsNote = r.movedSplits ? ` and ${r.movedSplits} split(s)` : "";
       setNotice(
         r.merged
-          ? `Merged into "${trimmedName}" — ${r.movedTransactions} transaction(s) moved.`
-          : `Renamed — ${r.movedTransactions} transaction(s) updated.`
+          ? `Merged into "${trimmedName}" — ${r.movedTransactions} transaction(s)${movedSplitsNote} moved.`
+          : `Renamed — ${r.movedTransactions} transaction(s)${movedSplitsNote} updated.`
       );
       await load();
     };
@@ -163,11 +171,16 @@ export function SettingsCategories() {
         setError(body.error ?? "Something went wrong");
         return;
       }
-      const r = body as { merged: boolean; movedTransactions: number };
+      const r = body as {
+        merged: boolean;
+        movedTransactions: number;
+        movedSplits: number;
+      };
+      const movedSplitsNote = r.movedSplits ? ` and ${r.movedSplits} split(s)` : "";
       setNotice(
         r.merged
-          ? `Merged into "${to}" — ${r.movedTransactions} transaction(s) moved.`
-          : `Renamed — ${r.movedTransactions} transaction(s) updated.`
+          ? `Merged into "${to}" — ${r.movedTransactions} transaction(s)${movedSplitsNote} moved.`
+          : `Renamed — ${r.movedTransactions} transaction(s)${movedSplitsNote} updated.`
       );
       await load();
     };
@@ -203,8 +216,12 @@ export function SettingsCategories() {
       `/api/categories/${c.id}/subcategories?name=${encodeURIComponent(s.name)}`,
       { method: "DELETE" },
       (b) => {
-        const moved = (b as { movedTransactions: number }).movedTransactions;
-        if (moved) setNotice(`Deleted — ${moved} transaction(s) moved back to "${c.name}".`);
+        const r = b as { movedTransactions: number; movedSplits: number };
+        const splitNote = r.movedSplits ? ` and ${r.movedSplits} split(s)` : "";
+        if (r.movedTransactions || r.movedSplits)
+          setNotice(
+            `Deleted — ${r.movedTransactions} transaction(s)${splitNote} moved back to "${c.name}".`
+          );
       }
     );
   };
@@ -375,7 +392,8 @@ export function SettingsCategories() {
                       </span>
                     )}{" "}
                     · {c.ruleCount} rule
-                    {c.ruleCount === 1 ? "" : "s"}
+                    {c.ruleCount === 1 ? "" : "s"} · {c.splitCount} split
+                    {c.splitCount === 1 ? "" : "s"}
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex flex-wrap gap-1">

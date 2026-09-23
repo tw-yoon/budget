@@ -1,13 +1,9 @@
-import { SettingsAnalytics } from "@/components/SettingsAnalytics";
+import { permanentRedirect } from "next/navigation";
 
-export const metadata = {
-  title: "Analytics · Settings · Budget Claude",
-};
-
-export default function SettingsAnalyticsPage() {
-  return (
-    <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">
-      <SettingsAnalytics />
-    </main>
-  );
+// The Normal/Pro switch stopped being an Analytics-only setting when splitting
+// arrived in the ledger. Permanent rather than temporary: this route is not
+// coming back, and the settings-sections work set the same precedent for
+// /rules.
+export default function SettingsAnalyticsRedirectPage() {
+  permanentRedirect("/settings/mode");
 }

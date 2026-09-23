@@ -1,9 +1,9 @@
 "use client";
 
-import { useAnalyticsMode } from "./useAnalyticsMode";
-import type { AnalyticsMode } from "@/lib/analytics-mode";
+import { useProMode } from "./useProMode";
+import type { ProMode } from "@/lib/pro-mode";
 
-const MODES: { value: AnalyticsMode; label: string; blurb: string }[] = [
+const MODES: { value: ProMode; label: string; blurb: string }[] = [
   {
     value: "normal",
     label: "Normal",
@@ -13,19 +13,19 @@ const MODES: { value: AnalyticsMode; label: string; blurb: string }[] = [
     value: "pro",
     label: "Pro",
     blurb:
-      "Everything in Normal, plus the cash-flow diagram and the cumulative spending graph.",
+      "Everything in Normal, plus the cash-flow diagram, the cumulative spending graph, and splitting one payment across categories in the ledger.",
   },
 ];
 
-export function SettingsAnalytics() {
-  const { mode, choose } = useAnalyticsMode();
+export function SettingsMode() {
+  const { mode, choose } = useProMode();
 
   return (
     <div className="flex flex-col gap-5">
       <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Analytics</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Mode</h1>
         <p className="text-sm text-black/55 dark:text-white/55">
-          How much detail the Analytics page shows.
+          How much detail the app shows.
         </p>
       </header>
 

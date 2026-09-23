@@ -8,7 +8,7 @@ import { CategoryChart } from "./charts/CategoryChart";
 import { MonthlyTrendChart } from "./charts/MonthlyTrendChart";
 import { CashFlowSankey } from "./charts/CashFlowSankey";
 import { SpendingGraph } from "./charts/SpendingGraph";
-import { useAnalyticsMode } from "./useAnalyticsMode";
+import { useProMode } from "./useProMode";
 
 const RANGES = [3, 6, 12] as const;
 
@@ -21,7 +21,7 @@ export function AnalyticsDashboard() {
   const [error, setError] = useState<string | null>(null);
   // Normal until the stored preference arrives; Normal for good if it never
   // does, or if what it holds is not a mode we recognise.
-  const { mode } = useAnalyticsMode();
+  const { mode } = useProMode();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -99,7 +99,7 @@ export function AnalyticsDashboard() {
         <p className="text-center text-xs text-black/45 dark:text-white/45">
           Cash flow and cumulative spending are hidden in Normal mode —{" "}
           <Link
-            href="/settings/analytics"
+            href="/settings/mode"
             className="underline underline-offset-2 hover:text-foreground"
           >
             switch to Pro in Settings

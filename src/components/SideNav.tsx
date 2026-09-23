@@ -33,7 +33,7 @@ const NAV: NavItem[] = [
       { href: "/settings/categories", label: "Categories" },
       { href: "/settings/rules", label: "Rules" },
       { href: "/settings/connections", label: "Connections" },
-      { href: "/settings/analytics", label: "Analytics" },
+      { href: "/settings/mode", label: "Mode" },
     ],
   },
 ];

@@ -1,10 +1,11 @@
 /**
  * Reads and writes for the user's category list.
  *
- * A category is stored as text on transactions and rules, not as a relation, so
- * renaming means rewriting every reference and deleting means refusing while
- * references exist. Both of those live here rather than in a route, because the
- * rewrite has to happen in one transaction with the row it renames.
+ * A category is stored as text on transactions, rules, and splits, not as a
+ * relation, so renaming means rewriting every reference and deleting means
+ * refusing while references exist. Both of those live here rather than in a
+ * route, because the rewrite has to happen in one transaction with the row it
+ * renames.
  */
 
 import { prisma } from "@/lib/prisma";
@@ -19,6 +20,7 @@ export interface CategoryDTO {
   ruleCount: number;
   resolvedTransactionCount: number;
   subcategories: SubcategoryUsage[];
+  splitCount: number;
 }
 
 /** Thrown when a delete would strand references. */
@@ -26,7 +28,8 @@ export class CategoryInUseError extends Error {
   constructor(
     readonly transactionCount: number,
     readonly ruleCount: number,
-    readonly mappingCount: number
+    readonly mappingCount: number,
+    readonly splitCount: number
   ) {
     super("Category is still in use");
     this.name = "CategoryInUseError";
@@ -73,7 +76,8 @@ export class MergeNotConfirmedError extends Error {
     readonly targetName: string,
     readonly movingTransactions: number,
     readonly movingRules: number,
-    readonly movingResolved: number
+    readonly movingResolved: number,
+    readonly movingSplits: number
   ) {
     super(`Renaming would merge into "${targetName}"`);
     this.name = "MergeNotConfirmedError";
@@ -97,6 +101,12 @@ function txUsing(name: string) {
 function ruleUsing(name: string) {
   return {
     OR: [{ category: name }, { category: { startsWith: name + " > " } }],
+  };
+}
+
+function splitUsing(name: string) {
+  return {
+    OR: [{ userCategory: name }, { userCategory: { startsWith: name + " > " } }],
   };
 }
 
@@ -189,6 +199,9 @@ export async function listCategories(): Promise<CategoryDTO[]> {
         }),
         resolvedTransactionCount: await addResolved(transactionCount, plaidPrimaries),
         subcategories: subs.get(c.name) ?? [],
+        splitCount: await prisma.transactionSplit.count({
+          where: splitUsing(c.name),
+        }),
       };
     })
   );
@@ -204,6 +217,7 @@ export async function createCategory(name: string): Promise<CategoryDTO> {
     ruleCount: 0,
     resolvedTransactionCount: 0,
     subcategories: [],
+    splitCount: 0,
   };
 }
 
@@ -222,13 +236,20 @@ export async function renameCategory(
   movedTransactions: number;
   movedRules: number;
   movedResolved: number;
+  movedSplits: number;
 }> {
   const to = newName.trim();
   const source = await prisma.category.findUnique({ where: { id } });
   if (!source) throw new Error("Category not found");
   if (RESERVED_NAMES.has(source.name)) throw new ReservedCategoryError(source.name);
   if (source.name === to)
-    return { merged: false, movedTransactions: 0, movedRules: 0, movedResolved: 0 };
+    return {
+      merged: false,
+      movedTransactions: 0,
+      movedRules: 0,
+      movedResolved: 0,
+      movedSplits: 0,
+    };
 
   const existing = await prisma.category.findUnique({ where: { name: to } });
 
@@ -240,6 +261,10 @@ export async function renameCategory(
     where: ruleUsing(source.name),
     select: { id: true, category: true },
   });
+  const splits = await prisma.transactionSplit.findMany({
+    where: splitUsing(source.name),
+    select: { id: true, userCategory: true },
+  });
   // Computed before the transaction below runs, since a merge deletes `source`.
   const resolved = await resolvedCount(source.id, source.name);
 
@@ -247,7 +272,13 @@ export async function renameCategory(
   // said yes to that. Deciding here rather than in the client is what makes the
   // confirmation trustworthy: the client's list can be stale, this cannot.
   if (existing && !allowMerge) {
-    throw new MergeNotConfirmedError(existing.name, txs.length, rules.length, resolved);
+    throw new MergeNotConfirmedError(
+      existing.name,
+      txs.length,
+      rules.length,
+      resolved,
+      splits.length
+    );
   }
 
   await prisma.$transaction(async (tx) => {
@@ -261,6 +292,12 @@ export async function renameCategory(
       const next = renameCategoryIn(r.category, source.name, to);
       if (next !== null) {
         await tx.categoryRule.update({ where: { id: r.id }, data: { category: next } });
+      }
+    }
+    for (const s of splits) {
+      const next = renameCategoryIn(s.userCategory, source.name, to);
+      if (next !== null) {
+        await tx.transactionSplit.update({ where: { id: s.id }, data: { userCategory: next } });
       }
     }
 
@@ -296,6 +333,7 @@ export async function renameCategory(
     movedTransactions: txs.length,
     movedRules: rules.length,
     movedResolved: resolved,
+    movedSplits: splits.length,
   };
 }
 
@@ -333,13 +371,14 @@ export async function deleteCategory(id: string, reassignTo?: string): Promise<v
     return;
   }
 
-  const [transactionCount, ruleCount, mappingCount] = await Promise.all([
+  const [transactionCount, ruleCount, mappingCount, splitCount] = await Promise.all([
     prisma.transaction.count({ where: txUsing(cat.name) }),
     prisma.categoryRule.count({ where: ruleUsing(cat.name) }),
     prisma.categoryMapping.count({ where: { categoryId: id } }),
+    prisma.transactionSplit.count({ where: splitUsing(cat.name) }),
   ]);
-  if (transactionCount || ruleCount || mappingCount) {
-    throw new CategoryInUseError(transactionCount, ruleCount, mappingCount);
+  if (transactionCount || ruleCount || mappingCount || splitCount) {
+    throw new CategoryInUseError(transactionCount, ruleCount, mappingCount, splitCount);
   }
 
   await prisma.category.delete({ where: { id } });
@@ -412,24 +451,48 @@ export async function renameSubcategory(
   from: string,
   to: string,
   allowMerge = false
-): Promise<{ merged: boolean; movedTransactions: number; movedRules: number }> {
+): Promise<{
+  merged: boolean;
+  movedTransactions: number;
+  movedRules: number;
+  movedSplits: number;
+}> {
   const cat = await prisma.category.findUnique({ where: { id: categoryId } });
   if (!cat) throw new Error("Category not found");
-  if (from === to) return { merged: false, movedTransactions: 0, movedRules: 0 };
+  if (from === to)
+    return { merged: false, movedTransactions: 0, movedRules: 0, movedSplits: 0 };
 
   const oldValue = cat.name + " > " + from;
   const newValue = cat.name + " > " + to;
-  const [movedTransactions, movedRules, targetRow, targetTx, targetRules] =
-    await Promise.all([
+  // Carve-outs store the same "Parent > Sub" string as transactions and rules,
+  // so they count on both sides of the merge test and move with the rename.
+  const [
+    movedTransactions,
+    movedRules,
+    targetRow,
+    targetTx,
+    targetRules,
+    movedSplits,
+    targetSplits,
+  ] = await Promise.all([
       prisma.transaction.count({ where: { userCategory: oldValue } }),
       prisma.categoryRule.count({ where: { category: oldValue } }),
       prisma.subcategory.findUnique({ where: { categoryId_name: { categoryId, name: to } } }),
       prisma.transaction.count({ where: { userCategory: newValue } }),
       prisma.categoryRule.count({ where: { category: newValue } }),
+      prisma.transactionSplit.count({ where: { userCategory: oldValue } }),
+      prisma.transactionSplit.count({ where: { userCategory: newValue } }),
     ]);
-  const merged = Boolean(targetRow) || targetTx > 0 || targetRules > 0;
+  const merged =
+    Boolean(targetRow) || targetTx > 0 || targetRules > 0 || targetSplits > 0;
   if (merged && !allowMerge) {
-    throw new MergeNotConfirmedError(to, movedTransactions, movedRules, movedTransactions);
+    throw new MergeNotConfirmedError(
+      to,
+      movedTransactions,
+      movedRules,
+      movedTransactions,
+      movedSplits
+    );
   }
 
   await prisma.$transaction(async (tx) => {
@@ -441,6 +504,10 @@ export async function renameSubcategory(
       where: { category: oldValue },
       data: { category: newValue },
     });
+    await tx.transactionSplit.updateMany({
+      where: { userCategory: oldValue },
+      data: { userCategory: newValue },
+    });
     // The declared row follows the rename; when the target is already
     // declared, the source row just goes.
     if (targetRow) {
@@ -450,7 +517,7 @@ export async function renameSubcategory(
     }
   });
 
-  return { merged, movedTransactions, movedRules };
+  return { merged, movedTransactions, movedRules, movedSplits };
 }
 
 /**
@@ -461,7 +528,7 @@ export async function renameSubcategory(
 export async function deleteSubcategory(
   categoryId: string,
   name: string
-): Promise<{ movedTransactions: number; movedRules: number }> {
+): Promise<{ movedTransactions: number; movedRules: number; movedSplits: number }> {
   const cat = await prisma.category.findUnique({ where: { id: categoryId } });
   if (!cat) throw new Error("Category not found");
   const value = cat.name + " > " + name;
@@ -475,7 +542,16 @@ export async function deleteSubcategory(
       where: { category: value },
       data: { category: cat.name },
     });
+    // Carve-outs fall back to the bare parent alongside everything else.
+    const splits = await tx.transactionSplit.updateMany({
+      where: { userCategory: value },
+      data: { userCategory: cat.name },
+    });
     await tx.subcategory.deleteMany({ where: { categoryId, name } });
-    return { movedTransactions: txs.count, movedRules: rules.count };
+    return {
+      movedTransactions: txs.count,
+      movedRules: rules.count,
+      movedSplits: splits.count,
+    };
   });
 }
