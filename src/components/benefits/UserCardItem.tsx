@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { loadSynced, pushSynced } from "@/lib/ui-state";
 import type { BenefitDTO, EarningsCategoryDTO, UserCardDTO } from "@/types";
 import { formatCurrency, humanizePfc } from "@/lib/format";
 import {
@@ -21,50 +22,62 @@ const inputClass =
 /**
  * Whether a card's statement-credits list is expanded, remembered per card.
  *
- * The value lives in localStorage, which does not exist while the server
- * renders — so it cannot simply be read during render, and reading it in an
- * effect (what this used to do) paints the default first and corrects it a
- * frame later. useSyncExternalStore is React's supported way to read a browser
- * store: getServerSnapshot supplies the value the server renders and hydration
- * compares against, and the stored value is picked up on the client without a
- * mismatch. Writes go through writeCreditsOpen, which notifies every mounted
- * card so each re-reads its own key.
+ * This rides on the shared ui-state store rather than raw localStorage, the
+ * same way useProMode and the income and spending-graph preferences do, so the
+ * collapse state follows the user between browsers instead of being a fact
+ * about one machine.
+ *
+ * That store is read over the network, so the value cannot be known on the
+ * first render: the list starts expanded and collapses once the read lands.
+ * The initial value is a constant, identical on the server and in the browser,
+ * so nothing here can produce a hydration mismatch.
  */
 const CREDITS_OPEN_DEFAULT = true;
-const creditsOpenListeners = new Set<() => void>();
-// Only consulted when localStorage throws (private browsing, blocked storage),
-// so the toggle still works for the life of the page even when nothing can be
-// persisted.
-const creditsOpenFallback = new Map<string, boolean>();
 
-function subscribeCreditsOpen(onStoreChange: () => void) {
-  creditsOpenListeners.add(onStoreChange);
-  return () => {
-    creditsOpenListeners.delete(onStoreChange);
-  };
+function creditsKey(cardId: string): string {
+  return `card-credits-open:${cardId}`;
 }
 
-function readCreditsOpen(storeKey: string): boolean {
-  try {
-    const saved = localStorage.getItem(storeKey);
-    return saved === null ? CREDITS_OPEN_DEFAULT : saved === "1";
-  } catch {
-    return creditsOpenFallback.get(storeKey) ?? CREDITS_OPEN_DEFAULT;
-  }
-}
-
-function writeCreditsOpen(storeKey: string, open: boolean): void {
-  try {
-    localStorage.setItem(storeKey, open ? "1" : "0");
-  } catch {
-    creditsOpenFallback.set(storeKey, open);
-  }
-  for (const onStoreChange of creditsOpenListeners) onStoreChange();
-}
-
-// The server has no localStorage, so it renders the default.
-function serverCreditsOpen(): boolean {
+// Before this moved onto the shared store the value was the raw string "1" or
+// "0", which loadSynced JSON-parses back out as the number 1 or 0. Existing
+// preferences have to keep working, so accept every shape they were saved in.
+// A toggle rewrites the key as a boolean.
+function toCreditsOpen(stored: unknown): boolean {
+  if (typeof stored === "boolean") return stored;
+  if (typeof stored === "number") return stored !== 0;
+  if (typeof stored === "string") return stored !== "0" && stored !== "";
   return CREDITS_OPEN_DEFAULT;
+}
+
+function useCreditsOpen(cardId: string) {
+  const [open, setOpen] = useState(CREDITS_OPEN_DEFAULT);
+  // A click that lands while the read is still in flight is a deliberate
+  // choice and must not be overwritten by the stale value when it arrives —
+  // the same race useProMode guards. It outlives the effect run, so it is a
+  // ref rather than a local.
+  const chosen = useRef(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    chosen.current = false;
+    void (async () => {
+      const stored = await loadSynced(creditsKey(cardId));
+      if (stored == null) return;
+      if (!cancelled && !chosen.current) setOpen(toCreditsOpen(stored));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [cardId]);
+
+  const toggle = useCallback(() => {
+    chosen.current = true;
+    const next = !open;
+    setOpen(next);
+    pushSynced(creditsKey(cardId), next);
+  }, [cardId, open]);
+
+  return { open, toggle };
 }
 
 export function UserCardItem({
@@ -83,18 +96,8 @@ export function UserCardItem({
   const [adding, setAdding] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  // Remember collapsed/expanded per card across reloads.
-  const storeKey = `card-credits-open:${card.id}`;
-  const readThisCard = useCallback(() => readCreditsOpen(storeKey), [storeKey]);
-  const showCredits = useSyncExternalStore(
-    subscribeCreditsOpen,
-    readThisCard,
-    serverCreditsOpen,
-  );
-
-  function toggleCredits() {
-    writeCreditsOpen(storeKey, !showCredits);
-  }
+  // Remembered per card, and shared across this user's browsers.
+  const { open: showCredits, toggle: toggleCredits } = useCreditsOpen(card.id);
 
   async function deleteCard() {
     if (!confirm(`Remove ${ISSUER_LABELS[card.issuer] ?? card.issuer} ··${card.last4} and its benefits?`))
