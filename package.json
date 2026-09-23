@@ -6,8 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint",
-    "test": "bash scripts/test-scrub.sh && bash scripts/test-launcher.sh && node --test scripts/test-links.mjs scripts/test-plaid-errors.mjs scripts/test-categories.mjs scripts/test-subcategories.mjs scripts/test-rules.mjs scripts/test-pro-mode.mjs scripts/test-splits.mjs"
+    "lint": "eslint --max-warnings 0",
+    "test": "bash scripts/test-scrub.sh && npm run lint && bash scripts/test-launcher.sh && node --test scripts/test-links.mjs scripts/test-plaid-errors.mjs scripts/test-categories.mjs scripts/test-subcategories.mjs scripts/test-rules.mjs scripts/test-pro-mode.mjs scripts/test-splits.mjs"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
