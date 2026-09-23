@@ -37,7 +37,11 @@ export async function POST(
     const category = body.category?.trim() || "";
     const subcategory = body.subcategory?.trim() || null;
     const userCategory = category ? joinCategory(category, subcategory) : "";
-    const amount = Number(body.amount);
+    // Rounded to cents: the client sends a plain number from React state, not
+    // a form-validated one, so `step="0.01"` on the input never actually stops
+    // something like 30.005 from reaching here and breaking the "slices sum
+    // back to the transaction" invariant by half a cent.
+    const amount = Math.round(Number(body.amount) * 100) / 100;
 
     const problem = validateNewSplit(row, row.splits, { amount, userCategory });
     if (problem) {

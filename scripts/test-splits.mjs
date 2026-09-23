@@ -71,6 +71,20 @@ test("slices always sum back to the transaction", () => {
   assert.equal(Math.round(total * 100) / 100, row.amount);
 });
 
+test("slices still sum back when a sub-cent input is rounded to cents first", () => {
+  // Regression test: the POST route used to store `Number(body.amount)`
+  // unrounded, so a sub-cent value like 30.005 (from a client sending a plain
+  // number, not a form-validated one) landed in the database as-is and broke
+  // this same invariant by half a cent. The route now rounds with
+  // `Math.round(amount * 100) / 100` before writing — mirrored here so the
+  // invariant is pinned against that exact kind of input, not just clean ones.
+  const rawAmount = 30.005;
+  const rounded = Math.round(rawAmount * 100) / 100;
+  const parts = [part(rounded, "Food", "a")];
+  const total = sliceTransaction(row, parts).reduce((s, x) => s + x.amount, 0);
+  assert.equal(Math.round(total * 100) / 100, row.amount);
+});
+
 // sliceForAnalytics — the per-row logic analytics uses, extracted here so a
 // regression like the one below is caught by node:test rather than by a
 // human eyeballing a dashboard number.

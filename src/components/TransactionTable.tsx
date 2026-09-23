@@ -21,6 +21,22 @@ function isSplittable(t: TransactionDTO): boolean {
   return t.amount > 0 && !t.pending;
 }
 
+// Selectable categories for a two-level picker on a row: the user's list,
+// plus whatever the row already shows (e.g. a Plaid primary with no mapping)
+// so nothing gets orphaned. Shared by CategoryEditor and AddSplitForm so a
+// part's picker offers exactly what the row's own picker offers — "the same
+// picker the row itself uses" per the spec.
+function categoryOptionsFor(
+  categories: string[],
+  category: string,
+  plaidCategory: string
+): string[] {
+  const set = new Set(categories);
+  set.add(category);
+  set.add(plaidCategory);
+  return [...set].sort((a, b) => a.localeCompare(b));
+}
+
 // A sortable column header. Clicking the active column flips direction;
 // clicking the other one switches to it and starts descending — newest, and
 // highest-numbered, is what you want on arrival either way.
@@ -222,7 +238,18 @@ export function TransactionTable({
                         </Badge>
                       )}
                       {hasSplits && (
-                        <Badge tone="slate">
+                        <Badge
+                          tone={
+                            t.splitRemainder !== null && t.splitRemainder < 0
+                              ? "amber"
+                              : "slate"
+                          }
+                          title={
+                            t.splitRemainder !== null && t.splitRemainder < 0
+                              ? "This transaction's amount changed and is now smaller than its splits"
+                              : undefined
+                          }
+                        >
                           {splitWays === 1
                             ? "Split 1 way"
                             : `Split ${splitWays} ways`}
@@ -334,7 +361,9 @@ export function TransactionTable({
                         <SplitPanel
                           transaction={t}
                           category={category}
+                          categoryDetailed={categoryDetailed}
                           categories={categories}
+                          knownSubs={knownSubs}
                           onChanged={onChanged}
                         />
                       )}
@@ -416,7 +445,9 @@ function RefundPanel({ refunds }: { refunds: TransactionDTO["refunds"] }) {
 function SplitPanel({
   transaction: t,
   category,
+  categoryDetailed,
   categories,
+  knownSubs,
   onChanged,
 }: {
   transaction: TransactionDTO;
@@ -424,7 +455,11 @@ function SplitPanel({
   // this session included. Naming where the leftover lands is the whole job of
   // the "(rest)" line, so it has to agree with the label on the row above it.
   category: string;
+  // The row's effective subcategory, same rules as `category` above — needed
+  // so "(rest)" reads as the full category, not just its parent.
+  categoryDetailed: string | null;
   categories: string[];
+  knownSubs: Map<string, Set<string>>;
   onChanged: () => void;
 }) {
   const { mode, loading } = useProMode();
@@ -494,8 +529,13 @@ function SplitPanel({
         {t.splitRemainder !== null && (
           <li className="flex items-center justify-between gap-4 text-sm text-black/45 dark:text-white/45">
             {/* The leftover is a part among equals, distinguished only by being
-                the one you cannot remove — it is derived, not stored. */}
-            <span>{category} (rest)</span>
+                the one you cannot remove — it is derived, not stored. Full
+                effective category (parent + sub when there is one), matching
+                how a carve-out renders above. */}
+            <span>
+              {categoryDetailed ? `${category} › ${categoryDetailed}` : category}{" "}
+              (rest)
+            </span>
             <span
               className={`font-mono tabular-nums ${
                 t.splitRemainder < 0 ? "text-red-600 dark:text-red-400" : ""
@@ -527,7 +567,9 @@ function SplitPanel({
         <AddSplitForm
           key={t.splits.length}
           transaction={t}
+          category={category}
           categories={categories}
+          knownSubs={knownSubs}
           onChanged={onChanged}
         />
       )}
@@ -547,11 +589,18 @@ function SplitPanel({
 
 function AddSplitForm({
   transaction: t,
+  category,
   categories,
+  knownSubs,
   onChanged,
 }: {
   transaction: TransactionDTO;
+  // The row's own effective category (parent only), so the picker can offer
+  // it even when it came from an unmapped Plaid primary — same reasoning as
+  // CategoryEditor's `options` below.
+  category: string;
   categories: string[];
+  knownSubs: Map<string, Set<string>>;
   onChanged: () => void;
 }) {
   // From the second carve-out onward the amount left is the natural default:
@@ -566,9 +615,20 @@ function AddSplitForm({
   const [amount, setAmount] = useState(
     t.splits.length > 0 && left > 0 ? left.toFixed(2) : ""
   );
-  const [category, setCategory] = useState(categories[0] ?? "");
+  // Same picker the row itself uses: the user's list plus whatever this row
+  // already shows, so a part can be carved under a category the row is
+  // currently wearing even when that came from an unmapped Plaid primary.
+  const options = useMemo(
+    () => categoryOptionsFor(categories, category, t.plaidCategory),
+    [categories, category, t.plaidCategory]
+  );
+  const [cat, setCat] = useState(options[0] ?? category);
+  const [sub, setSub] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  const subs = [...(knownSubs.get(cat) ?? [])].sort((a, b) => a.localeCompare(b));
+  const datalistId = `split-subs-${t.id}`;
 
   const submit = async () => {
     setBusy(true);
@@ -577,7 +637,11 @@ function AddSplitForm({
       const res = await fetch(`/api/transactions/${t.id}/splits`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount: Number(amount), category }),
+        body: JSON.stringify({
+          amount: Number(amount),
+          category: cat,
+          subcategory: sub.trim() || null,
+        }),
       });
       if (!res.ok) {
         // The server owns validation; showing its message keeps the two from
@@ -601,24 +665,41 @@ function AddSplitForm({
       <input
         type="number"
         step="0.01"
-        min="0"
+        min="0.01"
         value={amount}
         onChange={(e) => setAmount(e.target.value)}
         aria-label="Split amount"
         className="w-24 rounded border border-black/15 px-2 py-1 text-sm dark:border-white/15 dark:bg-transparent"
       />
       <select
-        value={category}
-        onChange={(e) => setCategory(e.target.value)}
+        value={cat}
+        onChange={(e) => {
+          setCat(e.target.value);
+          setSub("");
+        }}
         aria-label="Split category"
         className="rounded border border-black/15 px-2 py-1 text-sm dark:border-white/15 dark:bg-transparent"
       >
-        {categories.map((c) => (
+        {options.map((c) => (
           <option key={c} value={c}>
             {c}
           </option>
         ))}
       </select>
+      <input
+        type="text"
+        value={sub}
+        onChange={(e) => setSub(e.target.value)}
+        placeholder="Subcategory (optional)"
+        list={datalistId}
+        aria-label="Split subcategory"
+        className="w-44 rounded border border-black/15 px-2 py-1 text-sm dark:border-white/15 dark:bg-transparent"
+      />
+      <datalist id={datalistId}>
+        {subs.map((s) => (
+          <option key={s} value={s} />
+        ))}
+      </datalist>
       <button
         type="button"
         onClick={() => void submit()}
@@ -673,17 +754,19 @@ function CategoryEditor({
   const { mode } = useProMode();
   const locked = linkedTo !== null;
   // An unsplit row is not expandable, so the first carve-out has nowhere else
-  // to be started from.
-  const canSplit = mode === "pro" && isSplittable(transaction);
+  // to be started from. Restricted to an unsplit row: once there are parts,
+  // the row is expandable and the panel's own AddSplitForm is the one place
+  // to add another — without this, an already-split, expanded row with the
+  // editor open would render two identical add-split forms at once.
+  const canSplit =
+    mode === "pro" && isSplittable(transaction) && transaction.splits.length === 0;
 
   // Selectable categories: the user's list, plus whatever this row already
   // shows (e.g. a Plaid primary with no mapping) so nothing gets orphaned.
-  const options = useMemo(() => {
-    const set = new Set(categories);
-    set.add(category);
-    set.add(transaction.plaidCategory);
-    return [...set].sort((a, b) => a.localeCompare(b));
-  }, [categories, category, transaction.plaidCategory]);
+  const options = useMemo(
+    () => categoryOptionsFor(categories, category, transaction.plaidCategory),
+    [categories, category, transaction.plaidCategory]
+  );
 
   const subs = [...(knownSubs.get(cat) ?? [])].sort((a, b) =>
     a.localeCompare(b)
@@ -798,7 +881,9 @@ function CategoryEditor({
           {splitting ? (
             <AddSplitForm
               transaction={transaction}
+              category={category}
               categories={categories}
+              knownSubs={knownSubs}
               onChanged={onSplit}
             />
           ) : (
@@ -820,9 +905,11 @@ function CategoryEditor({
 function Badge({
   children,
   tone,
+  title,
 }: {
   children: React.ReactNode;
   tone: "amber" | "slate" | "violet";
+  title?: string;
 }) {
   const tones = {
     amber:
@@ -834,6 +921,7 @@ function Badge({
   };
   return (
     <span
+      title={title}
       className={`shrink-0 whitespace-nowrap rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide ${tones[tone]}`}
     >
       {children}
