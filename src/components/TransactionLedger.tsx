@@ -29,6 +29,8 @@ export function TransactionLedger() {
   const [sort, setSort] = useState<SortColumn>("date");
   const [dir, setDir] = useState<SortDir>("desc");
   const [categories, setCategories] = useState<string[]>([]);
+  // Category name -> its subcategories, declared or in use.
+  const [subcategories, setSubcategories] = useState<Map<string, string[]>>(new Map());
 
   // Load accounts once for the payment-account filter. If it fails the
   // dropdown just stays on "All accounts".
@@ -52,7 +54,11 @@ export function TransactionLedger() {
       .then((res) => (res.ok ? res.json() : null))
       .then((json) => {
         if (json && !cancelled) {
-          setCategories(json.categories.map((c: { name: string }) => c.name));
+          const cats = json.categories as { name: string; subcategories: { name: string }[] }[];
+          setCategories(cats.map((c) => c.name));
+          setSubcategories(
+            new Map(cats.map((c) => [c.name, c.subcategories.map((s) => s.name)]))
+          );
         }
       })
       .catch(() => {});
@@ -206,6 +212,7 @@ export function TransactionLedger() {
               transactions={data?.transactions ?? []}
               onChanged={load}
               categories={categories}
+              subcategories={subcategories}
               sort={sort}
               dir={dir}
               onSort={handleSort}

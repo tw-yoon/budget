@@ -239,6 +239,23 @@ model Category {
   createdAt DateTime @default(now())
 
   plaidMappings CategoryMapping[]
+  subcategories Subcategory[]
+}
+
+// A subcategory the user declared under a category from /settings/categories.
+// Like categories, subcategories live on transactions and rules as TEXT
+// ("Parent > Sub"), so a sub can also exist purely by being used — typed into
+// the ledger, say. This table holds the declared ones, so a sub can be set up
+// before anything uses it; the Settings list shows both kinds.
+model Subcategory {
+  id         String   @id @default(cuid())
+  categoryId String
+  name       String
+  createdAt  DateTime @default(now())
+
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([categoryId, name])
 }
 
 // Which of Plaid's personal-finance-category primaries resolve to this

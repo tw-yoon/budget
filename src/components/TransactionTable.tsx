@@ -55,6 +55,7 @@ export function TransactionTable({
   transactions,
   onChanged,
   categories,
+  subcategories,
   sort,
   dir,
   onSort,
@@ -62,6 +63,7 @@ export function TransactionTable({
   transactions: TransactionDTO[];
   onChanged: () => void;
   categories: string[];
+  subcategories: Map<string, string[]>;
   sort: SortColumn;
   dir: SortDir;
   onSort: (column: SortColumn) => void;
@@ -75,10 +77,13 @@ export function TransactionTable({
     new Map()
   );
 
-  // Subcategories already in use, grouped by parent — feeds the editor's
-  // datalist so existing subs are one click away but free text still works.
+  // Subcategories from Settings plus any used on this page or saved this
+  // session, grouped by parent — feeds the editor's datalist so existing subs
+  // are one click away but free text still works.
   const knownSubs = useMemo(() => {
-    const map = new Map<string, Set<string>>();
+    const map = new Map<string, Set<string>>(
+      [...subcategories].map(([parent, subs]) => [parent, new Set(subs)])
+    );
     const add = (raw: string | null) => {
       if (!raw) return;
       const { parent, sub } = splitCategory(raw);
@@ -89,7 +94,7 @@ export function TransactionTable({
     for (const t of transactions) add(t.userCategory);
     for (const raw of overrides.values()) add(raw);
     return map;
-  }, [transactions, overrides]);
+  }, [subcategories, transactions, overrides]);
 
   if (transactions.length === 0) {
     return (

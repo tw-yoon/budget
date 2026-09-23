@@ -9,6 +9,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { renameCategoryIn } from "@/lib/category-rename";
+import { groupSubcategories, type SubcategoryUsage } from "@/lib/subcategories";
 
 export interface CategoryDTO {
   id: string;
@@ -17,6 +18,7 @@ export interface CategoryDTO {
   transactionCount: number;
   ruleCount: number;
   resolvedTransactionCount: number;
+  subcategories: SubcategoryUsage[];
 }
 
 /** Thrown when a delete would strand references. */
@@ -54,6 +56,14 @@ export class ReservedCategoryError extends Error {
       `"${categoryName}" controls how transactions are excluded from spending — it cannot be renamed or deleted`
     );
     this.name = "ReservedCategoryError";
+  }
+}
+
+/** Thrown when adding a subcategory its category already declares. */
+export class SubcategoryExistsError extends Error {
+  constructor(readonly subcategoryName: string) {
+    super(`"${subcategoryName}" already exists`);
+    this.name = "SubcategoryExistsError";
   }
 }
 
@@ -132,9 +142,33 @@ export async function listCategoryNames(): Promise<string[]> {
  */
 export async function listCategories(): Promise<CategoryDTO[]> {
   const rows = await prisma.category.findMany({
-    include: { plaidMappings: { select: { pfcPrimary: true } } },
+    include: {
+      plaidMappings: { select: { pfcPrimary: true } },
+      subcategories: { select: { name: true } },
+    },
     orderBy: { name: "asc" },
   });
+
+  // Every "Parent > Sub" value in use, counted once per distinct value — two
+  // grouped queries cover every category's subs.
+  const [txSubs, ruleSubs] = await Promise.all([
+    prisma.transaction.groupBy({
+      by: ["userCategory"],
+      where: { userCategory: { contains: " > " } },
+      _count: { _all: true },
+    }),
+    prisma.categoryRule.groupBy({
+      by: ["category"],
+      where: { category: { contains: " > " } },
+      _count: { _all: true },
+    }),
+  ]);
+  const subs = groupSubcategories(
+    rows.map((c) => c.name),
+    rows.flatMap((c) => c.subcategories.map((s) => ({ parent: c.name, name: s.name }))),
+    txSubs.map((g) => ({ value: g.userCategory!, count: g._count._all })),
+    ruleSubs.map((g) => ({ value: g.category, count: g._count._all }))
+  );
 
   return Promise.all(
     rows.map(async (c) => {
@@ -154,6 +188,7 @@ export async function listCategories(): Promise<CategoryDTO[]> {
           where: ruleUsing(c.name),
         }),
         resolvedTransactionCount: await addResolved(transactionCount, plaidPrimaries),
+        subcategories: subs.get(c.name) ?? [],
       };
     })
   );
@@ -168,6 +203,7 @@ export async function createCategory(name: string): Promise<CategoryDTO> {
     transactionCount: 0,
     ruleCount: 0,
     resolvedTransactionCount: 0,
+    subcategories: [],
   };
 }
 
@@ -233,6 +269,19 @@ export async function renameCategory(
       // it. Checking for the existing name first is what keeps the unique
       // constraint from ever being violated.
       await tx.categoryMapping.updateMany({
+        where: { categoryId: source.id },
+        data: { categoryId: existing.id },
+      });
+      // Declared subcategories move too, except those the survivor already
+      // declares — dropping those first keeps (categoryId, name) unique.
+      const survivorSubs = await tx.subcategory.findMany({
+        where: { categoryId: existing.id },
+        select: { name: true },
+      });
+      await tx.subcategory.deleteMany({
+        where: { categoryId: source.id, name: { in: survivorSubs.map((s) => s.name) } },
+      });
+      await tx.subcategory.updateMany({
         where: { categoryId: source.id },
         data: { categoryId: existing.id },
       });
@@ -333,4 +382,100 @@ export async function loadPlaidCategoryMap(): Promise<Map<string, string>> {
     select: { pfcPrimary: true, category: { select: { name: true } } },
   });
   return new Map(rows.map((r) => [r.pfcPrimary, r.category.name]));
+}
+
+/**
+ * Declare a subcategory under a category, so it can be picked in the ledger
+ * before anything uses it. Declaring one that is already in use (typed into
+ * the ledger) is fine — it just becomes declared.
+ */
+export async function createSubcategory(categoryId: string, name: string): Promise<void> {
+  const cat = await prisma.category.findUnique({ where: { id: categoryId } });
+  if (!cat) throw new Error("Category not found");
+  try {
+    await prisma.subcategory.create({ data: { categoryId, name } });
+  } catch (err) {
+    if (err && typeof err === "object" && (err as { code?: string }).code === "P2002") {
+      throw new SubcategoryExistsError(name);
+    }
+    throw err;
+  }
+}
+
+/**
+ * Rename a subcategory, rewriting every "Parent > Sub" that names it. Renaming
+ * onto a sub the category already has — declared or merely used — merges the
+ * two, and like a category merge that has to be confirmed.
+ */
+export async function renameSubcategory(
+  categoryId: string,
+  from: string,
+  to: string,
+  allowMerge = false
+): Promise<{ merged: boolean; movedTransactions: number; movedRules: number }> {
+  const cat = await prisma.category.findUnique({ where: { id: categoryId } });
+  if (!cat) throw new Error("Category not found");
+  if (from === to) return { merged: false, movedTransactions: 0, movedRules: 0 };
+
+  const oldValue = cat.name + " > " + from;
+  const newValue = cat.name + " > " + to;
+  const [movedTransactions, movedRules, targetRow, targetTx, targetRules] =
+    await Promise.all([
+      prisma.transaction.count({ where: { userCategory: oldValue } }),
+      prisma.categoryRule.count({ where: { category: oldValue } }),
+      prisma.subcategory.findUnique({ where: { categoryId_name: { categoryId, name: to } } }),
+      prisma.transaction.count({ where: { userCategory: newValue } }),
+      prisma.categoryRule.count({ where: { category: newValue } }),
+    ]);
+  const merged = Boolean(targetRow) || targetTx > 0 || targetRules > 0;
+  if (merged && !allowMerge) {
+    throw new MergeNotConfirmedError(to, movedTransactions, movedRules, movedTransactions);
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.transaction.updateMany({
+      where: { userCategory: oldValue },
+      data: { userCategory: newValue },
+    });
+    await tx.categoryRule.updateMany({
+      where: { category: oldValue },
+      data: { category: newValue },
+    });
+    // The declared row follows the rename; when the target is already
+    // declared, the source row just goes.
+    if (targetRow) {
+      await tx.subcategory.deleteMany({ where: { categoryId, name: from } });
+    } else {
+      await tx.subcategory.updateMany({ where: { categoryId, name: from }, data: { name: to } });
+    }
+  });
+
+  return { merged, movedTransactions, movedRules };
+}
+
+/**
+ * Remove a subcategory. Anything using it falls back to the bare parent
+ * category — analytics already roll subs up into their parent, so no spend
+ * moves between categories.
+ */
+export async function deleteSubcategory(
+  categoryId: string,
+  name: string
+): Promise<{ movedTransactions: number; movedRules: number }> {
+  const cat = await prisma.category.findUnique({ where: { id: categoryId } });
+  if (!cat) throw new Error("Category not found");
+  const value = cat.name + " > " + name;
+
+  return prisma.$transaction(async (tx) => {
+    const txs = await tx.transaction.updateMany({
+      where: { userCategory: value },
+      data: { userCategory: cat.name },
+    });
+    const rules = await tx.categoryRule.updateMany({
+      where: { category: value },
+      data: { category: cat.name },
+    });
+    await tx.subcategory.deleteMany({ where: { categoryId, name } });
+    return { movedTransactions: txs.count, movedRules: rules.count };
+  });
 }
