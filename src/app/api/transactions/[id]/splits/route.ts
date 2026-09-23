@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { joinCategory } from "@/lib/categories";
-import { validateNewSplit } from "@/lib/splits";
+import { roundToCents, validateNewSplit } from "@/lib/splits";
 
 // POST /api/transactions/:id/splits — carve part of a purchase out under its
 // own category.
@@ -41,7 +41,7 @@ export async function POST(
     // a form-validated one, so `step="0.01"` on the input never actually stops
     // something like 30.005 from reaching here and breaking the "slices sum
     // back to the transaction" invariant by half a cent.
-    const amount = Math.round(Number(body.amount) * 100) / 100;
+    const amount = roundToCents(Number(body.amount));
 
     const problem = validateNewSplit(row, row.splits, { amount, userCategory });
     if (problem) {

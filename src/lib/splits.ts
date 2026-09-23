@@ -48,7 +48,8 @@ export interface Slice {
 /** Below this, a remainder is zero rather than float noise. */
 const CENT = 0.005;
 
-function round(n: number): number {
+/** The money-rounding rule every write path applies before storing an amount. */
+export function roundToCents(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
@@ -59,7 +60,7 @@ function round(n: number): number {
  * user typed in response to an event they never saw.
  */
 export function remainderOf(amount: number, parts: { amount: number }[]): number {
-  return round(parts.reduce((left, p) => left - p.amount, amount));
+  return roundToCents(parts.reduce((left, p) => left - p.amount, amount));
 }
 
 /**

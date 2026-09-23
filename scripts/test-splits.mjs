@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   remainderOf,
+  roundToCents,
   sliceForAnalytics,
   sliceTransaction,
   validateNewSplit,
@@ -71,16 +72,32 @@ test("slices always sum back to the transaction", () => {
   assert.equal(Math.round(total * 100) / 100, row.amount);
 });
 
-test("slices still sum back when a sub-cent input is rounded to cents first", () => {
-  // Regression test: the POST route used to store `Number(body.amount)`
-  // unrounded, so a sub-cent value like 30.005 (from a client sending a plain
-  // number, not a form-validated one) landed in the database as-is and broke
-  // this same invariant by half a cent. The route now rounds with
-  // `Math.round(amount * 100) / 100` before writing — mirrored here so the
-  // invariant is pinned against that exact kind of input, not just clean ones.
-  const rawAmount = 30.005;
-  const rounded = Math.round(rawAmount * 100) / 100;
-  const parts = [part(rounded, "Food", "a")];
+test("an unrounded sub-cent part breaks the sum-back invariant", () => {
+  // Regression test for the failure mode `roundToCents` exists to prevent.
+  // The POST route used to store `Number(body.amount)` unrounded, so a
+  // sub-cent value like 30.005 (from a client sending a plain number, not a
+  // form-validated one) landed in the database as-is. 30.005 has no exact
+  // binary floating-point representation, and — empirically, verified by
+  // running this exact computation — that pushes the row's slices out of
+  // sync with the row: `remainderOf` rounds `100 - 30.005` up to 70 (its
+  // own rounding), but the part itself is left at the raw 30.005, so the
+  // slices total 100.005, which itself rounds to 100.01 — a cent off the
+  // real transaction amount of 100, not the 100 the invariant requires.
+  const parts = [part(30.005, "Food", "a")];
+  const total = sliceTransaction(row, parts).reduce((s, x) => s + x.amount, 0);
+  assert.notEqual(Math.round(total * 100) / 100, row.amount);
+  assert.equal(Math.round(total * 100) / 100, 100.01);
+});
+
+test("roundToCents on that same sub-cent value keeps slices summing back", () => {
+  // The fix: every write path rounds through `roundToCents` before a part's
+  // amount is stored, so the part itself is 30.01, not 30.005 — and with
+  // that, the slices sum back to the row exactly. Pinned two ways: the
+  // rounded value itself (so a broken formula is caught even if a
+  // self-cancelling total would otherwise hide it), and the sum-back check.
+  const roundedPart = roundToCents(30.005);
+  assert.equal(roundedPart, 30.01);
+  const parts = [part(roundedPart, "Food", "a")];
   const total = sliceTransaction(row, parts).reduce((s, x) => s + x.amount, 0);
   assert.equal(Math.round(total * 100) / 100, row.amount);
 });
