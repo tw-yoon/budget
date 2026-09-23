@@ -8,7 +8,13 @@
  */
 
 import { prisma } from "@/lib/prisma";
-import { firstMatch } from "@/lib/rules";
+import {
+  firstMatch,
+  firstMatchingRule,
+  ruleOutcomes,
+  isHandSet,
+  type RuleOutcome,
+} from "@/lib/rules";
 import type { CategoryRule, Prisma } from "@prisma/client";
 
 /** Enabled rules in evaluation order: priority asc, then oldest first. */
@@ -24,6 +30,38 @@ export async function listRules(): Promise<CategoryRule[]> {
   return prisma.categoryRule.findMany({
     orderBy: [{ priority: "asc" }, { createdAt: "asc" }],
   });
+}
+
+/**
+ * Every transaction a rule could ever touch, with who set its category. A
+ * connected row takes its category from its link and is never a rule's.
+ */
+function unlinkedRows() {
+  return prisma.transaction.findMany({
+    where: { linkedToId: null },
+    select: {
+      id: true,
+      name: true,
+      merchantName: true,
+      userCategory: true,
+      userCategorySource: true,
+    },
+  });
+}
+
+/**
+ * All rules, each with how its matches stand (see ruleOutcomes). A disabled
+ * rule matches nothing, so its outcome is null.
+ */
+export async function listRulesWithOutcomes(): Promise<
+  (CategoryRule & { outcome: RuleOutcome | null })[]
+> {
+  const [rules, rows] = await Promise.all([listRules(), unlinkedRows()]);
+  const outcomes = ruleOutcomes(
+    rules.filter((r) => r.enabled),
+    rows
+  );
+  return rules.map((r) => ({ ...r, outcome: outcomes.get(r.id) ?? null }));
 }
 
 export async function createRule(
@@ -59,9 +97,10 @@ export function categorizeRow(
 /**
  * Re-apply all enabled rules to existing transactions. Only rows that are
  * rule-owned or uncategorized are eligible (manual/Venmo categories are kept).
- * Returns how many rows changed. Backs the "Apply now" button.
+ * Returns how many rows changed, and how many matched but were kept because
+ * they were set by hand. Backs the "Apply now" button.
  */
-export async function applyRulesToExisting(): Promise<{ updated: number }> {
+export async function applyRulesToExisting(): Promise<{ updated: number; kept: number }> {
   const rules = await getEnabledRulesOrdered();
 
   const rows = await prisma.transaction.findMany({
@@ -100,5 +139,35 @@ export async function applyRulesToExisting(): Promise<{ updated: number }> {
     }
   }
 
-  return { updated };
+  const kept = (await unlinkedRows()).filter(
+    (row) => isHandSet(row.userCategorySource) && categorizeRow(rules, row) !== null
+  ).length;
+
+  return { updated, kept };
+}
+
+/**
+ * Let a rule take over the hand-set rows it matches: those where it is the
+ * first matching rule, but whose category was set by hand and so kept. Their
+ * hand-set category is replaced, and from then on they follow the rule.
+ * Returns how many rows changed.
+ */
+export async function takeOverHandSet(ruleId: string): Promise<{ updated: number }> {
+  const rules = await getEnabledRulesOrdered();
+  const rule = rules.find((r) => r.id === ruleId);
+  if (!rule) throw new Error("Rule not found or off");
+
+  const ids = (await unlinkedRows())
+    .filter(
+      (row) =>
+        isHandSet(row.userCategorySource) && firstMatchingRule(rules, row)?.id === rule.id
+    )
+    .map((row) => row.id);
+
+  const { count } = await prisma.transaction.updateMany({
+    // linkedToId: null again, in case a row was connected since it was read.
+    where: { id: { in: ids }, linkedToId: null },
+    data: { userCategory: rule.category, userCategorySource: "RULE" },
+  });
+  return { updated: count };
 }

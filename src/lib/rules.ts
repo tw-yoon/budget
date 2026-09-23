@@ -75,78 +75,15 @@ export const RULE_CATEGORIES: string[] = Array.from(
   new Set([...P2P_CATEGORIES, ...PFC_PRIMARIES.map(humanizePfc)])
 ).sort((a, b) => a.localeCompare(b));
 
-/** The fields of a rule needed to evaluate a match. */
-export interface RuleMatcher {
-  field: string;
-  matchType: string;
-  pattern: string;
-}
-
-/** The transaction fields a rule matches against. */
-export interface RuleTarget {
-  name: string;
-  merchantName: string | null;
-}
-
-/** Build the haystack string(s) a rule inspects for a given field. */
-function haystacks(field: string, tx: RuleTarget): string[] {
-  switch (field) {
-    case "MERCHANT":
-      return [tx.merchantName ?? ""];
-    case "NAME":
-      return [tx.name];
-    case "EITHER":
-    default:
-      return [tx.merchantName ?? "", tx.name];
-  }
-}
-
-/**
- * Does `rule` match `tx`? Text matching is case-insensitive. An invalid regex
- * never matches (rather than throwing) so one bad rule can't break a sync.
- */
-export function ruleMatches(rule: RuleMatcher, tx: RuleTarget): boolean {
-  const pattern = rule.pattern.trim();
-  if (!pattern) return false;
-
-  const fields = haystacks(rule.field, tx);
-
-  if (rule.matchType === "REGEX") {
-    let re: RegExp;
-    try {
-      re = new RegExp(pattern, "i");
-    } catch {
-      return false;
-    }
-    return fields.some((f) => re.test(f));
-  }
-
-  const needle = pattern.toLowerCase();
-  return fields.some((f) => {
-    const hay = f.toLowerCase();
-    switch (rule.matchType) {
-      case "EQUALS":
-        return hay === needle;
-      case "STARTS_WITH":
-        return hay.startsWith(needle);
-      case "CONTAINS":
-      default:
-        return hay.includes(needle);
-    }
-  });
-}
-
-/**
- * Return the category assigned by the first matching rule, or null if none
- * match. `rules` must already be ordered (priority asc, then createdAt asc) and
- * filtered to enabled rules by the caller.
- */
-export function firstMatch(
-  rules: (RuleMatcher & { category: string })[],
-  tx: RuleTarget
-): string | null {
-  for (const rule of rules) {
-    if (ruleMatches(rule, tx)) return rule.category;
-  }
-  return null;
-}
+// The matcher lives in an import-free module so node:test can load it.
+export {
+  ruleMatches,
+  firstMatch,
+  firstMatchingRule,
+  ruleOutcomes,
+  isHandSet,
+  type RuleMatcher,
+  type RuleTarget,
+  type RuleRow,
+  type RuleOutcome,
+} from "@/lib/rule-match";

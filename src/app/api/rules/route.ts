@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { listRules, createRule } from "@/services/rules.service";
+import { listRulesWithOutcomes, createRule } from "@/services/rules.service";
 import {
   RULE_FIELDS,
   RULE_MATCH_TYPES,
@@ -7,10 +7,11 @@ import {
   type RuleMatchType,
 } from "@/lib/rules";
 
-// GET /api/rules — all rules in evaluation order.
+// GET /api/rules — all rules in evaluation order, each with how the rows it
+// matches stand (`outcome`, null for a rule that is off).
 export async function GET() {
   try {
-    const rules = await listRules();
+    const rules = await listRulesWithOutcomes();
     return NextResponse.json({ rules });
   } catch (err) {
     console.error("[rules GET]", err);
