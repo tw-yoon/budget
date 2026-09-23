@@ -220,24 +220,46 @@ export function TransactionLedger() {
           </div>
 
           {totalPages > 1 && (
-            <div className="flex items-center justify-between text-sm">
-              <button
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page <= 1}
-                className="rounded-md border border-black/15 px-3 py-1.5 disabled:opacity-40 dark:border-white/15"
-              >
-                ← Previous
-              </button>
-              <span className="text-black/55 dark:text-white/55">
+            <div className="flex items-center justify-between gap-2 text-sm">
+              {/* First/Last drop their words on a phone so all four buttons
+                  fit beside the page count. */}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setPage(1)}
+                  disabled={page <= 1}
+                  aria-label="First page"
+                  className="whitespace-nowrap rounded-md border border-black/15 px-3 py-1.5 disabled:opacity-40 dark:border-white/15"
+                >
+                  «<span className="hidden sm:inline"> First</span>
+                </button>
+                <button
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page <= 1}
+                  className="whitespace-nowrap rounded-md border border-black/15 px-3 py-1.5 disabled:opacity-40 dark:border-white/15"
+                >
+                  ← Previous
+                </button>
+              </div>
+              <span className="text-center text-black/55 dark:text-white/55">
                 Page {page} of {totalPages}
               </span>
-              <button
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={page >= totalPages}
-                className="rounded-md border border-black/15 px-3 py-1.5 disabled:opacity-40 dark:border-white/15"
-              >
-                Next →
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={page >= totalPages}
+                  className="whitespace-nowrap rounded-md border border-black/15 px-3 py-1.5 disabled:opacity-40 dark:border-white/15"
+                >
+                  Next →
+                </button>
+                <button
+                  onClick={() => setPage(totalPages)}
+                  disabled={page >= totalPages}
+                  aria-label="Last page"
+                  className="whitespace-nowrap rounded-md border border-black/15 px-3 py-1.5 disabled:opacity-40 dark:border-white/15"
+                >
+                  <span className="hidden sm:inline">Last </span>»
+                </button>
+              </div>
             </div>
           )}
         </>
