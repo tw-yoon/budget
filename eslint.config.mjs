@@ -12,6 +12,11 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Where a parallel dev server puts its build output (next.config.ts reads
+    // NEXT_DIST_DIR; .claude/launch.json sets it). Same generated bundles as
+    // .next/, just under another name — and thousands of lint problems if
+    // left in, which drown out every real one.
+    ".next-preview/**",
   ]),
 ]);
 
