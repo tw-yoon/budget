@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useState, useSyncExternalStore } from "react";
 import type { BenefitDTO, EarningsCategoryDTO, UserCardDTO } from "@/types";
 import { formatCurrency, humanizePfc } from "@/lib/format";
 import {
@@ -18,6 +18,55 @@ import {
 const inputClass =
   "rounded-md border border-black/15 bg-transparent px-2.5 py-1.5 text-sm outline-none placeholder:text-black/40 focus:border-black/40 dark:border-white/15 dark:placeholder:text-white/40 dark:focus:border-white/40";
 
+/**
+ * Whether a card's statement-credits list is expanded, remembered per card.
+ *
+ * The value lives in localStorage, which does not exist while the server
+ * renders — so it cannot simply be read during render, and reading it in an
+ * effect (what this used to do) paints the default first and corrects it a
+ * frame later. useSyncExternalStore is React's supported way to read a browser
+ * store: getServerSnapshot supplies the value the server renders and hydration
+ * compares against, and the stored value is picked up on the client without a
+ * mismatch. Writes go through writeCreditsOpen, which notifies every mounted
+ * card so each re-reads its own key.
+ */
+const CREDITS_OPEN_DEFAULT = true;
+const creditsOpenListeners = new Set<() => void>();
+// Only consulted when localStorage throws (private browsing, blocked storage),
+// so the toggle still works for the life of the page even when nothing can be
+// persisted.
+const creditsOpenFallback = new Map<string, boolean>();
+
+function subscribeCreditsOpen(onStoreChange: () => void) {
+  creditsOpenListeners.add(onStoreChange);
+  return () => {
+    creditsOpenListeners.delete(onStoreChange);
+  };
+}
+
+function readCreditsOpen(storeKey: string): boolean {
+  try {
+    const saved = localStorage.getItem(storeKey);
+    return saved === null ? CREDITS_OPEN_DEFAULT : saved === "1";
+  } catch {
+    return creditsOpenFallback.get(storeKey) ?? CREDITS_OPEN_DEFAULT;
+  }
+}
+
+function writeCreditsOpen(storeKey: string, open: boolean): void {
+  try {
+    localStorage.setItem(storeKey, open ? "1" : "0");
+  } catch {
+    creditsOpenFallback.set(storeKey, open);
+  }
+  for (const onStoreChange of creditsOpenListeners) onStoreChange();
+}
+
+// The server has no localStorage, so it renders the default.
+function serverCreditsOpen(): boolean {
+  return CREDITS_OPEN_DEFAULT;
+}
+
 export function UserCardItem({
   card,
   onChanged,
@@ -33,21 +82,18 @@ export function UserCardItem({
 }) {
   const [adding, setAdding] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [showCredits, setShowCredits] = useState(true);
 
   // Remember collapsed/expanded per card across reloads.
   const storeKey = `card-credits-open:${card.id}`;
-  useEffect(() => {
-    const saved = localStorage.getItem(storeKey);
-    if (saved !== null) setShowCredits(saved === "1");
-  }, [storeKey]);
+  const readThisCard = useCallback(() => readCreditsOpen(storeKey), [storeKey]);
+  const showCredits = useSyncExternalStore(
+    subscribeCreditsOpen,
+    readThisCard,
+    serverCreditsOpen,
+  );
 
   function toggleCredits() {
-    setShowCredits((v) => {
-      const next = !v;
-      localStorage.setItem(storeKey, next ? "1" : "0");
-      return next;
-    });
+    writeCreditsOpen(storeKey, !showCredits);
   }
 
   async function deleteCard() {
