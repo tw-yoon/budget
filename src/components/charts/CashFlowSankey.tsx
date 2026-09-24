@@ -242,11 +242,17 @@ export function CashFlowSankey() {
   const cxOf = (k: number) => slotW * (k + 0.5);
 
   /**
-   * Gradient stops down one side of the hub: each band's colour placed at the
-   * centre of the height that band occupies, so the colour is exact where the
-   * band meets the bar and blends between neighbours in between. Both sides
-   * fill the hub exactly — a shortfall on either side arrives as the savings
-   * drawdown or leaves as the surplus — so the offsets need no normalizing.
+   * Gradient stops down one side of the hub.
+   *
+   * Each band holds its own colour flat across the height it actually occupies
+   * and blends only in a short zone either side of a boundary. Placing a single
+   * stop at each band's centre instead — the obvious way to write this — makes
+   * every band bleed halfway into its neighbour, so a tall green band above a
+   * short red one reads as green far past where the green ends.
+   *
+   * Both sides fill the hub exactly — a shortfall on either side arrives as the
+   * savings drawdown or leaves as the surplus — so the offsets need no
+   * normalizing.
    */
   const hubStops = (nodes: Node[], totalH: number) => {
     if (!nodes.length || totalH <= 0)
@@ -255,9 +261,22 @@ export function CashFlowSankey() {
     let acc = 0;
     nodes.forEach((n, i) => {
       const h = n.amount * scale;
-      const centre = Math.min(1, Math.max(0, (acc + h / 2) / totalH));
+      const start = acc / totalH;
+      const end = (acc + h) / totalH;
+      // How far into this band the blend with its neighbour reaches. A share of
+      // the band so a thin one is not swallowed, capped so a tall one keeps a
+      // crisp edge rather than fading across a third of itself.
+      const fade = Math.min((end - start) * 0.3, 0.02);
+      const from = start + fade;
+      const to = end - fade;
       if (i === 0) out.push(<stop key="top" offset={0} stopColor={n.color} />);
-      out.push(<stop key={i} offset={centre} stopColor={n.color} />);
+      if (to > from) {
+        out.push(<stop key={`${i}a`} offset={from} stopColor={n.color} />);
+        out.push(<stop key={`${i}b`} offset={to} stopColor={n.color} />);
+      } else {
+        // Too thin to hold a plateau: one stop at its centre.
+        out.push(<stop key={`${i}c`} offset={(start + end) / 2} stopColor={n.color} />);
+      }
       if (i === nodes.length - 1) out.push(<stop key="bot" offset={1} stopColor={n.color} />);
       acc += h;
     });
@@ -467,20 +486,27 @@ export function CashFlowSankey() {
                   </mask>
                 </defs>
               );
-              // No rounded corners and the same opacity as the ribbons each
-              // side carries, so the bar stops reading as a rectangle laid on
-              // top of the flows and becomes the stretch where they meet. It
-              // is still a real element, so the whole zone still answers the
-              // pointer with the month's total.
+              // The two layers are opaque and the group carries the one
+              // opacity, so the outflow side *replaces* the inflow side as the
+              // ramp crosses. Fading each layer separately instead leaves the
+              // right-hand end showing half an outflow colour over half an
+              // inflow colour, and two hues at half strength over a dark
+              // background is grey — which is exactly the flat grey this was
+              // meant to be rid of.
+              //
+              // No rounded corners, and roughly the ribbons' own opacity, so
+              // the bar stops reading as a rectangle laid over the flows and
+              // becomes the stretch where they meet. It is still a real
+              // element, so the whole zone answers the pointer with the total.
               els.push(
-                <rect key={`hub-${k}`} {...hubBox} fill={`url(#${gid}-in)`} fillOpacity={0.42}
-                  role="img" aria-label={`${m.label} · Total cash flow: ${formatCurrency(m.hubTotal)}`}
-                  {...track({ month: m.label, name: "Total cash flow", amount: m.hubTotal, color: HUB_COLOR })} />
-              );
-              els.push(
-                // Masked-out pixels take no pointer events, so the hover has to
-                // live on the layer underneath.
-                <rect key={`hub-out-${k}`} {...hubBox} fill={`url(#${gid}-out)`} fillOpacity={0.5} mask={`url(#${gid}-mask)`} pointerEvents="none" />
+                <g key={`hub-${k}`} opacity={0.46}>
+                  <rect {...hubBox} fill={`url(#${gid}-in)`}
+                    role="img" aria-label={`${m.label} · Total cash flow: ${formatCurrency(m.hubTotal)}`}
+                    {...track({ month: m.label, name: "Total cash flow", amount: m.hubTotal, color: HUB_COLOR })} />
+                  {/* Masked-out pixels take no pointer events, so the hover
+                      lives on the layer underneath. */}
+                  <rect {...hubBox} fill={`url(#${gid}-out)`} mask={`url(#${gid}-mask)`} pointerEvents="none" />
+                </g>
               );
 
               // labels

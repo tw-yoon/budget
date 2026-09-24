@@ -4,6 +4,12 @@ Versions are `MAJOR.MINOR.PATCH`. The middle number moves for new features,
 the last for fixes alone. Still `0.x`: the database schema changes between
 releases (migrations run on update), so nothing here is a stability promise.
 
+## 0.5.5 — 2026-09-24
+
+- Fixes the cash-flow bar introduced over 0.5.3–0.5.4: the outgoing side had
+  gone grey again, and each colour bled halfway into its neighbour, so a tall
+  income band read as if it ran well past where it ends.
+
 ## 0.5.4 — 2026-09-24
 
 - The middle of Cash flow over time no longer looks like a bar laid over the
