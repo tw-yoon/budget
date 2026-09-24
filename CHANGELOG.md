@@ -4,6 +4,14 @@ Versions are `MAJOR.MINOR.PATCH`. The middle number moves for new features,
 the last for fixes alone. Still `0.x`: the database schema changes between
 releases (migrations run on update), so nothing here is a stability promise.
 
+## 0.5.6 — 2026-09-24
+
+- `npm test` runs the tests before the linter instead of after it. Linting
+  first meant one unused variable stopped the suite before it checked anything
+  that matters, so a session with work in progress lost every real signal over
+  a cosmetic warning. The linter is still strict and still fails the run — it
+  just no longer decides whether the tests get to speak.
+
 ## 0.5.5 — 2026-09-24
 
 - Fixes the cash-flow bar introduced over 0.5.3–0.5.4: the outgoing side had
