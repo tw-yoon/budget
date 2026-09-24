@@ -19,46 +19,8 @@ update), so nothing here is a stability promise.
 
 ## 0.5.5 — 2026-09-24
 
-- Fixes the cash-flow bar introduced over 0.5.3–0.5.4: the outgoing side had
-  gone grey again, and each colour bled halfway into its neighbour, so a tall
-  income band read as if it ran well past where it ends. The bar is also wider
-  than the end nodes now, so incoming colours turn into outgoing ones over a
-  long enough stretch to read as a blend; the ribbons either side give back
-  what it takes, leaving the diagram the same size.
-
-## 0.5.4 — 2026-09-24
-
-- The middle of Cash flow over time no longer looks like a bar laid over the
-  diagram. It keeps its gradient but drops the rounded corners and takes the
-  same opacity as the ribbons either side, so the flows read as running
-  through it. Hovering that stretch still reports the month's total.
-
-## 0.5.3 — 2026-09-24
-
-- The bar in the middle of Cash flow over time is no longer flat grey. It
-  carries the colours it joins: what arrives, down its left edge, fading
-  across to what leaves, down its right. The legend shows it as an outline
-  now, since it has no colour of its own to key.
-
-## 0.5.2 — 2026-09-24
-
-- Hovering any band in Cash flow over time names it — month, category, and the
-  subcategory when there is one — with its amount. The thin bands are the ones
-  that needed it, since there is no room to label them, so every band also
-  carries a hit area tall enough to point at. Only in the one- and two-month
-  views: wider than that, a month is a few pixels across and its bands are too
-  tightly stacked to point at the one you meant.
-
-## 0.5.1 — 2026-09-24
-
-- Light, Dark and System under Settings > Mode. The choice follows you between
-  browsers like every other setting, and is applied before the first paint, so
-  there is no flash of the wrong palette on load. System is the default and
-  tracks the device.
-- The spending-by-category donut fits inside its card again. Its radius was a
-  fixed 88px against a box that is 169px across, so it overhung the edges.
-
-## 0.5.0 — 2026-09-24
+Developed as a series of changes and published together, so 0.5.0 through
+0.5.4 were never releases of their own.
 
 - The income and tax organizer is part of Pro. Normal leaves it out of the
   sidebar, and `/income` says where the switch is rather than redirecting.
@@ -66,6 +28,38 @@ update), so nothing here is a stability promise.
 - The mode switch now reaches the sidebar immediately. Every reader of the
   mode shared one stored value but kept its own copy of it, which only showed
   as a bug once something mounted for the whole session rather than per page.
+- Light, Dark and System under Settings > Mode. The choice follows you between
+  browsers like every other setting, and is applied before the first paint, so
+  there is no flash of the wrong palette on load. System is the default and
+  tracks the device.
+- The spending-by-category donut fits inside its card again. Its radius was a
+  fixed 88px against a box that is 169px across, so it overhung the edges.
+- Hovering any band in Cash flow over time names it — month, category, and the
+  subcategory when there is one — with its amount. The thin bands are the ones
+  that needed it, since there is no room to label them, so every band also
+  carries a hit area tall enough to point at. Only in the one- and two-month
+  views: wider than that, a month is a few pixels across and its bands are too
+  tightly stacked to point at the one you meant.
+- The bar in the middle of Cash flow over time is no longer flat grey. It
+  carries the colours it joins: what arrives, down its left edge, fading
+  across to what leaves, down its right. The legend shows it as an outline
+  now, since it has no colour of its own to key.
+- The middle of Cash flow over time no longer looks like a bar laid over the
+  diagram. It keeps its gradient but drops the rounded corners and takes the
+  same opacity as the ribbons either side, so the flows read as running
+  through it. Hovering that stretch still reports the month's total.
+- Fixes the cash-flow bar introduced over 0.5.3–0.5.4: the outgoing side had
+  gone grey again, and each colour bled halfway into its neighbour, so a tall
+  income band read as if it ran well past where it ends. The bar is also wider
+  than the end nodes now, so incoming colours turn into outgoing ones over a
+  long enough stretch to read as a blend; the ribbons either side give back
+  what it takes, leaving the diagram the same size.
+
+
+
+
+
+
 
 ## 0.4.1 — 2026-09-24
 
