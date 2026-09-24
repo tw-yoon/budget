@@ -8,10 +8,16 @@ test("bank-feed Zelle payments are recognized", () => {
   assert.ok(isZelleName("ZELLE INSTANT PMT TO JANE DOE"));
 });
 
+test("Chase's wording is recognized too", () => {
+  assert.ok(isZelleName("Zelle payment to Jane Doe JPM99bxk42q7"));
+  assert.ok(isZelleName("Zelle payment from John Roe JPM99cmf3ab1"));
+});
+
 test("a memo that merely mentions Zelle is not a Zelle payment", () => {
   assert.ok(!isZelleName("Paid back via zelle pmt"));
   assert.ok(!isZelleName("Zelle"));
   assert.ok(!isZelleName("Zellers Pmt To Store"));
+  assert.ok(!isZelleName("Zelle was down so paying here"));
 });
 
 test("Venmo imports and Zelle payments are P2P; ordinary merchants aren't", () => {
@@ -23,6 +29,11 @@ test("Venmo imports and Zelle payments are P2P; ordinary merchants aren't", () =
 test("the counterparty drops the trailing bank reference", () => {
   assert.equal(parseZelleCounterparty("Zelle Instant Pmt To Jane Doe Usb0wbt3kq9"), "Jane Doe");
   assert.equal(parseZelleCounterparty("Ref Zelle Standard Pmt From John Roe 0923 Usbx1"), "John Roe");
+});
+
+test("Chase's counterparty drops its JPM reference", () => {
+  assert.equal(parseZelleCounterparty("Zelle payment to Jane Doe JPM99bxk42q7"), "Jane Doe");
+  assert.equal(parseZelleCounterparty("Zelle payment from John Roe JPM99cmf3ab1"), "John Roe");
 });
 
 test("direction words are matched case-insensitively", () => {
