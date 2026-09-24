@@ -202,7 +202,7 @@ no build step and no dependency. Run them before sending a change.
 - `/accounts` — balances, net worth, due dates
 - `/transactions` — ledger with search & filters; connect a refund to the purchase it pays back
 - `/venmo` — categorize Venmo payments, or connect a payback to what it covers; changes flow into Transactions & Analytics
-- `/zelle` — categorize or connect Zelle payments from your bank feed the same way
+- `/zelle` — categorize or connect Zelle payments from your bank feed the same way (recognizes U.S. Bank's and Chase's descriptions; other banks word Zelle differently — see `src/lib/zelle.ts`)
 - `/analytics` — spending by category, monthly trend, top merchants
 - `/benefits` — card earning rates + statement credits + "best card by category"
 - `/subscriptions` — detected recurring subscriptions and their monthly total
