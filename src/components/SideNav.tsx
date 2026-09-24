@@ -3,11 +3,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Fragment, useEffect, useState } from "react";
+import { useProMode } from "./useProMode";
 
 type NavItem = {
   href: string;
   label: string;
   code: string;
+  /** Only listed in Pro. The route still answers; it explains itself there. */
+  pro?: true;
   children?: { href: string; label: string }[];
 };
 
@@ -24,7 +27,7 @@ const NAV: NavItem[] = [
   { href: "/analytics", label: "Analytics", code: "ANL" },
   { href: "/benefits", label: "Benefits", code: "BEN" },
   { href: "/subscriptions", label: "Subscriptions", code: "SUB" },
-  { href: "/income", label: "Income", code: "INC" },
+  { href: "/income", label: "Income", code: "INC", pro: true },
   {
     href: "/settings",
     label: "Settings",
@@ -42,6 +45,12 @@ const STORAGE_KEY = "sidebar-collapsed";
 
 export default function SideNav({ version }: { version: string }) {
   const pathname = usePathname();
+  // Pro entries stay out of the nav until the stored mode says otherwise —
+  // including while it is still loading, so a Normal user never sees one
+  // appear and then vanish. A Pro user's entries arrive a moment after mount,
+  // which is the same way the Pro sections of Analytics behave.
+  const { mode } = useProMode();
+  const items = NAV.filter((item) => !item.pro || mode === "pro");
   // Collapsed by default; a saved preference (if any) overrides on mount.
   const [collapsed, setCollapsed] = useState(true);
 
@@ -84,7 +93,7 @@ export default function SideNav({ version }: { version: string }) {
       </Link>
 
       <nav className="flex flex-1 flex-col overflow-y-auto">
-        {NAV.map((item) => {
+        {items.map((item) => {
           const active =
             pathname === item.href || pathname.startsWith(item.href + "/");
           // A parent is never itself the destination — /settings redirects to

@@ -13,7 +13,7 @@ const MODES: { value: ProMode; label: string; blurb: string }[] = [
     value: "pro",
     label: "Pro",
     blurb:
-      "Everything in Normal, plus the cash-flow diagram, the cumulative spending graph, and splitting one payment across categories in the ledger.",
+      "Everything in Normal, plus the income and tax organizer, the cash-flow diagram, the cumulative spending graph, and splitting one payment across categories in the ledger.",
   },
 ];
 

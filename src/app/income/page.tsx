@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { statesForYear, calcStateTax, effectiveStateRate, type StateInfo } from "@/data/state-tax-brackets";
 import { loadSynced, pushSynced } from "@/lib/ui-state";
+import { ProOnly } from "@/components/ProOnly";
 
 // ── Federal tax tables by year ───────────────────────────────────────────────
 // Each tax year holds its own IRS limits, brackets, and standard deduction. To
@@ -786,7 +787,7 @@ function parseStore(parsed: any): Store {
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
-export default function IncomePage() {
+function IncomeOrganizer() {
   const [store, setStore] = useState<Store>(freshStore);
   const [loaded, setLoaded] = useState(false);
 
@@ -1904,5 +1905,16 @@ export default function IncomePage() {
         </div>
       )}
     </main>
+  );
+}
+
+// Pro-only: the organizer is a projection built from figures you type in, not
+// from synced bank data, and it is the one page here that is about next April
+// rather than about this month.
+export default function IncomePage() {
+  return (
+    <ProOnly title="Income">
+      <IncomeOrganizer />
+    </ProOnly>
   );
 }

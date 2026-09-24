@@ -4,6 +4,15 @@ Versions are `MAJOR.MINOR.PATCH`. The middle number moves for new features,
 the last for fixes alone. Still `0.x`: the database schema changes between
 releases (migrations run on update), so nothing here is a stability promise.
 
+## 0.5.0 — 2026-09-24
+
+- The income and tax organizer is part of Pro. Normal leaves it out of the
+  sidebar, and `/income` says where the switch is rather than redirecting.
+  Nothing you entered is touched — turning Pro back on shows it unchanged.
+- The mode switch now reaches the sidebar immediately. Every reader of the
+  mode shared one stored value but kept its own copy of it, which only showed
+  as a bug once something mounted for the whole session rather than per page.
+
 ## 0.4.1 — 2026-09-24
 
 - The version is shown on the home page too, not only at the foot of the
