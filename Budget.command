@@ -206,6 +206,17 @@ do_update() {
 # handshake, but none of that bounds a connection that opens and then goes
 # silent -- so the fetch is backgrounded and polled against a 10s wall-clock
 # cap as the real backstop, standing in for `timeout`, which macOS lacks.
+# The "version" field of a package.json fed in on stdin. Read from a file for
+# this clone and from `git show` for the published one, so the two can be
+# compared without checking anything out.
+read_version() {
+  sed -n 's/^[[:space:]]*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1
+}
+
+app_version() {
+  read_version < "$SCRIPT_DIR/package.json" 2>/dev/null
+}
+
 check_updates() {
   updatable || return 0
 
@@ -233,7 +244,18 @@ check_updates() {
   behind=$(git -C "$SCRIPT_DIR" rev-list --count "HEAD..origin/$branch" 2>/dev/null) || return 0
   [ "${behind:-0}" -gt 0 ] || return 0
 
-  echo "$behind update(s) available — run ./Budget.command --update"
+  # A version bump is the useful thing to report: a commit count says nothing
+  # about what changed, and CHANGELOG.md is written per version. Releases that
+  # ship without a bump (or a clone whose package.json won't parse) still get
+  # the count, which is better than silence.
+  local here there
+  here=$(app_version)
+  there=$(git -C "$SCRIPT_DIR" show "origin/$branch:package.json" 2>/dev/null | read_version)
+  if [ -n "$here" ] && [ -n "$there" ] && [ "$here" != "$there" ]; then
+    echo "v$there available (you have v$here) — run ./Budget.command --update"
+  else
+    echo "$behind update(s) available — run ./Budget.command --update"
+  fi
 }
 
 # A rebuild is needed when there's no build yet, --rebuild was passed, or any
@@ -413,7 +435,8 @@ main() {
     # Skip the "Ready" line if ensure_db's node_modules guard fired (status 2)
     # -- telling someone to launch right after telling them deps aren't
     # installed undercuts the warning.
-    [ "$db_status" -eq 2 ] || echo "Ready. Launch with ./Budget.command"
+    local version; version=$(app_version)
+    [ "$db_status" -eq 2 ] || echo "Ready${version:+ (v$version)}. Launch with ./Budget.command"
     exit 0
   fi
 
@@ -467,7 +490,8 @@ main() {
     fi
   fi
 
-  echo "Budget is ready at $URL"
+  local version; version=$(app_version)
+  echo "Budget${version:+ v$version} is ready at $URL"
   $NO_OPEN || open "$URL"
 }
 

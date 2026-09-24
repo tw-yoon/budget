@@ -122,6 +122,32 @@ git rev-parse HEAD:budget-claude
 git -C "$PUB" rev-parse HEAD^{tree}
 ```
 
+**Superseded 2026-09-24: two things this replay does not handle on its own.**
+
+*Versions.* Releases are numbered (`MAJOR.MINOR.PATCH`, minor for features,
+patch for fixes alone). Before cutting the patches, bump `version` in
+`package.json` and add the matching `CHANGELOG.md` entry with today's date;
+`scripts/test-version.mjs` fails if the two disagree. The launcher compares
+this field against the published one to say *what* is waiting rather than how
+many commits, so a release that skips the bump is reported only as a count.
+
+*Merges.* `format-patch` omits merge commits, so a branch that was merged after
+main had moved (and whose conflicts were resolved by hand) cannot be replayed
+as a straight line — `git am` stops on the first conflicted file. Rebuild the
+shape instead: apply the branch's own patches on the public commit matching its
+real base, apply main's patches in merge order, then `git merge` in the public
+clone and take the conflicted files verbatim from the private merge
+(`git show <merge>:budget-claude/<path>`). After every step, compare
+`git rev-parse HEAD^{tree}` in the clone against
+`git rev-parse <private commit>:budget-claude`; they must be equal. Never add
+the monorepo as a remote of the public clone — copy file contents, not objects.
+Use `git am -3 --keep-cr`: `-3` for the merges, `--keep-cr` because a Venmo
+test fixture deliberately uses CRLF line endings.
+
+Scrub every commit, not only the tip — each private commit becomes a public
+one, so run the checks over each patch's added lines *and* its message,
+including merge messages, which carry no patch.
+
 Then run `npm test` in the monorepo, and only once it is green:
 
 ```bash

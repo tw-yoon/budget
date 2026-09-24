@@ -40,7 +40,7 @@ const NAV: NavItem[] = [
 
 const STORAGE_KEY = "sidebar-collapsed";
 
-export default function SideNav() {
+export default function SideNav({ version }: { version: string }) {
   const pathname = usePathname();
   // Collapsed by default; a saved preference (if any) overrides on mount.
   const [collapsed, setCollapsed] = useState(true);
@@ -134,6 +134,15 @@ export default function SideNav() {
           );
         })}
       </nav>
+
+      {/* Which build you are looking at — the same string the launcher
+          reports and CHANGELOG.md is written against. Hidden when collapsed,
+          where the rail is only wide enough for the three-letter codes. */}
+      {!collapsed && (
+        <div className="shrink-0 border-t border-line px-[18px] py-[7px] text-[10px] uppercase tracking-[.14em] text-muted2">
+          v{version}
+        </div>
+      )}
 
       <button
         type="button"

@@ -94,8 +94,13 @@ Every normal launch checks in the background for a newer published version and
 tells you if one exists:
 
 ```
-2 update(s) available — run ./Budget.command --update
+v0.5.0 available (you have v0.4.0) — run ./Budget.command --update
 ```
+
+[CHANGELOG.md](CHANGELOG.md) says what each version changed. The version you
+are running is shown at the bottom of the sidebar, and by
+`./Budget.command --check-only`. (A release published without a version bump
+is reported as a count of commits instead.)
 
 To apply it:
 
@@ -189,7 +194,7 @@ data or absolute home path is about to be published, and
 `scripts/test-launcher.sh` drives `Budget.command` against throwaway clones to
 cover setup, updating, and the cases where it must refuse — both plain Bash.
 The `scripts/test-*.mjs` suites cover pure logic — refund linking, the wording
-of a failed sync, category renaming, the analytics detail mode, payment
+of a failed sync, category renaming, the version and changelog, the analytics detail mode, payment
 splits, reward earnings and the best-card rates, Venmo statement parsing, Zelle
 detection, subscription costs, the shared UI-state store — on Node's built-in
 test runner, importing the TypeScript directly (Node 22.18+ strips the types,

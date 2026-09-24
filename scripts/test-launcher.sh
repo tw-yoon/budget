@@ -159,7 +159,10 @@ out=$(run_app "$tmp/app")
 assert_lacks "$out" "Starting Budget" "--check-only never starts a server"
 [ ! -d "$tmp/app/.next" ] && pass "--check-only never builds" \
                           || fail "--check-only never builds" ".next was created"
-assert_has "$out" "Ready. Launch with" "--check-only reports ready"
+assert_has "$out" "Launch with ./Budget.command" "--check-only reports ready"
+# --check-only is the "what have I got?" command, so it names the version.
+assert_has "$out" "Ready (v$(sed -n 's/^[[:space:]]*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$ROOT/package.json" | head -1))" \
+           "--check-only names the installed version"
 
 echo "launcher: env bootstrap"
 tmp=$(make_fixture)
@@ -289,6 +292,18 @@ git -C "$tmp/seed" push -q "$tmp/origin.git" main
 out=$(run_app "$tmp/app")
 assert_has "$out" "2 update(s) available" "counts commits behind"
 assert_has "$out" "--update" "names the command to run"
+
+# A published version bump is reported as versions, not as a commit count:
+# "3 commits" says nothing about what changed, and the number resets meaning
+# every release.
+local_v=$(sed -n 's/^[[:space:]]*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$ROOT/package.json" | head -1)
+sed -i '' 's/"version": "[^"]*"/"version": "99.9.9"/' "$tmp/seed/package.json"
+git -C "$tmp/seed" -c user.email=t@test -c user.name=test commit -qam "publish 99.9.9"
+git -C "$tmp/seed" push -q "$tmp/origin.git" main
+out=$(run_app "$tmp/app")
+assert_has "$out" "v99.9.9 available" "names the published version"
+assert_has "$out" "you have v$local_v" "names the version you are on"
+assert_lacks "$out" "update(s) available" "drops the commit count once versions differ"
 
 # Being behind must never stop the app from launching.
 assert_has "$out" "Ready" "still reports ready when behind"
