@@ -17,6 +17,11 @@ const eslintConfig = defineConfig([
     // .next/, just under another name — and thousands of lint problems if
     // left in, which drown out every real one.
     ".next-preview/**",
+    // Session worktrees nest a full copy of the app — source from other
+    // branches plus their own .next/ and .next-preview/ output. The patterns
+    // above only match at the top level, so without this lint descends into
+    // them and main fails on another branch's work or build output.
+    ".claude/worktrees/**",
   ]),
 ]);
 
