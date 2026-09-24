@@ -227,6 +227,11 @@ export function CashFlowSankey() {
   const nodeW = single ? 13 : 11;
   const pad = 7;
   const slotW = (width || 600) / N;
+  // The hub is wider than the end nodes: it is the one place two palettes cross,
+  // and a 13px bar gives the crossfade no room to read as one. The ribbon runs
+  // either side give back exactly what it takes, so the diagram keeps its
+  // footprint and only the length of the blend changes.
+  const hubW = Math.round(Math.max(nodeW, Math.min(single ? 64 : 28, slotW * 0.1)));
   const showLabels = single || slotW > 300;
   const showMonthEvery = Math.max(1, Math.ceil((narrow ? 60 : 80) / slotW));
   const showTotals = slotW > 70;
@@ -348,10 +353,13 @@ export function CashFlowSankey() {
               const cx = cxOf(k) - (hasSubStage ? (subRun + nodeW) / 2 : 0);
               const hubH = m.hubTotal * scale;
               const hubTop = topPad + (usableH - hubH) / 2;
-              const hubL = cx - nodeW / 2;
-              const hubR = cx + nodeW / 2;
-              const xInR = hubL - ribbonRun;
-              const xSpL = hubR + ribbonRun;
+              const hubL = cx - hubW / 2;
+              const hubR = cx + hubW / 2;
+              // What the wider hub takes, the runs give back — but never below
+              // a length that still reads as a flowing ribbon.
+              const run = Math.max(16, ribbonRun - (hubW - nodeW) / 2);
+              const xInR = hubL - run;
+              const xSpL = hubR + run;
               const xSubL = xSpL + nodeW + subRun;
               const els: React.ReactElement[] = [];
 
@@ -465,7 +473,7 @@ export function CashFlowSankey() {
               // left edge, fading across to what leaves, down the right. A flat
               // grey here was the one part of the diagram that said nothing.
               const gid = `${uid}-hub-${k}`;
-              const hubBox = { x: hubL, y: hubTop, width: nodeW, height: Math.max(1, hubH) };
+              const hubBox = { x: hubL, y: hubTop, width: hubW, height: Math.max(1, hubH) };
               els.push(
                 <defs key={`hg-${k}`}>
                   <linearGradient id={`${gid}-in`} x1="0" y1="0" x2="0" y2="1">

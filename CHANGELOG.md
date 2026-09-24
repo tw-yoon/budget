@@ -8,7 +8,10 @@ releases (migrations run on update), so nothing here is a stability promise.
 
 - Fixes the cash-flow bar introduced over 0.5.3–0.5.4: the outgoing side had
   gone grey again, and each colour bled halfway into its neighbour, so a tall
-  income band read as if it ran well past where it ends.
+  income band read as if it ran well past where it ends. The bar is also wider
+  than the end nodes now, so incoming colours turn into outgoing ones over a
+  long enough stretch to read as a blend; the ribbons either side give back
+  what it takes, leaving the diagram the same size.
 
 ## 0.5.4 — 2026-09-24
 
