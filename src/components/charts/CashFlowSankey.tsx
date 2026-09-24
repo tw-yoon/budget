@@ -467,15 +467,20 @@ export function CashFlowSankey() {
                   </mask>
                 </defs>
               );
+              // No rounded corners and the same opacity as the ribbons each
+              // side carries, so the bar stops reading as a rectangle laid on
+              // top of the flows and becomes the stretch where they meet. It
+              // is still a real element, so the whole zone still answers the
+              // pointer with the month's total.
               els.push(
-                <rect key={`hub-${k}`} {...hubBox} rx={2} fill={`url(#${gid}-in)`}
+                <rect key={`hub-${k}`} {...hubBox} fill={`url(#${gid}-in)`} fillOpacity={0.42}
                   role="img" aria-label={`${m.label} · Total cash flow: ${formatCurrency(m.hubTotal)}`}
                   {...track({ month: m.label, name: "Total cash flow", amount: m.hubTotal, color: HUB_COLOR })} />
               );
               els.push(
                 // Masked-out pixels take no pointer events, so the hover has to
                 // live on the layer underneath.
-                <rect key={`hub-out-${k}`} {...hubBox} rx={2} fill={`url(#${gid}-out)`} mask={`url(#${gid}-mask)`} pointerEvents="none" />
+                <rect key={`hub-out-${k}`} {...hubBox} fill={`url(#${gid}-out)`} fillOpacity={0.5} mask={`url(#${gid}-mask)`} pointerEvents="none" />
               );
 
               // labels

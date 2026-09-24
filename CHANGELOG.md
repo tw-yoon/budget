@@ -4,6 +4,13 @@ Versions are `MAJOR.MINOR.PATCH`. The middle number moves for new features,
 the last for fixes alone. Still `0.x`: the database schema changes between
 releases (migrations run on update), so nothing here is a stability promise.
 
+## 0.5.4 — 2026-09-24
+
+- The middle of Cash flow over time no longer looks like a bar laid over the
+  diagram. It keeps its gradient but drops the rounded corners and takes the
+  same opacity as the ribbons either side, so the flows read as running
+  through it. Hovering that stretch still reports the month's total.
+
 ## 0.5.3 — 2026-09-24
 
 - The bar in the middle of Cash flow over time is no longer flat grey. It
