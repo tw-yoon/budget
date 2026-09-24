@@ -4,6 +4,13 @@ Versions are `MAJOR.MINOR.PATCH`. The middle number moves for new features,
 the last for fixes alone. Still `0.x`: the database schema changes between
 releases (migrations run on update), so nothing here is a stability promise.
 
+## 0.5.2 — 2026-09-24
+
+- Hovering any band in Cash flow over time names it — month, category, and the
+  subcategory when there is one — with its amount. The thin bands are the ones
+  that needed it, since there is no room to label them, so every band also
+  carries a hit area tall enough to point at.
+
 ## 0.5.1 — 2026-09-24
 
 - Light, Dark and System under Settings > Mode. The choice follows you between

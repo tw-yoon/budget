@@ -13,6 +13,11 @@ const TOP_INCOME = 5;
 const DRAG_PX = 80;
 const NARROW = 560;
 const LABEL_MIN_H = 11;
+// A band one pixel tall is impossible to point at, and those are exactly the
+// ones with no room for a label — so every node carries an invisible hit area
+// of at least this height. Kept under the node gap (`pad`) so a thin band's
+// target cannot swallow its neighbour's.
+const HIT_MIN_H = 9;
 
 const kCompact = (n: number) => formatCompactCurrency(n);
 const truncate = (s: string, max: number) =>
@@ -46,6 +51,19 @@ function ribbon(
 ): string {
   const mx = (x0 + x1) / 2;
   return `M${x0},${t0} C${mx},${t0} ${mx},${t1} ${x1},${t1} L${x1},${b1} C${mx},${b1} ${mx},${b0} ${x0},${b0} Z`;
+}
+
+/** What the pointer is over, in container coordinates. */
+interface Hover {
+  x: number;
+  y: number;
+  month: string;
+  name: string;
+  /** Set when `name` is a subcategory, so the tooltip can show the pair. */
+  parent?: string;
+  amount: number;
+  color: string;
+  faded?: boolean; // the un-subcategorized remainder of a branched category
 }
 
 interface MonthVM {
@@ -115,6 +133,7 @@ export function CashFlowSankey() {
   const { view, startIdx, pan, zoom, panTo } = win;
 
   const [grabbing, setGrabbing] = useState(false);
+  const [hover, setHover] = useState<Hover | null>(null);
   const [width, setWidth] = useState(0);
   const chartRef = useRef<HTMLDivElement | null>(null);
   const drag = useRef<{ startX: number; startEnd: number } | null>(null);
@@ -129,6 +148,7 @@ export function CashFlowSankey() {
   }, []);
 
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    setHover(null); // panning, not reading
     drag.current = { startX: e.clientX, startEnd: view.end };
     setGrabbing(true);
     try {
@@ -151,6 +171,23 @@ export function CashFlowSankey() {
     } catch {
       /* ignore */
     }
+  };
+
+  // Hover handlers for one band. Pointer capture during a drag routes moves to
+  // the container, so the only case to guard is the pointer that went down on
+  // a band and is now panning.
+  const track = (info: Omit<Hover, "x" | "y">) => {
+    const show = (e: React.PointerEvent<SVGElement>) => {
+      if (drag.current) return;
+      const box = chartRef.current?.getBoundingClientRect();
+      if (!box) return;
+      setHover({ ...info, x: e.clientX - box.left, y: e.clientY - box.top });
+    };
+    return {
+      onPointerEnter: show,
+      onPointerMove: show,
+      onPointerLeave: () => setHover(null),
+    };
   };
 
   const windowMonths = useMemo(
@@ -213,7 +250,7 @@ export function CashFlowSankey() {
         onPointerMove={onPointerMove}
         onPointerUp={endDrag}
         onPointerCancel={endDrag}
-        className={`mt-3 w-full select-none ${hasFlow ? (grabbing ? "cursor-grabbing" : "cursor-grab") : ""}`}
+        className={`relative mt-3 w-full select-none ${hasFlow ? (grabbing ? "cursor-grabbing" : "cursor-grab") : ""}`}
         style={{ touchAction: "pan-y" }}
       >
         {loading ? (
@@ -258,12 +295,15 @@ export function CashFlowSankey() {
               let hy = hubTop;
               m.inflow.forEach((n, idx) => {
                 const h = n.amount * scale;
+                const inHover = { month: m.label, name: n.name, amount: n.amount, color: n.color };
+                const inLabel = `${m.label} · ${n.name}: ${formatCurrency(n.amount)}`;
                 els.push(
-                  <path key={`ir-${k}-${idx}`} d={ribbon(xInR, ny, ny + h, hubL, hy, hy + h)} fill={n.color} fillOpacity={0.42}>
-                    <title>{`${n.name}: ${formatCurrency(n.amount)}`}</title>
-                  </path>
+                  <path key={`ir-${k}-${idx}`} d={ribbon(xInR, ny, ny + h, hubL, hy, hy + h)} fill={n.color} fillOpacity={0.42} role="img" aria-label={inLabel} {...track(inHover)} />
                 );
                 els.push(<rect key={`in-${k}-${idx}`} x={xInR - nodeW} y={ny} width={nodeW} height={Math.max(1, h)} rx={2} fill={n.color} />);
+                els.push(
+                  <rect key={`ih-${k}-${idx}`} x={xInR - nodeW - 3} y={ny + h / 2 - Math.max(h, HIT_MIN_H) / 2} width={nodeW + 6} height={Math.max(h, HIT_MIN_H)} fill="transparent" role="img" aria-label={inLabel} {...track(inHover)} />
+                );
                 if (showLabels && h >= LABEL_MIN_H)
                   els.push(
                     <text key={`il-${k}-${idx}`} x={xInR - nodeW - 5} y={ny + h / 2} textAnchor="end" dominantBaseline="central" fontSize={10} fill="currentColor">
@@ -281,12 +321,15 @@ export function CashFlowSankey() {
               let subCursor = topPad; // keeps adjacent categories' sub stacks from overlapping
               m.outflow.forEach((n, idx) => {
                 const h = n.amount * scale;
+                const outHover = { month: m.label, name: n.name, amount: n.amount, color: n.color };
+                const outLabel = `${m.label} · ${n.name}: ${formatCurrency(n.amount)}`;
                 els.push(
-                  <path key={`or-${k}-${idx}`} d={ribbon(hubR, hy, hy + h, xSpL, oy, oy + h)} fill={n.color} fillOpacity={0.5}>
-                    <title>{`${n.name}: ${formatCurrency(n.amount)}`}</title>
-                  </path>
+                  <path key={`or-${k}-${idx}`} d={ribbon(hubR, hy, hy + h, xSpL, oy, oy + h)} fill={n.color} fillOpacity={0.5} role="img" aria-label={outLabel} {...track(outHover)} />
                 );
                 els.push(<rect key={`on-${k}-${idx}`} x={xSpL} y={oy} width={nodeW} height={Math.max(1, h)} rx={2} fill={n.color} />);
+                els.push(
+                  <rect key={`oh-${k}-${idx}`} x={xSpL - 3} y={oy + h / 2 - Math.max(h, HIT_MIN_H) / 2} width={nodeW + 6} height={Math.max(h, HIT_MIN_H)} fill="transparent" role="img" aria-label={outLabel} {...track(outHover)} />
+                );
 
                 // Branch this category into its subcategories; whatever wasn't
                 // subcategorized flows on as a "rest" node ("Other <category>").
@@ -304,12 +347,22 @@ export function CashFlowSankey() {
                   let py = oy; // cursor along the parent node's right edge
                   parts.forEach((p, j) => {
                     const sh = p.amount * scale;
+                    const subHover = {
+                      month: m.label,
+                      name: p.rest ? "Other" : p.name,
+                      parent: n.name,
+                      amount: p.amount,
+                      color: n.color,
+                      faded: p.rest,
+                    };
+                    const subLabel = `${m.label} · ${n.name} › ${p.rest ? "Other" : p.name}: ${formatCurrency(p.amount)}`;
                     els.push(
-                      <path key={`sr-${k}-${idx}-${j}`} d={ribbon(xSpL + nodeW, py, py + sh, xSubL, sy, sy + sh)} fill={n.color} fillOpacity={p.rest ? 0.18 : 0.34}>
-                        <title>{`${n.name} > ${p.rest ? "Other" : p.name}: ${formatCurrency(p.amount)}`}</title>
-                      </path>
+                      <path key={`sr-${k}-${idx}-${j}`} d={ribbon(xSpL + nodeW, py, py + sh, xSubL, sy, sy + sh)} fill={n.color} fillOpacity={p.rest ? 0.18 : 0.34} role="img" aria-label={subLabel} {...track(subHover)} />
                     );
                     els.push(<rect key={`sn-${k}-${idx}-${j}`} x={xSubL} y={sy} width={nodeW} height={Math.max(1, sh)} rx={2} fill={n.color} fillOpacity={p.rest ? 0.5 : 0.85} />);
+                    els.push(
+                      <rect key={`sh-${k}-${idx}-${j}`} x={xSubL - 3} y={sy + sh / 2 - Math.max(sh, HIT_MIN_H) / 2} width={nodeW + 6} height={Math.max(sh, HIT_MIN_H)} fill="transparent" role="img" aria-label={subLabel} {...track(subHover)} />
+                    );
                     if (sh >= 8)
                       els.push(
                         <text key={`sl-${k}-${idx}-${j}`} x={xSubL + nodeW + 5} y={sy + sh / 2} textAnchor="start" dominantBaseline="central" fontSize={9.5} fill="currentColor" fillOpacity={p.rest ? 0.55 : 0.85} fontStyle={p.rest ? "italic" : "normal"}>
@@ -342,7 +395,11 @@ export function CashFlowSankey() {
               });
 
               // central total node
-              els.push(<rect key={`hub-${k}`} x={hubL} y={hubTop} width={nodeW} height={Math.max(1, hubH)} rx={2} fill={HUB_COLOR} fillOpacity={0.92} />);
+              els.push(
+                <rect key={`hub-${k}`} x={hubL} y={hubTop} width={nodeW} height={Math.max(1, hubH)} rx={2} fill={HUB_COLOR} fillOpacity={0.92}
+                  role="img" aria-label={`${m.label} · Total cash flow: ${formatCurrency(m.hubTotal)}`}
+                  {...track({ month: m.label, name: "Total cash flow", amount: m.hubTotal, color: HUB_COLOR })} />
+              );
 
               // labels
               if (k % showMonthEvery === 0)
@@ -365,6 +422,34 @@ export function CashFlowSankey() {
           </svg>
         ) : (
           <div className="h-72" />
+        )}
+
+        {/* Follows the pointer, and never receives it — a tooltip under the
+            cursor would end its own hover. Flips to the left of the pointer
+            near the right edge so it stays inside the chart. */}
+        {hover && (
+          <div
+            className="pointer-events-none absolute z-10 whitespace-nowrap border border-line bg-panel px-2 py-1.5 text-xs shadow-sm"
+            style={{
+              left: hover.x > (width || 0) - 190 ? undefined : hover.x + 14,
+              right: hover.x > (width || 0) - 190 ? Math.max(0, (width || 0) - hover.x + 14) : undefined,
+              top: Math.max(0, hover.y - 46),
+            }}
+          >
+            <div className="text-[10px] uppercase tracking-wide text-black/45 dark:text-white/45">
+              {hover.month}
+            </div>
+            <div className="mt-0.5 flex items-center gap-1.5 text-foreground">
+              <span className="h-2 w-2 shrink-0" style={{ background: hover.color, opacity: hover.faded ? 0.5 : 1 }} />
+              {hover.parent && (
+                <span className="text-black/55 dark:text-white/55">{hover.parent} ›</span>
+              )}
+              <span className={hover.faded ? "italic" : "font-medium"}>{hover.name}</span>
+            </div>
+            <div className="mt-0.5 font-mono tabular-nums text-foreground">
+              {formatCurrency(hover.amount)}
+            </div>
+          </div>
         )}
       </div>
 
@@ -391,7 +476,7 @@ export function CashFlowSankey() {
               Added {formatCurrency(-model.drawn)} to savings over this span
             </span>
           ) : null}
-          <span className="ml-auto hidden text-black/40 sm:inline dark:text-white/40">Drag to move</span>
+          <span className="ml-auto hidden text-black/40 sm:inline dark:text-white/40">Hover for detail · drag to move</span>
         </div>
       )}
     </div>
