@@ -8,7 +8,7 @@
 import { plaidClient } from "@/lib/plaid";
 import { getAccessToken } from "@/lib/token-store";
 import { prisma } from "@/lib/prisma";
-import { mapFrequency } from "@/lib/subscriptions";
+import { estimateNext, mapFrequency } from "@/lib/subscriptions";
 
 const EXCLUDE_PRIMARY = new Set([
   "LOAN_PAYMENTS",
@@ -80,29 +80,6 @@ export async function detectSubscriptions(): Promise<{
   }
 
   return { found, errors };
-}
-
-function estimateNext(lastDate: string | null | undefined, cadence: string): Date | null {
-  if (!lastDate) return null;
-  const d = new Date(`${lastDate}T12:00:00Z`);
-  if (isNaN(d.getTime())) return null;
-  switch (cadence) {
-    case "WEEKLY":
-      d.setDate(d.getDate() + 7);
-      break;
-    case "BIWEEKLY":
-      d.setDate(d.getDate() + 14);
-      break;
-    case "QUARTERLY":
-      d.setMonth(d.getMonth() + 3);
-      break;
-    case "YEARLY":
-      d.setFullYear(d.getFullYear() + 1);
-      break;
-    default:
-      d.setMonth(d.getMonth() + 1);
-  }
-  return d;
 }
 
 function plaidErrorCode(err: unknown): string {

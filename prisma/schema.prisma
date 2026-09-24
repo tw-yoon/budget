@@ -216,7 +216,7 @@ model Subscription {
   id           String    @id @default(cuid())
   name         String
   amount       Float
-  cadence      String    @default("MONTHLY") // WEEKLY | BIWEEKLY | MONTHLY | QUARTERLY | YEARLY
+  cadence      String    @default("MONTHLY") // WEEKLY | BIWEEKLY | SEMI_MONTHLY | MONTHLY | QUARTERLY | YEARLY
   nextDate     DateTime?
   merchantName String?
   accountId    String? // loose link to an Account
