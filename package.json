@@ -1,13 +1,13 @@
 {
   "name": "budget-claude",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint --max-warnings 0",
-    "test": "bash scripts/test-scrub.sh && npm run lint && bash scripts/test-launcher.sh && node --import ./scripts/resolve-alias.mjs --test scripts/test-links.mjs scripts/test-plaid-errors.mjs scripts/test-categories.mjs scripts/test-subcategories.mjs scripts/test-rules.mjs scripts/test-pro-mode.mjs scripts/test-splits.mjs scripts/test-rewards.mjs scripts/test-venmo.mjs scripts/test-zelle.mjs scripts/test-subscriptions.mjs scripts/test-ui-state.mjs scripts/test-version.mjs"
+    "test": "bash scripts/test-scrub.sh && npm run lint && bash scripts/test-launcher.sh && node --import ./scripts/resolve-alias.mjs --test scripts/test-links.mjs scripts/test-plaid-errors.mjs scripts/test-categories.mjs scripts/test-subcategories.mjs scripts/test-rules.mjs scripts/test-pro-mode.mjs scripts/test-splits.mjs scripts/test-rewards.mjs scripts/test-venmo.mjs scripts/test-zelle.mjs scripts/test-subscriptions.mjs scripts/test-ui-state.mjs scripts/test-version.mjs scripts/test-theme.mjs"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",

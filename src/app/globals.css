@@ -23,8 +23,15 @@
   --foreground: var(--text);
 }
 
+/*
+ * Dark is declared twice on purpose: once for people who never chose (follow
+ * the OS, unless they explicitly chose light) and once for people who did
+ * choose it (regardless of the OS). CSS has no way to share one block between
+ * two selectors without a preprocessor, and scripts/test-theme.mjs fails if
+ * the two ever stop matching.
+ */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: #0a0b0c;
     --panel: #111213;
     --panel2: #0d0e0f;
@@ -39,6 +46,22 @@
     --red: #ff4b4b;
     --amber: #ffb000;
   }
+}
+
+:root[data-theme="dark"] {
+  --bg: #0a0b0c;
+  --panel: #111213;
+  --panel2: #0d0e0f;
+  --border: #27292b;
+  --grid: #1a1c1d;
+  --text: #d6d9db;
+  --muted: #6b7075;
+  --dim: #3c4043;
+  --accent: #27d980;
+  --accent-contrast: #000000;
+  --green: #27d980;
+  --red: #ff4b4b;
+  --amber: #ffb000;
 }
 
 @theme inline {

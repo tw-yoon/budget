@@ -79,7 +79,14 @@ export function CategoryChart() {
           <div className="relative h-52 w-52 shrink-0">
             <ResponsiveContainer>
               <PieChart>
-                <Pie data={slices} dataKey="amount" nameKey="category" innerRadius={62} outerRadius={88} paddingAngle={2} stroke="none">
+                {/* Radii are pixels, so they have to match the box below:
+                    h-52/w-52 is 13rem, and globals.css sets a 13px root font,
+                    so that is 169px — not the 208px a 16px root would give.
+                    The old 88 drew a 176px circle that spilled out of its own
+                    169px box; 80 leaves a few pixels either side. Percentages
+                    would be the obvious fix but recharts 3.9 draws no sectors
+                    at all for them here. Inner keeps the original 0.7 ratio. */}
+                <Pie data={slices} dataKey="amount" nameKey="category" innerRadius={56} outerRadius={80} paddingAngle={2} stroke="none">
                   {slices.map((s) => (
                     <Cell key={s.category} fill={categoryColor(s.category)} />
                   ))}

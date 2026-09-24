@@ -4,6 +4,15 @@ Versions are `MAJOR.MINOR.PATCH`. The middle number moves for new features,
 the last for fixes alone. Still `0.x`: the database schema changes between
 releases (migrations run on update), so nothing here is a stability promise.
 
+## 0.5.1 — 2026-09-24
+
+- Light, Dark and System under Settings > Mode. The choice follows you between
+  browsers like every other setting, and is applied before the first paint, so
+  there is no flash of the wrong palette on load. System is the default and
+  tracks the device.
+- The spending-by-category donut fits inside its card again. Its radius was a
+  fixed 88px against a box that is 169px across, so it overhung the edges.
+
 ## 0.5.0 — 2026-09-24
 
 - The income and tax organizer is part of Pro. Normal leaves it out of the
