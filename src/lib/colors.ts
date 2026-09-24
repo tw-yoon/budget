@@ -45,3 +45,46 @@ export function categoryColor(name: string): string {
   for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
   return SPEND_PALETTE[h % SPEND_PALETTE.length];
 }
+
+/**
+ * Placeholder artwork for a credit card, until a real image is supplied.
+ *
+ * Pairs rather than single colours so the swatch reads as a card face with
+ * some depth instead of a flat block. Issuers get their own family — the three
+ * here are recognizable enough that a wrong-looking colour is worse than a
+ * neutral one — and cards from the same issuer vary within it, so two Amex
+ * cards are still told apart at a glance.
+ */
+const CARD_PALETTES: Record<string, [string, string][]> = {
+  AMEX: [
+    ["#4b6cb7", "#25355f"],
+    ["#5b7fa6", "#2b3f52"],
+    ["#8d99ae", "#434a55"],
+  ],
+  CHASE: [
+    ["#1e4f8a", "#0f2747"],
+    ["#2563eb", "#132f66"],
+    ["#0f766e", "#0a3b37"],
+  ],
+  DISCOVER: [
+    ["#e08a3c", "#7a451a"],
+    ["#c2703a", "#5f3417"],
+  ],
+};
+const CARD_FALLBACK: [string, string][] = [
+  ["#3f3f46", "#18181b"],
+  ["#475569", "#1e293b"],
+  ["#57534e", "#1c1917"],
+];
+
+/**
+ * Deterministic card → placeholder colours: the same card always looks the
+ * same, across reloads and browsers, without storing anything.
+ */
+export function cardArtColors(issuer: string, seed: string): { from: string; to: string } {
+  const family = CARD_PALETTES[issuer] ?? CARD_FALLBACK;
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
+  const [from, to] = family[h % family.length];
+  return { from, to };
+}

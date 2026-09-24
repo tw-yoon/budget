@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { loadSynced, pushSynced } from "@/lib/ui-state";
 import type { BenefitDTO, EarningsCategoryDTO, UserCardDTO } from "@/types";
 import { formatCurrency, humanizePfc } from "@/lib/format";
+import { CardArt } from "./CardArt";
 import {
   ISSUER_LABELS,
   MONTH_NAMES,
@@ -112,21 +113,25 @@ export function UserCardItem({
   return (
     <section className="overflow-hidden rounded-xl border border-black/10 dark:border-white/10">
       <header className="flex flex-wrap items-start justify-between gap-3 border-b border-black/10 px-4 py-3 dark:border-white/10">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="rounded bg-black/[0.06] px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide dark:bg-white/10">
-              {ISSUER_LABELS[card.issuer] ?? card.issuer}
-            </span>
-            <span className="font-medium">{card.name || "Card"}</span>
-            <span className="text-black/45 dark:text-white/45">··{card.last4}</span>
-          </div>
-          <div className="mt-1 flex flex-wrap items-center gap-1 text-xs text-black/50 dark:text-white/50">
-            <span>Member since</span>
-            <StartMonthPicker card={card} onChanged={onChanged} />
-            <span>
-              {years > 0 && `· ${years} yr${years > 1 ? "s" : ""} `}·{" "}
-              {card.benefitsUsedCount}/{card.benefitCount} credits maxed
-            </span>
+        <div className="flex min-w-0 items-start gap-3">
+          {/* No image is stored for a card yet, so this is the placeholder face. */}
+          <CardArt issuer={card.issuer} last4={card.last4} name={card.name} />
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="rounded bg-black/[0.06] px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide dark:bg-white/10">
+                {ISSUER_LABELS[card.issuer] ?? card.issuer}
+              </span>
+              <span className="font-medium">{card.name || "Card"}</span>
+              <span className="text-black/45 dark:text-white/45">··{card.last4}</span>
+            </div>
+            <div className="mt-1 flex flex-wrap items-center gap-1 text-xs text-black/50 dark:text-white/50">
+              <span>Member since</span>
+              <StartMonthPicker card={card} onChanged={onChanged} />
+              <span>
+                {years > 0 && `· ${years} yr${years > 1 ? "s" : ""} `}·{" "}
+                {card.benefitsUsedCount}/{card.benefitCount} credits maxed
+              </span>
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-2">

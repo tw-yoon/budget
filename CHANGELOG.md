@@ -11,6 +11,10 @@ update), so nothing here is a stability promise.
 
 ## Unreleased
 
+- Each card on Benefits shows its face on the left. No image is stored for a
+  card yet, so every card gets a placeholder: a deterministic colour pair, cut
+  to the proportions of a real card and carrying its issuer and last four, so
+  two cards from the same issuer are still told apart at a glance.
 - `npm test` runs the tests before the linter instead of after it. Linting
   first meant one unused variable stopped the suite before it checked anything
   that matters, so a session with work in progress lost every real signal over
