@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useCashflow } from "./useCashflow";
 import { useMonthWindow } from "./useMonthWindow";
 import { WindowNav } from "./WindowNav";
@@ -132,6 +132,8 @@ export function CashFlowSankey() {
   const win = useMonthWindow(total, 2);
   const { view, startIdx, pan, zoom, panTo } = win;
 
+  // Gradient ids have to be unique in the document, not just in this subtree.
+  const uid = useId().replace(/[^a-zA-Z0-9_-]/g, "");
   const [grabbing, setGrabbing] = useState(false);
   const [hover, setHover] = useState<Hover | null>(null);
   const [width, setWidth] = useState(0);
@@ -238,6 +240,29 @@ export function CashFlowSankey() {
     ? Math.min(showSubStage ? 150 : (narrow ? 44 : 90), slotW * 0.24)
     : Math.min(narrow ? 30 : 58, slotW * 0.2);
   const cxOf = (k: number) => slotW * (k + 0.5);
+
+  /**
+   * Gradient stops down one side of the hub: each band's colour placed at the
+   * centre of the height that band occupies, so the colour is exact where the
+   * band meets the bar and blends between neighbours in between. Both sides
+   * fill the hub exactly — a shortfall on either side arrives as the savings
+   * drawdown or leaves as the surplus — so the offsets need no normalizing.
+   */
+  const hubStops = (nodes: Node[], totalH: number) => {
+    if (!nodes.length || totalH <= 0)
+      return [<stop key="flat" offset={0} stopColor={HUB_COLOR} />];
+    const out: React.ReactElement[] = [];
+    let acc = 0;
+    nodes.forEach((n, i) => {
+      const h = n.amount * scale;
+      const centre = Math.min(1, Math.max(0, (acc + h / 2) / totalH));
+      if (i === 0) out.push(<stop key="top" offset={0} stopColor={n.color} />);
+      out.push(<stop key={i} offset={centre} stopColor={n.color} />);
+      if (i === nodes.length - 1) out.push(<stop key="bot" offset={1} stopColor={n.color} />);
+      acc += h;
+    });
+    return out;
+  };
 
   return (
     <div className="rounded-lg border border-black/10 p-4 text-black/70 dark:border-white/10 dark:text-white/70">
@@ -417,10 +442,40 @@ export function CashFlowSankey() {
               });
 
               // central total node
+              // The hub carries the colours it joins: what arrives, down the
+              // left edge, fading across to what leaves, down the right. A flat
+              // grey here was the one part of the diagram that said nothing.
+              const gid = `${uid}-hub-${k}`;
+              const hubBox = { x: hubL, y: hubTop, width: nodeW, height: Math.max(1, hubH) };
               els.push(
-                <rect key={`hub-${k}`} x={hubL} y={hubTop} width={nodeW} height={Math.max(1, hubH)} rx={2} fill={HUB_COLOR} fillOpacity={0.92}
+                <defs key={`hg-${k}`}>
+                  <linearGradient id={`${gid}-in`} x1="0" y1="0" x2="0" y2="1">
+                    {hubStops(m.inflow, hubH)}
+                  </linearGradient>
+                  <linearGradient id={`${gid}-out`} x1="0" y1="0" x2="0" y2="1">
+                    {hubStops(m.outflow, hubH)}
+                  </linearGradient>
+                  {/* Left edge fully transparent, right edge fully opaque, so
+                      the outflow side is laid over the inflow side as a
+                      left-to-right crossfade. */}
+                  <linearGradient id={`${gid}-ramp`} x1="0" y1="0" x2="1" y2="0">
+                    <stop offset={0} stopColor="#fff" stopOpacity={0} />
+                    <stop offset={1} stopColor="#fff" stopOpacity={1} />
+                  </linearGradient>
+                  <mask id={`${gid}-mask`}>
+                    <rect {...hubBox} fill={`url(#${gid}-ramp)`} />
+                  </mask>
+                </defs>
+              );
+              els.push(
+                <rect key={`hub-${k}`} {...hubBox} rx={2} fill={`url(#${gid}-in)`}
                   role="img" aria-label={`${m.label} · Total cash flow: ${formatCurrency(m.hubTotal)}`}
                   {...track({ month: m.label, name: "Total cash flow", amount: m.hubTotal, color: HUB_COLOR })} />
+              );
+              els.push(
+                // Masked-out pixels take no pointer events, so the hover has to
+                // live on the layer underneath.
+                <rect key={`hub-out-${k}`} {...hubBox} rx={2} fill={`url(#${gid}-out)`} mask={`url(#${gid}-mask)`} pointerEvents="none" />
               );
 
               // labels
@@ -481,7 +536,9 @@ export function CashFlowSankey() {
             <span className="h-2 w-2 rounded-sm" style={{ background: INCOME_COLOR }} />Income
           </span>
           <span className="inline-flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-sm" style={{ background: HUB_COLOR }} />Total cash flow
+            {/* An outline, not a colour chip: the hub takes the colours of
+                whatever meets it, so there is no one swatch to show. */}
+            <span className="h-2.5 w-1.5 border" style={{ borderColor: "currentColor" }} />Total cash flow
           </span>
           <span className="inline-flex items-center gap-1.5">
             <span className="h-2 w-2 rounded-sm" style={{ background: DRAW_COLOR }} />From savings

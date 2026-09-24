@@ -4,6 +4,13 @@ Versions are `MAJOR.MINOR.PATCH`. The middle number moves for new features,
 the last for fixes alone. Still `0.x`: the database schema changes between
 releases (migrations run on update), so nothing here is a stability promise.
 
+## 0.5.3 — 2026-09-24
+
+- The bar in the middle of Cash flow over time is no longer flat grey. It
+  carries the colours it joins: what arrives, down its left edge, fading
+  across to what leaves, down its right. The legend shows it as an outline
+  now, since it has no colour of its own to key.
+
 ## 0.5.2 — 2026-09-24
 
 - Hovering any band in Cash flow over time names it — month, category, and the
