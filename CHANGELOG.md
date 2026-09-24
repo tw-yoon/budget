@@ -9,7 +9,9 @@ releases (migrations run on update), so nothing here is a stability promise.
 - Hovering any band in Cash flow over time names it — month, category, and the
   subcategory when there is one — with its amount. The thin bands are the ones
   that needed it, since there is no room to label them, so every band also
-  carries a hit area tall enough to point at.
+  carries a hit area tall enough to point at. Only in the one- and two-month
+  views: wider than that, a month is a few pixels across and its bands are too
+  tightly stacked to point at the one you meant.
 
 ## 0.5.1 — 2026-09-24
 

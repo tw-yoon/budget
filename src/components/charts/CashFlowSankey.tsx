@@ -177,6 +177,9 @@ export function CashFlowSankey() {
   // the container, so the only case to guard is the pointer that went down on
   // a band and is now panning.
   const track = (info: Omit<Hover, "x" | "y">) => {
+    // Safe to read `hoverable` from above: track() only runs while building the
+    // JSX below, long after that const is initialized.
+    if (!hoverable) return {};
     const show = (e: React.PointerEvent<SVGElement>) => {
       if (drag.current) return;
       const box = chartRef.current?.getBoundingClientRect();
@@ -205,6 +208,11 @@ export function CashFlowSankey() {
         ? model.months[0].label
         : `${model.months[0].label} – ${model.months[model.months.length - 1].label}`;
 
+  // Hovering is for the one- and two-month views. Past that a month is only a
+  // few pixels wide, its bands are stacked too tightly to point at the one you
+  // meant, and a tooltip chasing the pointer across a dozen months is noise —
+  // that view is for the shape of the series, not for reading a single band.
+  const hoverable = model.months.length <= 2;
   const narrow = width > 0 && width < NARROW;
   const labelMax = narrow ? 10 : 16;
 
@@ -241,7 +249,21 @@ export function CashFlowSankey() {
             {!single && model.months.length ? ` · ${model.months.length} months` : ""}
           </p>
         </div>
-        <WindowNav onPan={pan} onZoom={zoom} {...win} />
+        {/* Clear the tooltip as the window changes: the band under the pointer
+            is about to be a different one, or to stop listening altogether,
+            and either way no leave event is coming for it. Dragging clears it
+            on pointer-down for the same reason. */}
+        <WindowNav
+          onPan={(d) => {
+            setHover(null);
+            pan(d);
+          }}
+          onZoom={(d) => {
+            setHover(null);
+            zoom(d);
+          }}
+          {...win}
+        />
       </div>
 
       <div
@@ -301,7 +323,7 @@ export function CashFlowSankey() {
                   <path key={`ir-${k}-${idx}`} d={ribbon(xInR, ny, ny + h, hubL, hy, hy + h)} fill={n.color} fillOpacity={0.42} role="img" aria-label={inLabel} {...track(inHover)} />
                 );
                 els.push(<rect key={`in-${k}-${idx}`} x={xInR - nodeW} y={ny} width={nodeW} height={Math.max(1, h)} rx={2} fill={n.color} />);
-                els.push(
+                if (hoverable) els.push(
                   <rect key={`ih-${k}-${idx}`} x={xInR - nodeW - 3} y={ny + h / 2 - Math.max(h, HIT_MIN_H) / 2} width={nodeW + 6} height={Math.max(h, HIT_MIN_H)} fill="transparent" role="img" aria-label={inLabel} {...track(inHover)} />
                 );
                 if (showLabels && h >= LABEL_MIN_H)
@@ -327,7 +349,7 @@ export function CashFlowSankey() {
                   <path key={`or-${k}-${idx}`} d={ribbon(hubR, hy, hy + h, xSpL, oy, oy + h)} fill={n.color} fillOpacity={0.5} role="img" aria-label={outLabel} {...track(outHover)} />
                 );
                 els.push(<rect key={`on-${k}-${idx}`} x={xSpL} y={oy} width={nodeW} height={Math.max(1, h)} rx={2} fill={n.color} />);
-                els.push(
+                if (hoverable) els.push(
                   <rect key={`oh-${k}-${idx}`} x={xSpL - 3} y={oy + h / 2 - Math.max(h, HIT_MIN_H) / 2} width={nodeW + 6} height={Math.max(h, HIT_MIN_H)} fill="transparent" role="img" aria-label={outLabel} {...track(outHover)} />
                 );
 
@@ -360,7 +382,7 @@ export function CashFlowSankey() {
                       <path key={`sr-${k}-${idx}-${j}`} d={ribbon(xSpL + nodeW, py, py + sh, xSubL, sy, sy + sh)} fill={n.color} fillOpacity={p.rest ? 0.18 : 0.34} role="img" aria-label={subLabel} {...track(subHover)} />
                     );
                     els.push(<rect key={`sn-${k}-${idx}-${j}`} x={xSubL} y={sy} width={nodeW} height={Math.max(1, sh)} rx={2} fill={n.color} fillOpacity={p.rest ? 0.5 : 0.85} />);
-                    els.push(
+                    if (hoverable) els.push(
                       <rect key={`sh-${k}-${idx}-${j}`} x={xSubL - 3} y={sy + sh / 2 - Math.max(sh, HIT_MIN_H) / 2} width={nodeW + 6} height={Math.max(sh, HIT_MIN_H)} fill="transparent" role="img" aria-label={subLabel} {...track(subHover)} />
                     );
                     if (sh >= 8)
@@ -427,7 +449,7 @@ export function CashFlowSankey() {
         {/* Follows the pointer, and never receives it — a tooltip under the
             cursor would end its own hover. Flips to the left of the pointer
             near the right edge so it stays inside the chart. */}
-        {hover && (
+        {hoverable && hover && (
           <div
             className="pointer-events-none absolute z-10 whitespace-nowrap border border-line bg-panel px-2 py-1.5 text-xs shadow-sm"
             style={{
@@ -476,7 +498,9 @@ export function CashFlowSankey() {
               Added {formatCurrency(-model.drawn)} to savings over this span
             </span>
           ) : null}
-          <span className="ml-auto hidden text-black/40 sm:inline dark:text-white/40">Hover for detail · drag to move</span>
+          <span className="ml-auto hidden text-black/40 sm:inline dark:text-white/40">
+            {hoverable ? "Hover for detail · drag to move" : "Drag to move"}
+          </span>
         </div>
       )}
     </div>
