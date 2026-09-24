@@ -1,10 +1,15 @@
 # Changelog
 
-Versions are `MAJOR.MINOR.PATCH`. The middle number moves for new features,
-the last for fixes alone. Still `0.x`: the database schema changes between
-releases (migrations run on update), so nothing here is a stability promise.
+Versions are `MAJOR.MINOR.PATCH`, and they number **releases, not commits**: a
+version is something you can install, so it changes when the published version
+does, not every time main moves. Work lands under Unreleased and is given a
+number at the moment it is published. A release carrying new features moves the
+middle number; one carrying fixes and small changes moves the last.
 
-## 0.5.6 — 2026-09-24
+Still `0.x`: the database schema changes between releases (migrations run on
+update), so nothing here is a stability promise.
+
+## Unreleased
 
 - `npm test` runs the tests before the linter instead of after it. Linting
   first meant one unused variable stopped the suite before it checked anything
