@@ -309,6 +309,8 @@ export interface UserCardDTO {
   membershipStartMonth: number | null;
   annualFee: number;
   pointValueCents: number;
+  /** URL of the card's image, or null while it has none. */
+  artUrl: string | null;
   linked: boolean;
   linkedAccountName: string | null;
   benefits: BenefitDTO[];

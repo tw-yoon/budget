@@ -145,6 +145,10 @@ model UserCard {
   // earnings against other cards, which may pay cashback rather than points.
   pointValueCents     Float         @default(1)
   sortOrder           Int           @default(0) // manual display order (asc)
+  // File name of the card's image under data/card-art, e.g. "<id>.png". A name
+  // rather than a path: the directory is derived from the app folder, so a
+  // database copied between machines keeps working.
+  artFile             String?
   accountId           String?       // auto-linked when last4 matches Account.mask
   createdAt           DateTime      @default(now())
 

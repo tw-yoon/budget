@@ -401,6 +401,9 @@ export async function getUserCardsWithProgress(
       membershipStartMonth: card.membershipStartMonth,
       annualFee: card.annualFee,
       pointValueCents: card.pointValueCents,
+      // Served by /api/card-art rather than linked from public/, since the file
+      // lives in data/ with everything else the app writes.
+      artUrl: card.artFile ? `/api/card-art/${card.artFile}` : null,
       linked: !!card.accountId,
       linkedAccountName: card.accountId
         ? accountName.get(card.accountId) ?? null

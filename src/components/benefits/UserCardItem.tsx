@@ -5,6 +5,7 @@ import { loadSynced, pushSynced } from "@/lib/ui-state";
 import type { BenefitDTO, EarningsCategoryDTO, UserCardDTO } from "@/types";
 import { formatCurrency, humanizePfc } from "@/lib/format";
 import { CardArt } from "./CardArt";
+import { CardArtPicker } from "./CardArtPicker";
 import {
   ISSUER_LABELS,
   MONTH_NAMES,
@@ -114,8 +115,15 @@ export function UserCardItem({
     <section className="overflow-hidden rounded-xl border border-black/10 dark:border-white/10">
       <header className="flex flex-wrap items-start justify-between gap-3 border-b border-black/10 px-4 py-3 dark:border-white/10">
         <div className="flex min-w-0 items-start gap-3">
-          {/* No image is stored for a card yet, so this is the placeholder face. */}
-          <CardArt issuer={card.issuer} last4={card.last4} name={card.name} />
+          <div className="flex flex-col items-start">
+            <CardArt
+              issuer={card.issuer}
+              last4={card.last4}
+              name={card.name}
+              src={card.artUrl}
+            />
+            <CardArtPicker cardId={card.id} hasArt={!!card.artUrl} onChanged={onChanged} />
+          </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <span className="rounded bg-black/[0.06] px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide dark:bg-white/10">

@@ -11,6 +11,11 @@ update), so nothing here is a stability promise.
 
 ## Unreleased
 
+- Cards can carry their own image. Point it at a Wallet screenshot and it
+  finds the card in the frame and crops to it — the status bar and any caption
+  are left out — then shows what it decided before anything is saved. Images
+  live in `data/card-art`, beside the rest of what the app writes, and a card
+  can drop back to its placeholder at any time.
 - Each card on Benefits shows its face on the left. No image is stored for a
   card yet, so every card gets a placeholder: a deterministic colour pair, cut
   to the proportions of a real card and carrying its issuer and last four, so
