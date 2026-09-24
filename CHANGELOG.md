@@ -4,6 +4,11 @@ Versions are `MAJOR.MINOR.PATCH`. The middle number moves for new features,
 the last for fixes alone. Still `0.x`: the database schema changes between
 releases (migrations run on update), so nothing here is a stability promise.
 
+## 0.4.1 — 2026-09-24
+
+- The version is shown on the home page too, not only at the foot of the
+  sidebar, so it is visible without expanding the nav.
+
 ## 0.4.0 — 2026-09-24
 
 - Payment splits: carve one transaction into several categories, with the
