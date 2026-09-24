@@ -189,10 +189,12 @@ data or absolute home path is about to be published, and
 `scripts/test-launcher.sh` drives `Budget.command` against throwaway clones to
 cover setup, updating, and the cases where it must refuse — both plain Bash.
 The `scripts/test-*.mjs` suites cover pure logic — refund linking, the wording
-of a failed sync, category renaming, the analytics detail mode — on Node's
-built-in test runner, importing the TypeScript
-directly (Node 22+ strips the types), so they need no build step and no
-dependency. Run them before sending a change.
+of a failed sync, category renaming, the analytics detail mode, payment
+splits, reward earnings and the best-card rates, Venmo statement parsing, Zelle
+detection, subscription costs, the shared UI-state store — on Node's built-in
+test runner, importing the TypeScript directly (Node 22.18+ strips the types,
+and `scripts/resolve-alias.mjs` resolves the app's `@/` imports), so they need
+no build step and no dependency. Run them before sending a change.
 
 ## Pages
 

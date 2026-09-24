@@ -1,0 +1,9 @@
+Account Statement - (@Jamie-Rivera) ,,,,,,,,,,,,,,,,,,,,,
+Account Activity,,,,,,,,,,,,,,,,,,,,,
+,ID,Datetime,Type,Status,From,To,Amount (total),Note,Amount (tip),Amount (tax),Amount (fee),Tax Rate,Tax Exempt,Funding Source,Destination,Beginning Balance,Ending Balance,Statement Period Venmo Fees,Terminal Location,Year to Date Venmo Fees,Disclaimer
+,,,,,,,,,,,,,,,,$100.00,,,,,
+,3001,2026-03-01T09:00:00,Payment,Complete,Jamie Rivera,Alex Kim,- $18.25,uber home,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,$57.50,$0.00,,$0.00,
+,,,,,,,,,,,,,,,,,,,,,"In case of errors or questions about your electronic transfers:
+Call us, or write to us at the address on your ""statement"",
+as soon as you can."

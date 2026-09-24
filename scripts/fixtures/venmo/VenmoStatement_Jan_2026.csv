@@ -1,0 +1,16 @@
+Account Statement - (@Jamie-Rivera) ,,,,,,,,,,,,,,,,,,,,,
+Account Activity,,,,,,,,,,,,,,,,,,,,,
+,ID,Datetime,Type,Status,Note,From,To,Amount (total),Amount (tip),Amount (tax),Amount (fee),Tax Rate,Tax Exempt,Funding Source,Destination,Beginning Balance,Ending Balance,Statement Period Venmo Fees,Terminal Location,Year to Date Venmo Fees,Disclaimer
+,,,,,,,,,,,,,,,,$100.00,,,,,
+,1001,2026-01-05T18:22:11,Payment,Complete,Dinner 🍕,Jamie Rivera,Alex Kim,- $42.50,,,,,,,,,,,,,
+,1002,2026-01-03T09:00:00,Payment,Complete,"rent, january",Sam Lee,Jamie Rivera,"+ $1,200.00",,,,,,,,,,,,,
+,1003,2026-01-10T12:00:00,Charge,Complete,"concert ""tickets""",Jamie Rivera,Chris Park,+ $30.00,,,,,,,,,,,,,
+,1004,2026-01-12T08:00:00,Standard Transfer,Issued,,Jamie Rivera,,- $500.00,,,,,,,,,,,,,
+,1005,2026-01-08T13:30:00,Payment,Complete,"thanks
+for lunch",Alex Kim,Jamie Rivera,+ $15.00,,,,,,,,,,,,,
+,1006,2026-01-20T20:00:00,Payment,Complete,🤷,Alex Kim,Jamie Rivera,+ $8.00,,,,,,,,,,,,,
+,1007,2026-01-21T20:00:00,Payment,Complete,misc,Jamie Rivera,Sam Lee,- $5.00,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,$57.50,$0.00,,$0.00,
+,,,,,,,,,,,,,,,,,,,,,"In case of errors or questions about your electronic transfers:
+Call us, or write to us at the address on your ""statement"",
+as soon as you can."

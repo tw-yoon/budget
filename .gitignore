@@ -60,3 +60,6 @@ next-env.d.ts
 # machine-local Claude Code settings
 .claude/settings.local.json
 /.claude/worktrees/
+
+# scratch files written by npm test (scripts/test-ui-state.mjs)
+/.test-tmp/
