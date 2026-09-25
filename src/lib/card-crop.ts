@@ -26,8 +26,19 @@ export interface Rect {
 const MIN_ROW_FILL = 0.5;
 /** Likewise down the column, within the rows already chosen. */
 const MIN_COL_FILL = 0.5;
-/** How far a channel may drift from the background and still count as background. */
-const DEFAULT_TOLERANCE = 28;
+/** How much of a line must still be covered for the box to grow over it. */
+const EDGE_FILL = 0.25;
+/**
+ * How far a channel may drift from the background and still count as
+ * background. Lower means fussier: a card whose lower edge fades into its own
+ * drop shadow needs a low number for that edge to register at all, while a
+ * noisy or textured backdrop needs a high one to stay ignored. Exposed as a
+ * choice rather than tuned to one screenshot, since which way is right depends
+ * on the picture.
+ */
+export const TOLERANCES = { high: 12, medium: 22, low: 36 } as const;
+export type Sensitivity = keyof typeof TOLERANCES;
+const DEFAULT_TOLERANCE = TOLERANCES.medium;
 
 /**
  * Which pixels are not background, as one byte per pixel.
@@ -121,5 +132,33 @@ export function detectCardRect(
   if (!cols) return null;
   const [left, right] = cols;
 
-  return { x: left, y: top, width: right - left, height: bandH };
+  // The pass above needs half a line covered, which the fade at a card's edge —
+  // a drop shadow, or art that dims into the backdrop — never is, so the box
+  // stops at the last solid line and clips it. Grow each edge outward while the
+  // next line is still substantially covered. A shadow runs the card's full
+  // width so it is kept; a caption below is far narrower, and the clear
+  // background between stops the growth before reaching it either way.
+  const rowCover = (y: number) => {
+    let n = 0;
+    for (let x = left; x < right; x++) n += mask[y * width + x];
+    return n;
+  };
+  const colCover = (x: number) => {
+    let n = 0;
+    for (let y = top; y < bottom; y++) n += mask[y * width + x];
+    return n;
+  };
+  const rowFloor = (right - left) * EDGE_FILL;
+  const colFloor = bandH * EDGE_FILL;
+
+  let y0 = top;
+  while (y0 > 0 && rowCover(y0 - 1) >= rowFloor) y0--;
+  let y1 = bottom;
+  while (y1 < height && rowCover(y1) >= rowFloor) y1++;
+  let x0 = left;
+  while (x0 > 0 && colCover(x0 - 1) >= colFloor) x0--;
+  let x1 = right;
+  while (x1 < width && colCover(x1) >= colFloor) x1++;
+
+  return { x: x0, y: y0, width: x1 - x0, height: y1 - y0 };
 }

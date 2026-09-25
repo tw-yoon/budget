@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { detectCardRect, foregroundMask } from "@/lib/card-crop";
+import { TOLERANCES, detectCardRect, foregroundMask, type Sensitivity } from "@/lib/card-crop";
 
 /**
  * Turn a screenshot into a card face.
@@ -11,7 +11,10 @@ import { detectCardRect, foregroundMask } from "@/lib/card-crop";
  * and the re-encode for free — so the server never needs an image library, and
  * what gets uploaded is exactly what was shown in the preview.
  */
-async function cropToCard(file: File): Promise<{ blob: Blob; detected: boolean }> {
+async function cropToCard(
+  file: File,
+  sensitivity: Sensitivity
+): Promise<{ blob: Blob; detected: boolean }> {
   const bitmap = await createImageBitmap(file);
   const full = document.createElement("canvas");
   full.width = bitmap.width;
@@ -21,7 +24,7 @@ async function cropToCard(file: File): Promise<{ blob: Blob; detected: boolean }
   fullCtx.drawImage(bitmap, 0, 0);
 
   const { data } = fullCtx.getImageData(0, 0, bitmap.width, bitmap.height);
-  const mask = foregroundMask(data, bitmap.width, bitmap.height);
+  const mask = foregroundMask(data, bitmap.width, bitmap.height, TOLERANCES[sensitivity]);
   const rect = mask && detectCardRect(mask, bitmap.width, bitmap.height);
   // Nothing card-shaped found — an image that is already cropped, or a photo
   // rather than a screenshot. Keep the whole thing: the preview shows what it
@@ -53,6 +56,10 @@ export function CardArtPicker({
   const input = useRef<HTMLInputElement | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Held so the crop can be redone at another sensitivity without asking for
+  // the file again.
+  const [source, setSource] = useState<File | null>(null);
+  const [sensitivity, setSensitivity] = useState<Sensitivity>("medium");
   const [preview, setPreview] = useState<{ url: string; blob: Blob; detected: boolean } | null>(null);
 
   function clearPreview() {
@@ -60,22 +67,35 @@ export function CardArtPicker({
       if (p) URL.revokeObjectURL(p.url);
       return null;
     });
+    setSource(null);
   }
 
-  async function pick(file: File | undefined) {
-    if (!file) return;
+  async function crop(file: File, level: Sensitivity) {
     setError(null);
     setBusy(true);
     try {
-      const { blob, detected } = await cropToCard(file);
-      clearPreview();
-      setPreview({ url: URL.createObjectURL(blob), blob, detected });
+      const { blob, detected } = await cropToCard(file, level);
+      setPreview((p) => {
+        if (p) URL.revokeObjectURL(p.url);
+        return { url: URL.createObjectURL(blob), blob, detected };
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : "That image could not be read.");
     } finally {
       setBusy(false);
-      if (input.current) input.current.value = ""; // so the same file can be picked again
     }
+  }
+
+  async function pick(file: File | undefined) {
+    if (!file) return;
+    setSource(file);
+    await crop(file, sensitivity);
+    if (input.current) input.current.value = ""; // so the same file can be picked again
+  }
+
+  async function retry(level: Sensitivity) {
+    setSensitivity(level);
+    if (source) await crop(source, level);
   }
 
   async function save() {
@@ -131,14 +151,52 @@ export function CardArtPicker({
           <span className="text-[10px] text-black/45 dark:text-white/45">
             {preview.detected ? "Cropped to the card" : "No card found — using the whole image"}
           </span>
-          <div className="flex gap-2">
-            <button type="button" onClick={save} disabled={busy} className={link}>
-              {busy ? "Saving…" : "Save"}
+
+          {/* The right level depends on the picture: a card that fades into its
+              own shadow needs a fussier one, a busy backdrop a blunter one. */}
+          <div className="flex items-center gap-1">
+            <span className="text-[10px] text-black/40 dark:text-white/40">Edges</span>
+            {(["low", "medium", "high"] as const).map((level) => (
+              <button
+                key={level}
+                type="button"
+                onClick={() => retry(level)}
+                disabled={busy}
+                aria-pressed={sensitivity === level}
+                title={
+                  level === "high"
+                    ? "Catch faint edges"
+                    : level === "low"
+                      ? "Ignore a busy backdrop"
+                      : "Balanced"
+                }
+                className={`rounded px-1 text-[10px] uppercase disabled:opacity-50 ${
+                  sensitivity === level
+                    ? "bg-foreground text-background"
+                    : "text-black/45 hover:text-foreground dark:text-white/45"
+                }`}
+              >
+                {level === "low" ? "Loose" : level === "medium" ? "Mid" : "Tight"}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-2">
+            {/* Nothing is stored until this is pressed, so it reads as the
+                action rather than as another quiet link beside Cancel. */}
+            <button
+              type="button"
+              onClick={save}
+              disabled={busy}
+              className="rounded-md bg-foreground px-2.5 py-1 text-xs font-medium text-background hover:opacity-90 disabled:opacity-50"
+            >
+              {busy ? "Saving…" : "Save image"}
             </button>
             <button type="button" onClick={clearPreview} disabled={busy} className={link}>
               Cancel
             </button>
           </div>
+          <span className="text-[10px] text-amber-700 dark:text-amber-400">Not saved yet</span>
         </>
       ) : (
         <div className="flex gap-2">

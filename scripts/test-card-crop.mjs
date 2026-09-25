@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { detectCardRect, foregroundMask } from "../src/lib/card-crop.ts";
+import { TOLERANCES, detectCardRect, foregroundMask } from "../src/lib/card-crop.ts";
 
 // A synthetic screenshot: a background, with rectangles painted on it.
 function screenshot(width, height, bg, rects) {
@@ -18,10 +18,21 @@ function screenshot(width, height, bg, rects) {
 const BG = [10, 11, 12];
 const CARD = [200, 140, 60];
 
-const find = (w, h, rects, bg = BG) => {
-  const mask = foregroundMask(screenshot(w, h, bg, rects), w, h);
+const find = (w, h, rects, bg = BG, tolerance = undefined) => {
+  const mask = foregroundMask(screenshot(w, h, bg, rects), w, h, tolerance);
   return mask && detectCardRect(mask, w, h);
 };
+
+// A row of the card's width that fades toward the background, the way a drop
+// shadow under a card does.
+const shadow = (x, y, width, rows, from, to) =>
+  Array.from({ length: rows }, (_, i) => ({
+    x,
+    y: y + i,
+    width,
+    height: 1,
+    color: from.map((c, k) => Math.round(c + ((to[k] - c) * (i + 1)) / (rows + 1))),
+  }));
 
 test("a card on a plain background is found exactly", () => {
   const card = { x: 20, y: 60, width: 160, height: 100, color: CARD };
@@ -96,4 +107,56 @@ test("a buffer too small for its dimensions is refused", () => {
 test("zero dimensions are refused", () => {
   assert.equal(foregroundMask(new Uint8ClampedArray(0), 0, 0), null);
   assert.equal(detectCardRect(new Uint8Array(0), 0, 0), null);
+});
+
+// ── soft edges ───────────────────────────────────────────────────────────
+
+test("a drop shadow under the card is kept, not clipped away", () => {
+  // The shadow never fills half a row, so the first pass stops above it and
+  // the card looks cut off along the bottom.
+  const card = { x: 20, y: 60, width: 160, height: 100, color: CARD };
+  const cast = shadow(20, 160, 160, 8, [90, 70, 40], BG);
+  const box = find(200, 300, [card, ...cast]);
+  assert.equal(box.y, 60);
+  assert.ok(box.height > 100, `height ${box.height} should reach past the solid rows`);
+  assert.ok(box.height <= 108, `height ${box.height} should stop at the shadow`);
+});
+
+test("growing over a shadow never reaches the caption below it", () => {
+  const card = { x: 20, y: 60, width: 160, height: 100, color: CARD };
+  const cast = shadow(20, 160, 160, 6, [90, 70, 40], BG);
+  const caption = { x: 40, y: 185, width: 60, height: 8, color: [200, 200, 200] };
+  const box = find(200, 300, [card, ...cast, caption]);
+  assert.ok(box.y + box.height < 185, `bottom ${box.y + box.height} ran into the caption`);
+});
+
+// ── sensitivity ──────────────────────────────────────────────────────────
+
+test("a higher sensitivity finds a card that barely differs from its backdrop", () => {
+  // 18 per channel from the background: past the default, inside the high one.
+  const faint = { x: 20, y: 60, width: 160, height: 100, color: [28, 29, 30] };
+  assert.equal(find(200, 300, [faint]), null);
+  assert.deepEqual(find(200, 300, [faint], BG, TOLERANCES.high), {
+    x: 20,
+    y: 60,
+    width: 160,
+    height: 100,
+  });
+});
+
+test("a lower sensitivity ignores a faint backdrop texture", () => {
+  const card = { x: 20, y: 60, width: 160, height: 100, color: CARD };
+  // A band of noise across the backdrop, well inside the low tolerance.
+  const texture = { x: 0, y: 250, width: 200, height: 20, color: [34, 35, 36] };
+  assert.deepEqual(find(200, 300, [card, texture], BG, TOLERANCES.low), {
+    x: 20,
+    y: 60,
+    width: 160,
+    height: 100,
+  });
+});
+
+test("the sensitivities are ordered, fussiest first", () => {
+  assert.ok(TOLERANCES.high < TOLERANCES.medium);
+  assert.ok(TOLERANCES.medium < TOLERANCES.low);
 });

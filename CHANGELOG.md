@@ -19,6 +19,11 @@ update), so nothing here is a stability promise.
   way Settings is. It was one page holding every card's credits, rates and
   earnings plus two more tools, so anything below the first card was a long
   scroll away. `/benefits` lands on Cards.
+- The crop grows over a soft edge, so a card that fades into its own drop
+  shadow is no longer clipped along the bottom, and the preview offers three
+  edge sensitivities to re-crop with when a picture needs a fussier or blunter
+  one. Saving is a button rather than a quiet link, with the preview marked
+  "not saved yet" — it was too easy to judge a crop and never store it.
 - Cards can carry their own image. Point it at a Wallet screenshot and it
   finds the card in the frame and crops to it — the status bar and any caption
   are left out — then shows what it decided before anything is saved. Images
