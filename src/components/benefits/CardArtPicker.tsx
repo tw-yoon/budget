@@ -3,10 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import {
   CROP_KEY,
+  DEFAULT_CROP,
   detectCardRect,
   differenceMap,
   fromFractions,
   isCropFractions,
+  matchesDefaultCrop,
   toFractions,
   type CropFractions,
   type Rect,
@@ -45,7 +47,7 @@ export function CardArtPicker({
   const source = useRef<{ canvas: HTMLCanvasElement; width: number; height: number } | null>(null);
   const [dims, setDims] = useState<{ width: number; height: number } | null>(null);
   const [rect, setRect] = useState<Rect | null>(null);
-  const [origin, setOrigin] = useState<"saved" | "edges" | "whole">("edges");
+  const [origin, setOrigin] = useState<"saved" | "default" | "edges" | "whole">("edges");
   const [preview, setPreview] = useState<string | null>(null);
 
   const remembered = useRef<CropFractions | null>(null);
@@ -128,10 +130,19 @@ export function CardArtPicker({
       source.current = { canvas, width, height };
       setDims({ width, height });
 
+      // A crop saved here beats the built-in one, which beats reading edges
+      // that may not exist: the numbers are known for this screen, and what
+      // was right for the last card is righter still.
       const saved = remembered.current && fromFractions(remembered.current, width, height);
+      const builtIn = matchesDefaultCrop(width, height)
+        ? fromFractions(DEFAULT_CROP, width, height)
+        : null;
       if (saved) {
         setOrigin("saved");
         render(saved);
+      } else if (builtIn) {
+        setOrigin("default");
+        render(builtIn);
       } else {
         const diff = differenceMap(ctx.getImageData(0, 0, width, height).data, width, height);
         const found = diff && detectCardRect(diff, width, height);
@@ -237,9 +248,11 @@ export function CardArtPicker({
           <span className="text-[10px] text-black/45 dark:text-white/45">
             {origin === "saved"
               ? "Saved position"
-              : origin === "edges"
-                ? "Read from the edges"
-                : "No card found — whole image"}
+              : origin === "default"
+                ? "Standard position"
+                : origin === "edges"
+                  ? "Read from the edges"
+                  : "No card found — whole image"}
             {" · "}
             screenshot {dims.width}×{dims.height}
           </span>

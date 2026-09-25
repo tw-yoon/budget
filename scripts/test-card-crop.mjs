@@ -1,10 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  DEFAULT_CROP,
   detectCardRect,
   differenceMap,
   fromFractions,
   isCropFractions,
+  matchesDefaultCrop,
   toFractions,
 } from "../src/lib/card-crop.ts";
 
@@ -246,4 +248,31 @@ test("only a sane stored crop is trusted", () => {
     { x: NaN, y: 0, width: 0.5, height: 0.5 },
   ])
     assert.equal(isCropFractions(junk), false, JSON.stringify(junk));
+});
+
+// ── the built-in starting crop ───────────────────────────────────────────
+
+test("the built-in crop is a card, and fits the screen it was measured on", () => {
+  const [W, H] = [603, 1311];
+  const box = fromFractions(DEFAULT_CROP, W, H);
+  assert.deepEqual(box, { x: 30, y: 815, width: 543, height: 342 });
+  assert.ok(box.x + box.width <= W, "runs off the side");
+  assert.ok(box.y + box.height <= H, "runs off the bottom");
+  // 85.60 x 53.98 mm, within a pixel of rounding.
+  assert.ok(Math.abs(box.width / box.height - 85.6 / 53.98) < 0.01);
+});
+
+test("the same crop lands on the full-resolution screenshot", () => {
+  // The measurements were taken at half scale; the phone writes 1206 x 2622.
+  const box = fromFractions(DEFAULT_CROP, 1206, 2622);
+  assert.deepEqual(box, { x: 60, y: 1629, width: 1086, height: 684 });
+});
+
+test("it applies to that screen at any scale, and not to others", () => {
+  assert.ok(matchesDefaultCrop(603, 1311));
+  assert.ok(matchesDefaultCrop(1206, 2622));
+  assert.ok(matchesDefaultCrop(1179, 2556)); // a near-enough iPhone
+  assert.ok(!matchesDefaultCrop(1024, 768)); // a landscape screen
+  assert.ok(!matchesDefaultCrop(1000, 1000)); // a square photo
+  assert.ok(!matchesDefaultCrop(0, 0));
 });

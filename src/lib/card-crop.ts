@@ -271,3 +271,37 @@ export function isCropFractions(v: unknown): v is CropFractions {
     (c.width as number) > 0 && (c.height as number) > 0
   );
 }
+
+/**
+ * Where the card sits in a Wallet screenshot, before anything has been saved.
+ *
+ * Measured on an iPhone 16 Pro: a 603 x 1311 screenshot with the card 543 x 342
+ * at y = 814.5. Held as fractions, so the same numbers apply to the full-
+ * resolution screenshot (1206 x 2622) and to any other phone of that shape.
+ *
+ * X is the one number not measured: a 543-wide card leaves 60px of room in a
+ * 603-wide frame, so the 318 that came with the rest cannot be right, and a
+ * card centred in the frame — x = 30 — is the only reading that fits. Typing
+ * the real number once and saving replaces this for good.
+ */
+export const DEFAULT_CROP: CropFractions = {
+  x: 30 / 603,
+  y: 814.5 / 1311,
+  width: 543 / 603,
+  height: 342 / 1311,
+};
+
+/** The shape of screenshot those numbers were measured on. */
+const DEFAULT_CROP_ASPECT = 603 / 1311;
+/** How far from it a picture may be and still be the same screen. */
+const ASPECT_SLACK = 0.02;
+
+/**
+ * Whether the built-in crop applies to a picture. A screenshot from another
+ * phone, or a photo, has nothing to do with those numbers — it falls back to
+ * reading the edges instead.
+ */
+export function matchesDefaultCrop(width: number, height: number): boolean {
+  if (width <= 0 || height <= 0) return false;
+  return Math.abs(width / height - DEFAULT_CROP_ASPECT) <= ASPECT_SLACK;
+}
