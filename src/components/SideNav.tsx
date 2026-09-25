@@ -15,17 +15,26 @@ type NavItem = {
 };
 
 // Collapsed mode shows terminal-style three-letter codes instead of icons.
-// Two entries have children. Settings nests configuration you set once, so it
-// does not compete with the daily-use pages above; Benefits nests because one
-// page of every card's credits, rates and earnings was a long scroll to reach
-// anything at the bottom of it. Children get no codes of their own —
-// collapsed, the parent stands for all of them, and clicking a parent lands on
-// its first child via the redirect at /settings and /benefits.
+// Three entries have children. Transactions nests Venmo and Zelle, which are
+// the same ledger narrowed to one kind of payment; Settings nests
+// configuration you set once, so it does not compete with the daily-use pages
+// above; Benefits nests because one page of every card's credits, rates and
+// earnings was a long scroll to reach anything at the bottom of it. Children
+// get no codes of their own — collapsed, the parent stands for all of them,
+// and clicking a parent lands on its first child: the ledger itself for
+// Transactions, the redirect at /settings and /benefits for the other two.
 const NAV: NavItem[] = [
   { href: "/accounts", label: "Accounts", code: "ACC" },
-  { href: "/transactions", label: "Transactions", code: "TRX" },
-  { href: "/venmo", label: "Venmo", code: "VNM" },
-  { href: "/zelle", label: "Zelle", code: "ZEL" },
+  {
+    href: "/transactions",
+    label: "Transactions",
+    code: "TRX",
+    children: [
+      { href: "/transactions", label: "Ledger" },
+      { href: "/transactions/venmo", label: "Venmo" },
+      { href: "/transactions/zelle", label: "Zelle" },
+    ],
+  },
   { href: "/analytics", label: "Analytics", code: "ANL" },
   {
     href: "/benefits",
@@ -108,7 +117,8 @@ export default function SideNav({ version }: { version: string }) {
           const active =
             pathname === item.href || pathname.startsWith(item.href + "/");
           // A parent is never itself the destination — /settings redirects to
-          // its first child — so when expanded it takes the quieter
+          // its first child, and /transactions is listed again as its own
+          // first child — so when expanded it takes the quieter
           // accent-text treatment and leaves the filled highlight to whichever
           // child is open. Collapsed, children aren't rendered at all, so the
           // parent carries the filled highlight itself, same as every other

@@ -31,7 +31,7 @@ export type VenmoCategory = (typeof VENMO_CATEGORIES)[number];
 // note keyword -> category. Lowercased substring/regex match. Intentionally
 // modest, and deliberately about kinds of merchant rather than particular
 // places: most Venmo notes are cryptic, so this only seeds a starting guess
-// that you then correct by hand on the /venmo page.
+// that you then correct by hand on the /transactions/venmo page.
 const RULES: [RegExp, VenmoCategory][] = [
   [/walmart|wal\s*mart|sam.?s club|costco|grocer|target|kroger|safeway|aldi|trader/, "Groceries"],
   [/dinner|lunch|brunch|food|pizza|🍕|burger|taco|🌮|sushi|ramen|coffee|boba|bar tab/, "Dining"],

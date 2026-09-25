@@ -11,6 +11,10 @@ update), so nothing here is a stability promise.
 
 ## Unreleased
 
+- Venmo and Zelle move under Transactions in the sidebar, beside the ledger,
+  at `/transactions/venmo` and `/transactions/zelle`. Both are the ledger
+  narrowed to one kind of payment, so they sit with it rather than as two more
+  top-level pages. The old `/venmo` and `/zelle` addresses redirect.
 - A card's "Linked" badge is capped in width, with the full account name on
   hover. The name is whatever the bank calls the account, and a long one —
   "American Express Gold Card" — pushed the card's arrows and Remove onto a
