@@ -19,8 +19,8 @@ update), so nothing here is a stability promise.
   way Settings is. It was one page holding every card's credits, rates and
   earnings plus two more tools, so anything below the first card was a long
   scroll away. `/benefits` lands on Cards.
-- The crop's bottom edge is worked out from the card's proportions rather than
-  measured. The top and sides are where a card meets the backdrop cleanly; the
+- The crop's sides land on the card rather than on the glow around it, and its
+  bottom edge is worked out from the card's proportions rather than measured. The top and sides are where a card meets the backdrop cleanly; the
   bottom is where it sits over its own drop shadow, and measuring it either
   stopped short or ran down into the shadow. A bank card has a fixed shape, so
   the reliable width gives the height exactly.

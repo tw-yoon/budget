@@ -24,8 +24,33 @@ export interface Rect {
 
 /** A row counts as part of the card when this much of it differs. */
 const MIN_ROW_FILL = 0.5;
-/** Likewise down the column, within the rows already chosen. */
-const MIN_COL_FILL = 0.5;
+/**
+ * How much of a column must be covered for it to be part of the card.
+ *
+ * High, and deliberately so. Within the card's own rows a column that is card
+ * is covered essentially end to end, while one a few pixels outside catches
+ * only the blur of the shadow — so a demanding threshold lands on the edge
+ * itself instead of a few pixels into the glow around it. Those few pixels
+ * matter twice over: the height is derived from this width, so a box that is
+ * loose at the sides is loose along the bottom as well.
+ */
+const MIN_COL_FILL = 0.85;
+
+/**
+ * Columns are judged over the top of the card's rows, not all of them. The
+ * lower part is where art fades toward the backdrop and the shadow begins, so
+ * including it drags every column's coverage down and lets the threshold above
+ * eat into the card.
+ */
+const COL_PROBE = 0.6;
+
+/**
+ * How strong a column must be, against the card's own interior, to be card
+ * rather than the glow beside it. A fraction rather than a fixed number: a
+ * pale card on a dark backdrop and a dark one on a pale backdrop differ by
+ * wildly different amounts, and only the ratio holds across both.
+ */
+const SIDE_STRENGTH = 0.6;
 /** How much of a line must still be covered for the box to grow over it. */
 const EDGE_FILL = 0.25;
 /** How far a channel may drift from the background and still count as background. */
@@ -38,7 +63,11 @@ const DEFAULT_TOLERANCE = 22;
 const CARD_RATIO = 85.6 / 53.98;
 
 /**
- * Which pixels are not background, as one byte per pixel.
+ * How far each pixel is from the background, as one byte per pixel.
+ *
+ * Strength rather than a yes/no, because the two things this has to tell apart
+ * — the card and the glow of its shadow — are both "not background". Only the
+ * size of the difference separates them.
  *
  * The background colour is taken from the four corners: a screenshot has
  * chrome at the top and bottom but its corners are background in every layout
@@ -46,7 +75,7 @@ const CARD_RATIO = 85.6 / 53.98;
  * the edge, or a photo rather than a screenshot — and the caller is told so
  * with `null` rather than handed a confident wrong answer.
  */
-export function foregroundMask(
+export function differenceMap(
   rgba: Uint8ClampedArray | Uint8Array | number[],
   width: number,
   height: number,
@@ -70,15 +99,15 @@ export function foregroundMask(
   const agrees = corners.every((p) => p.every((v, c) => Math.abs(v - bg[c]) <= tolerance));
   if (!agrees) return null;
 
-  const mask = new Uint8Array(width * height);
-  for (let i = 0, p = 0; p < mask.length; p++, i += 4) {
-    const off =
-      Math.abs(rgba[i] - bg[0]) > tolerance ||
-      Math.abs(rgba[i + 1] - bg[1]) > tolerance ||
-      Math.abs(rgba[i + 2] - bg[2]) > tolerance;
-    mask[p] = off ? 1 : 0;
+  const diff = new Uint8Array(width * height);
+  for (let i = 0, p = 0; p < diff.length; p++, i += 4) {
+    diff[p] = Math.max(
+      Math.abs(rgba[i] - bg[0]),
+      Math.abs(rgba[i + 1] - bg[1]),
+      Math.abs(rgba[i + 2] - bg[2])
+    );
   }
-  return mask;
+  return diff;
 }
 
 /** The longest unbroken run of true values, as [start, endExclusive]. */
@@ -102,65 +131,87 @@ function longestRun(keep: boolean[]): [number, number] | null {
  * so has no background corners to measure against.
  */
 export function detectCardRect(
-  mask: Uint8Array,
+  diff: Uint8Array,
   width: number,
-  height: number
+  height: number,
+  tolerance: number = DEFAULT_TOLERANCE
 ): Rect | null {
-  if (width <= 0 || height <= 0 || mask.length < width * height) return null;
+  if (width <= 0 || height <= 0 || diff.length < width * height) return null;
+
+  const on = (x: number, y: number) => (diff[y * width + x] > tolerance ? 1 : 0);
 
   const rowKeep: boolean[] = [];
   for (let y = 0; y < height; y++) {
     let n = 0;
-    for (let x = 0; x < width; x++) n += mask[y * width + x];
+    for (let x = 0; x < width; x++) n += on(x, y);
     rowKeep.push(n >= width * MIN_ROW_FILL);
   }
   const rows = longestRun(rowKeep);
   if (!rows) return null;
   const [top, bottom] = rows;
 
+  // Columns are judged over the top of those rows, where the card is solid.
+  // Lower down its art fades toward the backdrop and the shadow starts, which
+  // drags every measurement there toward the wrong answer.
   const bandH = bottom - top;
+  const probeEnd = top + Math.max(1, Math.round(bandH * COL_PROBE));
+  const probeH = probeEnd - top;
+
   const colKeep: boolean[] = [];
   for (let x = 0; x < width; x++) {
     let n = 0;
-    for (let y = top; y < bottom; y++) n += mask[y * width + x];
-    colKeep.push(n >= bandH * MIN_COL_FILL);
+    for (let y = top; y < probeEnd; y++) n += on(x, y);
+    colKeep.push(n >= probeH * MIN_COL_FILL);
   }
   const cols = longestRun(colKeep);
   if (!cols) return null;
   const [left, right] = cols;
 
-  // The top and the sides are measured; the bottom is not.
+  // Now the sides properly. Everything above treats a pixel as on or off, and
+  // by that measure a column of the shadow's outer glow looks exactly like a
+  // column of card — both are "not background" top to bottom. What separates
+  // them is how far from the background they are, so the edges are found by
+  // strength: walk out from the middle while a column is still as strong as
+  // the card's interior, and stop where it drops off.
   //
-  // Those three edges are where the card meets the backdrop cleanly, so the
-  // pass above lands on them. The bottom is where a card sits over its own drop
-  // shadow: the fade never covers half a row, so a strict rule stops short of
-  // it, and a loose one runs down into the shadow instead. Either way the
-  // measurement is the worst of the four.
-  //
-  // So it is not measured. A bank card is cut to a fixed ratio, which is what
-  // Wallet draws and therefore what the screenshot holds, and the width here is
-  // reliable — so the height follows from it exactly.
+  // Those few pixels matter twice, since the height is derived from this
+  // width: a box loose at the sides is loose along the bottom too.
+  const strength = (x: number) => {
+    let sum = 0;
+    for (let y = top; y < probeEnd; y++) sum += diff[y * width + x];
+    return sum / probeH;
+  };
+  const inner: number[] = [];
+  const quarter = Math.floor((right - left) / 4);
+  for (let x = left + quarter; x < right - quarter; x++) inner.push(strength(x));
+  inner.sort((a, b) => a - b);
+  const reference = inner.length ? inner[Math.floor(inner.length / 2)] : 0;
+  const floor = reference * SIDE_STRENGTH;
+
+  const middle = Math.floor((left + right) / 2);
+  let x0 = middle;
+  while (x0 - 1 >= 0 && strength(x0 - 1) >= floor) x0--;
+  let x1 = middle;
+  while (x1 + 1 < width && strength(x1 + 1) >= floor) x1++;
+  x1 += 1; // exclusive
+
+  const rowFloor = (x1 - x0) * EDGE_FILL;
   const rowCover = (y: number) => {
     let n = 0;
-    for (let x = left; x < right; x++) n += mask[y * width + x];
+    for (let x = x0; x < x1; x++) n += on(x, y);
     return n;
   };
-  const colCover = (x: number) => {
-    let n = 0;
-    for (let y = top; y < bottom; y++) n += mask[y * width + x];
-    return n;
-  };
-  const rowFloor = (right - left) * EDGE_FILL;
-  const colFloor = bandH * EDGE_FILL;
-
-  // Grow the three measured edges over any soft join with the backdrop.
+  // Only the top grows over a soft join; the sides are already tight.
   let y0 = top;
   while (y0 > 0 && rowCover(y0 - 1) >= rowFloor) y0--;
-  let x0 = left;
-  while (x0 > 0 && colCover(x0 - 1) >= colFloor) x0--;
-  let x1 = right;
-  while (x1 < width && colCover(x1) >= colFloor) x1++;
 
+  // The top and the sides are measured; the bottom is not.
+  //
+  // The bottom is where a card sits over its own drop shadow: the fade never
+  // covers half a row, so a strict rule stops short of it and a loose one runs
+  // down into it. Either way it is the worst measurement of the four. A bank
+  // card is cut to a fixed ratio, which is what Wallet draws and therefore
+  // what the screenshot holds, so the height follows from the width exactly.
   const w = x1 - x0;
   const h = Math.min(Math.round(w / CARD_RATIO), height - y0);
   return { x: x0, y: y0, width: w, height: h };

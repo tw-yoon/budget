@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { detectCardRect, foregroundMask } from "../src/lib/card-crop.ts";
+import { detectCardRect, differenceMap } from "../src/lib/card-crop.ts";
 
 // A synthetic screenshot: a background, with rectangles painted on it.
 function screenshot(width, height, bg, rects) {
@@ -23,8 +23,8 @@ const RATIO = 85.6 / 53.98;
 const cardHeight = (width) => Math.round(width / RATIO);
 
 const find = (w, h, rects, bg = BG, tolerance = undefined) => {
-  const mask = foregroundMask(screenshot(w, h, bg, rects), w, h, tolerance);
-  return mask && detectCardRect(mask, w, h);
+  const diff = differenceMap(screenshot(w, h, bg, rects), w, h);
+  return diff && detectCardRect(diff, w, h, tolerance);
 };
 
 // A row of the card's width that fades toward the background, the way a drop
@@ -100,16 +100,16 @@ test("corners that disagree refuse rather than guess", () => {
     const x = i % w;
     rgba.set([20 + Math.round((x / w) * 200), 40, 60, 255], i * 4);
   }
-  assert.equal(foregroundMask(rgba, w, h), null);
+  assert.equal(differenceMap(rgba, w, h), null);
 });
 
 test("a buffer too small for its dimensions is refused", () => {
-  assert.equal(foregroundMask(new Uint8ClampedArray(10), 100, 100), null);
+  assert.equal(differenceMap(new Uint8ClampedArray(10), 100, 100), null);
   assert.equal(detectCardRect(new Uint8Array(10), 100, 100), null);
 });
 
 test("zero dimensions are refused", () => {
-  assert.equal(foregroundMask(new Uint8ClampedArray(0), 0, 0), null);
+  assert.equal(differenceMap(new Uint8ClampedArray(0), 0, 0), null);
   assert.equal(detectCardRect(new Uint8Array(0), 0, 0), null);
 });
 
@@ -161,4 +161,43 @@ test("a card filling less than half the frame's width is not found", () => {
   // the whole image, which the preview says.
   const small = { x: 10, y: 40, width: 120, height: cardHeight(120), color: CARD };
   assert.equal(find(400, 400, [small]), null);
+});
+
+// ── tight sides ──────────────────────────────────────────────────────────
+
+test("the glow beside a card is not counted as part of it", () => {
+  // A few columns either side, fading out — a blurred drop shadow seen from
+  // the left and right. Taking them into the width makes the card wider, and
+  // since the height comes from the width, taller as well: a gap under the
+  // card's real bottom edge.
+  const w = 160;
+  const card = { x: 20, y: 60, width: w, height: cardHeight(w), color: CARD };
+  const glow = [];
+  for (let i = 1; i <= 5; i++) {
+    const fade = [90, 70, 40].map((c, k) => Math.round(c + ((BG[k] - c) * i) / 6));
+    glow.push({ x: 20 - i, y: 64, width: 1, height: cardHeight(w), color: fade });
+    glow.push({ x: 20 + w - 1 + i, y: 64, width: 1, height: cardHeight(w), color: fade });
+  }
+  assert.deepEqual(find(200, 300, [...glow, card]), {
+    x: 20,
+    y: 60,
+    width: w,
+    height: cardHeight(w),
+  });
+});
+
+test("art that fades down the card does not pull the sides inward", () => {
+  // Columns are judged over the top of the card, where it is solid, so a lower
+  // half that dims toward the backdrop cannot narrow the box.
+  const w = 180;
+  const h = cardHeight(w);
+  const rows = Array.from({ length: h }, (_, i) => ({
+    x: 15,
+    y: 50 + i,
+    width: w,
+    height: 1,
+    // Solid at the top, close to the background by the bottom.
+    color: [200, 140, 60].map((c, k) => Math.round(c + ((BG[k] - c) * i) / (h - 1))),
+  }));
+  assert.deepEqual(find(200, 300, rows), { x: 15, y: 50, width: w, height: h });
 });

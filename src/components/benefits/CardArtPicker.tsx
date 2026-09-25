@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { detectCardRect, foregroundMask } from "@/lib/card-crop";
+import { detectCardRect, differenceMap } from "@/lib/card-crop";
 
 /**
  * Turn a screenshot into a card face.
@@ -21,8 +21,8 @@ async function cropToCard(file: File): Promise<{ blob: Blob; detected: boolean }
   fullCtx.drawImage(bitmap, 0, 0);
 
   const { data } = fullCtx.getImageData(0, 0, bitmap.width, bitmap.height);
-  const mask = foregroundMask(data, bitmap.width, bitmap.height);
-  const rect = mask && detectCardRect(mask, bitmap.width, bitmap.height);
+  const diff = differenceMap(data, bitmap.width, bitmap.height);
+  const rect = diff && detectCardRect(diff, bitmap.width, bitmap.height);
   // Nothing card-shaped found — an image that is already cropped, or a photo
   // rather than a screenshot. Keep the whole thing: the preview shows what it
   // decided, so a wrong guess is visible before it is saved.
