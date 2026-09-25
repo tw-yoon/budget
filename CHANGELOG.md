@@ -11,6 +11,10 @@ update), so nothing here is a stability promise.
 
 ## Unreleased
 
+- Cards start collapsed, opening on the chevron in their header. A card opened
+  out is four sections tall, so a wallet's worth of them buried everything
+  below the first; collapsed, each is one row and the whole list fits a screen.
+  Which cards you left open is remembered, like the rest of your settings.
 - Benefits splits into Cards, Best card and Flights, nested in the sidebar the
   way Settings is. It was one page holding every card's credits, rates and
   earnings plus two more tools, so anything below the first card was a long

@@ -51,8 +51,23 @@ function toCreditsOpen(stored: unknown): boolean {
   return CREDITS_OPEN_DEFAULT;
 }
 
-function useCreditsOpen(cardId: string) {
-  const [open, setOpen] = useState(CREDITS_OPEN_DEFAULT);
+/** Only ever written as a boolean, so anything else is a value we did not write. */
+function toBool(stored: unknown): boolean {
+  return stored === true;
+}
+
+/**
+ * A remembered on/off, shared across this user's browsers.
+ *
+ * `parse` has to be a stable reference — a module-level function, not one
+ * built during render — since the load effect depends on it.
+ */
+function useSyncedFlag(
+  key: string,
+  fallback: boolean,
+  parse: (stored: unknown) => boolean
+): [boolean, () => void] {
+  const [on, setOn] = useState(fallback);
   // A click that lands while the read is still in flight is a deliberate
   // choice and must not be overwritten by the stale value when it arrives —
   // the same race useProMode guards. It outlives the effect run, so it is a
@@ -63,22 +78,40 @@ function useCreditsOpen(cardId: string) {
     let cancelled = false;
     chosen.current = false;
     void (async () => {
-      const stored = await loadSynced(creditsKey(cardId));
+      const stored = await loadSynced(key);
       if (stored == null) return;
-      if (!cancelled && !chosen.current) setOpen(toCreditsOpen(stored));
+      if (!cancelled && !chosen.current) setOn(parse(stored));
     })();
     return () => {
       cancelled = true;
     };
-  }, [cardId]);
+  }, [key, parse]);
 
   const toggle = useCallback(() => {
     chosen.current = true;
-    const next = !open;
-    setOpen(next);
-    pushSynced(creditsKey(cardId), next);
-  }, [cardId, open]);
+    setOn((prev) => {
+      const next = !prev;
+      pushSynced(key, next);
+      return next;
+    });
+  }, [key]);
 
+  return [on, toggle];
+}
+
+function useCreditsOpen(cardId: string) {
+  const [open, toggle] = useSyncedFlag(creditsKey(cardId), CREDITS_OPEN_DEFAULT, toCreditsOpen);
+  return { open, toggle };
+}
+
+/**
+ * Whether a card is expanded. Closed by default: a card opened out is four
+ * sections tall, so a wallet's worth of them buried everything below the first.
+ * Collapsed, a card is its header — which already carries the issuer, the last
+ * four, how many credits are maxed and whether it is linked.
+ */
+function useCardOpen(cardId: string) {
+  const [open, toggle] = useSyncedFlag(`card-open:${cardId}`, false, toBool);
   return { open, toggle };
 }
 
@@ -98,8 +131,9 @@ export function UserCardItem({
   const [adding, setAdding] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  // Remembered per card, and shared across this user's browsers.
+  // Both remembered per card, and shared across this user's browsers.
   const { open: showCredits, toggle: toggleCredits } = useCreditsOpen(card.id);
+  const { open, toggle: toggleOpen } = useCardOpen(card.id);
 
   async function deleteCard() {
     if (!confirm(`Remove ${ISSUER_LABELS[card.issuer] ?? card.issuer} ··${card.last4} and its benefits?`))
@@ -143,6 +177,15 @@ export function UserCardItem({
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={toggleOpen}
+            aria-expanded={open}
+            aria-label={open ? "Collapse card" : "Expand card"}
+            title={open ? "Collapse" : "Expand"}
+            className="text-sm text-black/45 hover:text-foreground dark:text-white/45"
+          >
+            <span className={`inline-block transition-transform ${open ? "rotate-90" : ""}`}>›</span>
+          </button>
           {card.linked ? (
             <span className="rounded bg-green-100 px-2 py-0.5 text-[11px] font-medium text-green-700 dark:bg-green-500/15 dark:text-green-400">
               Linked · {card.linkedAccountName}
@@ -182,65 +225,69 @@ export function UserCardItem({
         </div>
       </header>
 
-      <FeeTracker card={card} onChanged={onChanged} />
-
-      <div className="border-b border-black/10 px-4 py-3 dark:border-white/10">
-        <div className="text-[11px] font-semibold uppercase tracking-wide text-black/45 dark:text-white/45">
-          Earning rates
-        </div>
-        <RatesSection card={card} onChanged={onChanged} />
-      </div>
-
-      <EarningsSection card={card} onChanged={onChanged} />
-
-      <button
-        onClick={toggleCredits}
-        aria-expanded={showCredits}
-        className="flex w-full items-center justify-between px-4 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-black/45 hover:text-foreground dark:text-white/45"
-      >
-        <span className="flex items-center gap-1.5">
-          <span className={`transition-transform ${showCredits ? "rotate-90" : ""}`}>›</span>
-          Statement credits
-        </span>
-        <span className="font-normal normal-case tracking-normal text-black/40 dark:text-white/40">
-          {showCredits
-            ? "Hide"
-            : `${card.benefitCount} ${card.benefitCount === 1 ? "credit" : "credits"} · ${formatCurrency(card.creditsYtd)} this year`}
-        </span>
-      </button>
-
-      {showCredits && (
+      {open && (
         <>
-          <div className="divide-y divide-black/[0.06] dark:divide-white/[0.06]">
-            {card.benefits.length === 0 ? (
-              <p className="px-4 py-5 text-center text-sm text-black/45 dark:text-white/45">
-                No credits yet — add one below.
-              </p>
-            ) : (
-              card.benefits.map((b) => (
-                <BenefitRow key={b.id} benefit={b} onChanged={onChanged} />
-              ))
-            )}
-          </div>
+        <FeeTracker card={card} onChanged={onChanged} />
 
-          {adding ? (
-            <AddBenefitForm
-              cardId={card.id}
-              onDone={() => {
-                setAdding(false);
-                onChanged();
-              }}
-              onCancel={() => setAdding(false)}
-            />
-          ) : (
-            <div className="px-4 py-2.5">
-              <button
-                onClick={() => setAdding(true)}
-                className="text-sm font-medium text-indigo-600 hover:underline dark:text-indigo-400"
-              >
-                + Add credit
-              </button>
+        <div className="border-b border-black/10 px-4 py-3 dark:border-white/10">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-black/45 dark:text-white/45">
+            Earning rates
+          </div>
+          <RatesSection card={card} onChanged={onChanged} />
+        </div>
+
+        <EarningsSection card={card} onChanged={onChanged} />
+
+        <button
+          onClick={toggleCredits}
+          aria-expanded={showCredits}
+          className="flex w-full items-center justify-between px-4 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-black/45 hover:text-foreground dark:text-white/45"
+        >
+          <span className="flex items-center gap-1.5">
+            <span className={`transition-transform ${showCredits ? "rotate-90" : ""}`}>›</span>
+            Statement credits
+          </span>
+          <span className="font-normal normal-case tracking-normal text-black/40 dark:text-white/40">
+            {showCredits
+              ? "Hide"
+              : `${card.benefitCount} ${card.benefitCount === 1 ? "credit" : "credits"} · ${formatCurrency(card.creditsYtd)} this year`}
+          </span>
+        </button>
+
+        {showCredits && (
+          <>
+            <div className="divide-y divide-black/[0.06] dark:divide-white/[0.06]">
+              {card.benefits.length === 0 ? (
+                <p className="px-4 py-5 text-center text-sm text-black/45 dark:text-white/45">
+                  No credits yet — add one below.
+                </p>
+              ) : (
+                card.benefits.map((b) => (
+                  <BenefitRow key={b.id} benefit={b} onChanged={onChanged} />
+                ))
+              )}
             </div>
+
+            {adding ? (
+              <AddBenefitForm
+                cardId={card.id}
+                onDone={() => {
+                  setAdding(false);
+                  onChanged();
+                }}
+                onCancel={() => setAdding(false)}
+              />
+            ) : (
+              <div className="px-4 py-2.5">
+                <button
+                  onClick={() => setAdding(true)}
+                  className="text-sm font-medium text-indigo-600 hover:underline dark:text-indigo-400"
+                >
+                  + Add credit
+                </button>
+              </div>
+            )}
+          </>
           )}
         </>
       )}
