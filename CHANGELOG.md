@@ -19,6 +19,11 @@ update), so nothing here is a stability promise.
   way Settings is. It was one page holding every card's credits, rates and
   earnings plus two more tools, so anything below the first card was a long
   scroll away. `/benefits` lands on Cards.
+- The crop is four numbers you can set: X, Y, width and height in the
+  screenshot's own pixels, with the preview redrawing as they change. Reading
+  the edges only fills them in — it cannot find a top edge on a card whose art
+  meets the backdrop, and no threshold invents one. "Fit height" sets the
+  height from the width at a bank card's proportions.
 - The position that worked for one card is reused for the next. Wallet puts the
   card in the same place on every screenshot from a given phone, so a crop that
   was right once is right again — more reliable than reading the edges of art
