@@ -11,6 +11,10 @@ update), so nothing here is a stability promise.
 
 ## Unreleased
 
+- Benefits splits into Cards, Best card and Flights, nested in the sidebar the
+  way Settings is. It was one page holding every card's credits, rates and
+  earnings plus two more tools, so anything below the first card was a long
+  scroll away. `/benefits` lands on Cards.
 - Cards can carry their own image. Point it at a Wallet screenshot and it
   finds the card in the frame and crops to it — the status bar and any caption
   are left out — then shows what it decided before anything is saved. Images

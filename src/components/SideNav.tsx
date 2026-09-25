@@ -15,17 +15,28 @@ type NavItem = {
 };
 
 // Collapsed mode shows terminal-style three-letter codes instead of icons.
-// Settings is the one entry with children: they are configuration you set once,
-// so they nest rather than competing with the daily-use pages above. They get no
-// codes of their own — collapsed, the parent stands for all of them, and
-// clicking it lands on Categories via the redirect at /settings.
+// Two entries have children. Settings nests configuration you set once, so it
+// does not compete with the daily-use pages above; Benefits nests because one
+// page of every card's credits, rates and earnings was a long scroll to reach
+// anything at the bottom of it. Children get no codes of their own —
+// collapsed, the parent stands for all of them, and clicking a parent lands on
+// its first child via the redirect at /settings and /benefits.
 const NAV: NavItem[] = [
   { href: "/accounts", label: "Accounts", code: "ACC" },
   { href: "/transactions", label: "Transactions", code: "TRX" },
   { href: "/venmo", label: "Venmo", code: "VNM" },
   { href: "/zelle", label: "Zelle", code: "ZEL" },
   { href: "/analytics", label: "Analytics", code: "ANL" },
-  { href: "/benefits", label: "Benefits", code: "BEN" },
+  {
+    href: "/benefits",
+    label: "Benefits",
+    code: "BEN",
+    children: [
+      { href: "/benefits/cards", label: "Cards" },
+      { href: "/benefits/best", label: "Best card" },
+      { href: "/benefits/flights", label: "Flights" },
+    ],
+  },
   { href: "/subscriptions", label: "Subscriptions", code: "SUB" },
   { href: "/income", label: "Income", code: "INC", pro: true },
   {

@@ -1,19 +1,9 @@
-import { BenefitsDashboard } from "@/components/BenefitsDashboard";
+import { redirect } from "next/navigation";
 
-export const metadata = {
-  title: "Benefits · Budget Claude",
-};
-
+// Benefits has no index of its own; the card list is the default landing.
+// Temporary rather than permanent on purpose: giving Benefits a real index
+// later should not mean unwinding a 308 that browsers have already cached.
+// Same reasoning as /settings.
 export default function BenefitsPage() {
-  return (
-    <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">
-      <div className="mb-5">
-        <h1 className="text-2xl font-semibold tracking-tight">Card Benefits</h1>
-        <p className="text-sm text-black/55 dark:text-white/55">
-          Track credits and perks against your spending
-        </p>
-      </div>
-      <BenefitsDashboard />
-    </main>
-  );
+  redirect("/benefits/cards");
 }

@@ -1,12 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import type { UserCardDTO, UserCardsResponse } from "@/types";
+import { useState } from "react";
 import { ISSUERS, ISSUER_LABELS, MONTH_NAMES } from "@/lib/categories";
 import { CARD_PRESETS } from "@/data/card-presets";
-import { UserCardItem } from "./benefits/UserCardItem";
-import { BestCards } from "./benefits/BestCards";
-import { FlightComparison } from "./benefits/FlightComparison";
+import { UserCardItem } from "./UserCardItem";
+import { RatesNote } from "./RatesNote";
+import { useUserCards } from "./useUserCards";
 
 const inputClass =
   "rounded-md border border-black/15 bg-transparent px-2.5 py-1.5 text-sm outline-none placeholder:text-black/40 focus:border-black/40 dark:border-white/15 dark:placeholder:text-white/40 dark:focus:border-white/40";
@@ -23,62 +22,12 @@ function toFullYear(raw: string): number {
   return n <= cy % 100 ? century + n : century - 100 + n;
 }
 
-export function BenefitsDashboard() {
-  const [cards, setCards] = useState<UserCardDTO[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/user-cards");
-      if (!res.ok) throw new Error(`Failed to load (HTTP ${res.status})`);
-      const data = (await res.json()) as UserCardsResponse;
-      setCards(data.cards);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    // Intentional data-fetch effect on mount.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    load();
-  }, [load]);
-
-  const move = useCallback(
-    async (id: string, dir: "up" | "down") => {
-      setCards((prev) => {
-        const idx = prev.findIndex((c) => c.id === id);
-        const swap = dir === "up" ? idx - 1 : idx + 1;
-        if (idx < 0 || swap < 0 || swap >= prev.length) return prev;
-        const next = [...prev];
-        [next[idx], next[swap]] = [next[swap], next[idx]];
-        // Persist the new order (fire-and-forget; optimistic update above).
-        fetch("/api/user-cards/reorder", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ids: next.map((c) => c.id) }),
-        }).catch(() => {});
-        return next;
-      });
-    },
-    []
-  );
+export function CardsSection() {
+  const { cards, loading, error, load, move } = useUserCards();
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="rounded-lg border border-amber-300/50 bg-amber-50 px-4 py-2.5 text-xs text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
-        Earning rates are pre-filled from a <strong>~2025 snapshot</strong> and
-        statement credits are whatever you enter — always verify current terms
-        with your issuer. Credit progress is <strong>estimated</strong> from
-        matched transactions on linked cards.
-      </div>
-
-      <BestCards cards={cards} />
+      <RatesNote />
 
       <AddCardForm onAdded={load} />
 
@@ -108,8 +57,6 @@ export function BenefitsDashboard() {
           ))}
         </div>
       )}
-
-      <FlightComparison cards={cards} />
     </div>
   );
 }
