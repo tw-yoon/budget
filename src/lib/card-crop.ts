@@ -231,19 +231,6 @@ export interface CropFractions {
   height: number;
 }
 
-/** The key this remembered crop occupies in the shared ui-state store. */
-export const CROP_KEY = "card-art-crop";
-
-export function toFractions(rect: Rect, width: number, height: number): CropFractions | null {
-  if (width <= 0 || height <= 0) return null;
-  return {
-    x: rect.x / width,
-    y: rect.y / height,
-    width: rect.width / width,
-    height: rect.height / height,
-  };
-}
-
 /**
  * Back to pixels for a given picture, clamped to it. A remembered crop from a
  * taller screen can reach past the bottom of a shorter one, and a crop is only
@@ -259,48 +246,39 @@ export function fromFractions(f: CropFractions, width: number, height: number): 
 }
 
 /**
- * Whether a stored value is usable. The store is a plain JSON file a user can
- * edit and is shared across app versions, so anything at all can come back.
+ * Where the card sits in a Wallet screenshot, per screen.
+ *
+ * A screenshot of a given phone puts the card in the same place every time, so
+ * the reliable way to cut one out is to know the screen rather than to read the
+ * picture. Each preset is matched on the shape of the screenshot and holds its
+ * crop as fractions, so one entry covers that phone at any scale — the 603 x
+ * 1311 the numbers were taken from and the 1206 x 2622 the phone writes alike.
  */
-export function isCropFractions(v: unknown): v is CropFractions {
-  if (!v || typeof v !== "object") return false;
-  const c = v as Record<string, unknown>;
-  const ok = (n: unknown) => typeof n === "number" && Number.isFinite(n) && n >= 0 && n <= 1;
-  return (
-    ok(c.x) && ok(c.y) && ok(c.width) && ok(c.height) &&
-    (c.width as number) > 0 && (c.height as number) > 0
-  );
+export interface CropPreset {
+  name: string;
+  /** width / height of the screenshots this was measured on. */
+  aspect: number;
+  crop: CropFractions;
 }
 
-/**
- * Where the card sits in a Wallet screenshot, before anything has been saved.
- *
- * Measured on an iPhone 16 Pro: a 603 x 1311 screenshot with the card 543 x 342
- * at 30, 192. Held as fractions, so the same numbers apply to the full-
- * resolution screenshot the phone actually writes (1206 x 2622) and to any
- * other phone of that shape.
- *
- * Saving a card replaces this with whatever crop was used, so a screen this
- * does not suit is a one-time correction rather than a standing annoyance.
- */
-export const DEFAULT_CROP: CropFractions = {
-  x: 30 / 603,
-  y: 192 / 1311,
-  width: 543 / 603,
-  height: 342 / 1311,
-};
+export const CROP_PRESETS: CropPreset[] = [
+  {
+    // Measured on an iPhone 16 Pro: the card 543 x 342 at 30, 192.
+    name: "iPhone",
+    aspect: 603 / 1311,
+    crop: { x: 30 / 603, y: 192 / 1311, width: 543 / 603, height: 342 / 1311 },
+  },
+];
 
-/** The shape of screenshot those numbers were measured on. */
-const DEFAULT_CROP_ASPECT = 603 / 1311;
-/** How far from it a picture may be and still be the same screen. */
+/** How far a picture's shape may be from a preset's and still be that screen. */
 const ASPECT_SLACK = 0.02;
 
 /**
- * Whether the built-in crop applies to a picture. A screenshot from another
- * phone, or a photo, has nothing to do with those numbers — it falls back to
- * reading the edges instead.
+ * The preset for a picture, or null when none fits — another phone, or a photo
+ * rather than a screenshot, in which case the edges are read instead.
  */
-export function matchesDefaultCrop(width: number, height: number): boolean {
-  if (width <= 0 || height <= 0) return false;
-  return Math.abs(width / height - DEFAULT_CROP_ASPECT) <= ASPECT_SLACK;
+export function presetFor(width: number, height: number): CropPreset | null {
+  if (width <= 0 || height <= 0) return null;
+  const aspect = width / height;
+  return CROP_PRESETS.find((p) => Math.abs(aspect - p.aspect) <= ASPECT_SLACK) ?? null;
 }

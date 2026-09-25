@@ -19,20 +19,11 @@ update), so nothing here is a stability promise.
   way Settings is. It was one page holding every card's credits, rates and
   earnings plus two more tools, so anything below the first card was a long
   scroll away. `/benefits` lands on Cards.
-- A Wallet screenshot from an iPhone of this shape starts at the right crop
-  without being told: 543 x 342 at 30, 192 of a 603 x 1311 screenshot, held as
-  fractions so it applies to the full-resolution file and to any phone of the
-  same proportions. Anything else falls back to reading the edges.
-- The crop is four numbers you can set: X, Y, width and height in the
-  screenshot's own pixels, with the preview redrawing as they change. Reading
-  the edges only fills them in — it cannot find a top edge on a card whose art
-  meets the backdrop, and no threshold invents one. "Fit height" sets the
-  height from the width at a bank card's proportions.
-- The position that worked for one card is reused for the next. Wallet puts the
-  card in the same place on every screenshot from a given phone, so a crop that
-  was right once is right again — more reliable than reading the edges of art
-  the app has never seen. Saving records the position; the next screenshot lands
-  on it, with one click to read that picture's own edges instead.
+- The crop comes from the screenshot's size. A given phone puts the card in the
+  same place every time, so the app matches the screen and stamps out its known
+  rectangle — 543 x 342 at 30, 192 for an iPhone of this shape, held as
+  fractions so one entry covers the full-resolution file too. A picture no
+  preset covers falls back to reading its edges.
 - The crop's sides land on the card rather than on the glow around it, and its
   bottom edge is worked out from the card's proportions rather than measured. The top and sides are where a card meets the backdrop cleanly; the
   bottom is where it sits over its own drop shadow, and measuring it either

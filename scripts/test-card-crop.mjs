@@ -1,13 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  DEFAULT_CROP,
+  CROP_PRESETS,
   detectCardRect,
   differenceMap,
   fromFractions,
-  isCropFractions,
-  matchesDefaultCrop,
-  toFractions,
+  presetFor,
 } from "../src/lib/card-crop.ts";
 
 // A synthetic screenshot: a background, with rectangles painted on it.
@@ -210,69 +208,58 @@ test("art that fades down the card does not pull the sides inward", () => {
   assert.deepEqual(find(200, 300, rows), { x: 15, y: 50, width: w, height: h });
 });
 
-// ── a remembered crop ────────────────────────────────────────────────────
+// ── presets ─────────────────────────────────────────────────────────────
 
-test("a crop survives the round trip through fractions", () => {
-  const rect = { x: 24, y: 150, width: 342, height: 216 };
-  const f = toFractions(rect, 390, 844);
-  assert.deepEqual(fromFractions(f, 390, 844), rect);
-});
+const iphone = () => CROP_PRESETS.find((p) => p.name === "iPhone");
 
-test("the same crop lands proportionally on a bigger screen", () => {
-  // The same Wallet layout photographed at 3x rather than 2x.
-  const f = toFractions({ x: 24, y: 150, width: 342, height: 216 }, 390, 844);
-  assert.deepEqual(fromFractions(f, 780, 1688), { x: 48, y: 300, width: 684, height: 432 });
-});
-
-test("a crop reaching past a shorter picture is clamped to it", () => {
-  const f = toFractions({ x: 10, y: 700, width: 300, height: 130 }, 390, 844);
-  const rect = fromFractions(f, 390, 500);
-  assert.ok(rect.y + rect.height <= 500, `${rect.y}+${rect.height} ran off the bottom`);
-  assert.ok(rect.x + rect.width <= 390);
-});
-
-test("zero dimensions have no fractions", () => {
-  assert.equal(toFractions({ x: 0, y: 0, width: 1, height: 1 }, 0, 0), null);
-  assert.equal(fromFractions({ x: 0, y: 0, width: 1, height: 1 }, 0, 0), null);
-});
-
-test("only a sane stored crop is trusted", () => {
-  assert.ok(isCropFractions({ x: 0.1, y: 0.2, width: 0.8, height: 0.3 }));
-  assert.ok(isCropFractions({ x: 0, y: 0, width: 1, height: 1 }));
-  for (const junk of [
-    null, undefined, 42, "crop", [],
-    { x: 0, y: 0, width: 0, height: 0.5 },      // nothing to crop
-    { x: -0.1, y: 0, width: 0.5, height: 0.5 }, // off the picture
-    { x: 0, y: 0, width: 1.5, height: 0.5 },    // wider than the picture
-    { x: 0, y: 0, width: 0.5 },                 // half a rectangle
-    { x: NaN, y: 0, width: 0.5, height: 0.5 },
-  ])
-    assert.equal(isCropFractions(junk), false, JSON.stringify(junk));
-});
-
-// ── the built-in starting crop ───────────────────────────────────────────
-
-test("the built-in crop is a card, and fits the screen it was measured on", () => {
-  const [W, H] = [603, 1311];
-  const box = fromFractions(DEFAULT_CROP, W, H);
+test("the iPhone preset cuts the measured rectangle", () => {
+  const box = fromFractions(iphone().crop, 603, 1311);
   assert.deepEqual(box, { x: 30, y: 192, width: 543, height: 342 });
-  assert.ok(box.x + box.width <= W, "runs off the side");
-  assert.ok(box.y + box.height <= H, "runs off the bottom");
-  // 85.60 x 53.98 mm, within a pixel of rounding.
-  assert.ok(Math.abs(box.width / box.height - 85.6 / 53.98) < 0.01);
 });
 
-test("the same crop lands on the full-resolution screenshot", () => {
-  // The measurements were taken at half scale; the phone writes 1206 x 2622.
-  const box = fromFractions(DEFAULT_CROP, 1206, 2622);
+test("it holds at the resolution the phone actually writes", () => {
+  // The numbers were taken at half scale; fractions carry them up.
+  const box = fromFractions(iphone().crop, 1206, 2622);
   assert.deepEqual(box, { x: 60, y: 384, width: 1086, height: 684 });
 });
 
-test("it applies to that screen at any scale, and not to others", () => {
-  assert.ok(matchesDefaultCrop(603, 1311));
-  assert.ok(matchesDefaultCrop(1206, 2622));
-  assert.ok(matchesDefaultCrop(1179, 2556)); // a near-enough iPhone
-  assert.ok(!matchesDefaultCrop(1024, 768)); // a landscape screen
-  assert.ok(!matchesDefaultCrop(1000, 1000)); // a square photo
-  assert.ok(!matchesDefaultCrop(0, 0));
+test("every preset stays inside its screen and cuts a card shape", () => {
+  for (const p of CROP_PRESETS) {
+    // A screen of the preset's own shape, at an arbitrary size.
+    const width = 1200;
+    const height = Math.round(width / p.aspect);
+    const box = fromFractions(p.crop, width, height);
+    assert.ok(box.x >= 0 && box.y >= 0, `${p.name} starts off the picture`);
+    assert.ok(box.x + box.width <= width, `${p.name} runs off the side`);
+    assert.ok(box.y + box.height <= height, `${p.name} runs off the bottom`);
+    // 85.60 x 53.98 mm, allowing for rounding at this size.
+    assert.ok(
+      Math.abs(box.width / box.height - 85.6 / 53.98) < 0.02,
+      `${p.name} is not a card shape: ${box.width}x${box.height}`
+    );
+  }
+});
+
+test("a screenshot is matched to its screen at any scale", () => {
+  assert.equal(presetFor(603, 1311)?.name, "iPhone");
+  assert.equal(presetFor(1206, 2622)?.name, "iPhone");
+  assert.equal(presetFor(1179, 2556)?.name, "iPhone"); // a near-enough iPhone
+});
+
+test("a picture of another shape matches nothing", () => {
+  // Those fall back to reading the edges, which is what the tests above cover.
+  assert.equal(presetFor(1024, 768), null); // landscape
+  assert.equal(presetFor(1000, 1000), null); // square
+  assert.equal(presetFor(0, 0), null);
+});
+
+test("no two presets claim the same screenshot", () => {
+  // presetFor takes the first match, so overlapping shapes would make which
+  // one wins depend on the order of the list.
+  for (let i = 0; i < CROP_PRESETS.length; i++)
+    for (let j = i + 1; j < CROP_PRESETS.length; j++)
+      assert.ok(
+        Math.abs(CROP_PRESETS[i].aspect - CROP_PRESETS[j].aspect) > 0.04,
+        `${CROP_PRESETS[i].name} and ${CROP_PRESETS[j].name} overlap`
+      );
 });
