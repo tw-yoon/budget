@@ -17,6 +17,9 @@ update), so nothing here is a stability promise.
   setting their category by hand, so rules still apply to them; renaming onto
   an existing subcategory merges them, and Reset goes back to Plaid's name.
   They show up in the Rules and ledger subcategory pickers too.
+- Plaid's subcategories drop the category name they repeat: "Food and Drink
+  Restaurant" is "Restaurant", and "Medical Other Medical" is "Other". One
+  named like a subcategory of your own now shares its row in Settings.
 
 ## 0.6.0 — 2026-09-25
 

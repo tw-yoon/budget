@@ -37,17 +37,34 @@ export function formatSignedAmount(amount: number): {
 
 // Plaid PFC enum → human label, e.g. "FOOD_AND_DRINK" → "Food and Drink"
 const LOWERCASE_WORDS = new Set(["and", "or", "of", "the", "to"]);
+const ACRONYMS = new Set(["atm", "bnpl", "tv"]);
 
 export function humanizePfc(pfc: string): string {
   return pfc
     .toLowerCase()
     .split("_")
     .map((word, i) =>
-      i > 0 && LOWERCASE_WORDS.has(word)
-        ? word
-        : word.charAt(0).toUpperCase() + word.slice(1)
+      ACRONYMS.has(word)
+        ? word.toUpperCase()
+        : i > 0 && LOWERCASE_WORDS.has(word)
+          ? word
+          : word.charAt(0).toUpperCase() + word.slice(1)
     )
     .join(" ");
+}
+
+/**
+ * Plaid's detailed label as a subcategory name. The code repeats its primary
+ * (FOOD_AND_DRINK_RESTAURANT) and the sub is always shown under that
+ * primary's category, so the repeat is dropped: "Restaurant". An "other"
+ * label that names its primary again (MEDICAL_OTHER_MEDICAL) is just "Other".
+ */
+export function humanizePfcDetailed(detailed: string, primary: string): string {
+  let rest = detailed;
+  // TRANSFER_IN_TRANSFER_IN_FROM_APPS repeats it twice.
+  while (rest.startsWith(primary + "_")) rest = rest.slice(primary.length + 1);
+  if (rest === primary || rest === "OTHER_" + primary) rest = "OTHER";
+  return humanizePfc(rest);
 }
 
 export function formatDate(iso: string): string {

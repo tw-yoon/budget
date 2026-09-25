@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { humanizePfc } from "@/lib/format";
+import { humanizePfc, humanizePfcDetailed } from "@/lib/format";
 import { splitCategory } from "@/lib/categories";
 import { getCashoutBreakdowns } from "@/services/venmo.service";
 import {
@@ -176,8 +176,10 @@ export async function GET(req: NextRequest) {
     ]);
     const plaidName = (primary: string) => plaidMap.get(primary) ?? humanizePfc(primary);
     // Plaid's detailed label, under the name given it in Settings if any.
-    const plaidSub = (detailed: string | null) =>
-      detailed ? detailedNames.get(detailed) ?? humanizePfc(detailed) : null;
+    const plaidSub = (detailed: string | null, primary: string) =>
+      detailed
+        ? detailedNames.get(detailed) ?? humanizePfcDetailed(detailed, primary)
+        : null;
 
     const refundsByPurchase = new Map<string, RefundDTO[]>();
     for (const r of refundRows) {
@@ -239,12 +241,12 @@ export async function GET(req: NextRequest) {
         name: t.name,
         merchantName: t.merchantName,
         category: uc ? uc.parent : plaidName(t.pfcPrimary),
-        categoryDetailed: uc ? uc.sub : plaidSub(t.pfcDetailed),
+        categoryDetailed: uc ? uc.sub : plaidSub(t.pfcDetailed, t.pfcPrimary),
         userCategory: t.userCategory,
         // Plaid's own categorization, kept alongside the effective one so the
         // client can preview/revert overrides without refetching.
         plaidCategory: plaidName(t.pfcPrimary),
-        plaidCategoryDetailed: plaidSub(t.pfcDetailed),
+        plaidCategoryDetailed: plaidSub(t.pfcDetailed, t.pfcPrimary),
         logoUrl: t.logoUrl,
         pending: t.pending,
         isTransfer: t.isTransfer,

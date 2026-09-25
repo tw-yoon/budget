@@ -21,8 +21,8 @@ export interface SubcategoryUsage {
   declared: boolean;
   transactionCount: number;
   ruleCount: number;
-  /** Plaid detailed labels that show as this sub, e.g. FOOD_AND_DRINK_RESTAURANT. */
-  plaidLabels: string[];
+  /** Plaid detailed labels that show as this sub, with Plaid's name for each. */
+  plaidLabels: { code: string; name: string }[];
   /** Rows showing it through one of those labels, i.e. not categorized by hand. */
   plaidTransactionCount: number;
   /** Whether any of those labels carries a name the user gave it. */
@@ -32,7 +32,10 @@ export interface SubcategoryUsage {
 /** One of Plaid's detailed labels, already resolved to where the ledger shows it. */
 export interface PresetSub {
   parent: string;
+  /** What it shows as: the user's name for it, else `plaidName`. */
   name: string;
+  /** Plaid's own name for it. */
+  plaidName: string;
   code: string;
   count: number;
   renamed: boolean;
@@ -104,7 +107,7 @@ export function groupSubcategories(
   for (const p of presets) {
     const e = entry(p.parent, p.name);
     if (!e) continue;
-    e.plaidLabels.push(p.code);
+    e.plaidLabels.push({ code: p.code, name: p.plaidName });
     e.plaidTransactionCount += p.count;
     e.renamed ||= p.renamed;
   }
@@ -113,7 +116,10 @@ export function groupSubcategories(
     [...byParent].map(([parent, subs]) => [
       parent,
       [...subs.values()]
-        .map((e) => ({ ...e, plaidLabels: e.plaidLabels.sort() }))
+        .map((e) => ({
+          ...e,
+          plaidLabels: e.plaidLabels.sort((a, b) => a.code.localeCompare(b.code)),
+        }))
         .sort((a, b) => a.name.localeCompare(b.name)),
     ])
   );

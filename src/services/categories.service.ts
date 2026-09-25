@@ -10,7 +10,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { renameCategoryIn } from "@/lib/category-rename";
-import { humanizePfc } from "@/lib/format";
+import { humanizePfc, humanizePfcDetailed } from "@/lib/format";
 import {
   groupSubcategories,
   type PresetSub,
@@ -430,7 +430,7 @@ export async function loadPlaidCategoryMap(): Promise<Map<string, string>> {
   return new Map(rows.map((r) => [r.pfcPrimary, r.category.name]));
 }
 
-/** Plaid detailed label → the name the user gave it. Unnamed labels read as humanizePfc. */
+/** Plaid detailed label → the name the user gave it. Unnamed labels read as humanizePfcDetailed. */
 export async function loadPlaidDetailedNames(): Promise<Map<string, string>> {
   const rows = await prisma.plaidDetailedName.findMany();
   return new Map(rows.map((r) => [r.pfcDetailed, r.name]));
@@ -463,9 +463,11 @@ async function listPresets(): Promise<PresetSub[]> {
   return all.map((g) => {
     const code = g.pfcDetailed!;
     const custom = names.get(code);
+    const plaidName = humanizePfcDetailed(code, g.pfcPrimary);
     return {
       parent: plaidMap.get(g.pfcPrimary) ?? humanizePfc(g.pfcPrimary),
-      name: custom ?? humanizePfc(code),
+      name: custom ?? plaidName,
+      plaidName,
       code,
       count: counts.get(key(g.pfcPrimary, code)) ?? 0,
       renamed: custom !== undefined,
@@ -585,7 +587,7 @@ export async function renameSubcategory(
     }
     for (const p of fromPresets) {
       // Renaming back to Plaid's own wording just drops the custom name.
-      if (to === humanizePfc(p.code)) {
+      if (to === p.plaidName) {
         await tx.plaidDetailedName.deleteMany({ where: { pfcDetailed: p.code } });
       } else {
         await tx.plaidDetailedName.upsert({

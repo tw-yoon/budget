@@ -19,7 +19,7 @@ interface Subcategory {
   declared: boolean;
   transactionCount: number;
   ruleCount: number;
-  plaidLabels: string[];
+  plaidLabels: { code: string; name: string }[];
   plaidTransactionCount: number;
   renamed: boolean;
 }
@@ -520,10 +520,10 @@ export function SettingsCategories() {
                         {sub.plaidLabels.length > 0 && (
                           <span
                             className="mt-0.5 rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-medium text-sky-700 dark:bg-sky-500/15 dark:text-sky-300"
-                            title={`Plaid: ${sub.plaidLabels.join(", ")}`}
+                            title={`Plaid: ${sub.plaidLabels.map((l) => l.code).join(", ")}`}
                           >
                             {sub.renamed
-                              ? `Plaid: ${sub.plaidLabels.map(humanizePfc).join(", ")}`
+                              ? `Plaid: ${sub.plaidLabels.map((l) => l.name).join(", ")}`
                               : "Plaid"}
                           </span>
                         )}
