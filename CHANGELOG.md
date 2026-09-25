@@ -11,6 +11,10 @@ update), so nothing here is a stability promise.
 
 ## Unreleased
 
+- A card's "Linked" badge is capped in width, with the full account name on
+  hover. The name is whatever the bank calls the account, and a long one —
+  "American Express Gold Card" — pushed the card's arrows and Remove onto a
+  row of their own.
 - Cards start collapsed, opening on the chevron in their header. A card opened
   out is four sections tall, so a wallet's worth of them buried everything
   below the first; collapsed, each is one row and the whole list fits a screen.

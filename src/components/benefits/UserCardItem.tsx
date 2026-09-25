@@ -187,7 +187,14 @@ export function UserCardItem({
             <span className={`inline-block transition-transform ${open ? "rotate-90" : ""}`}>›</span>
           </button>
           {card.linked ? (
-            <span className="rounded bg-green-100 px-2 py-0.5 text-[11px] font-medium text-green-700 dark:bg-green-500/15 dark:text-green-400">
+            // Capped, because the account name is whatever the bank calls it:
+            // "CREDIT CARD" for one, "American Express Gold Card" for another,
+            // and the long ones pushed the controls beside it onto a second
+            // row. The full name is on hover.
+            <span
+              title={`Linked · ${card.linkedAccountName}`}
+              className="max-w-[12rem] truncate rounded bg-green-100 px-2 py-0.5 text-[11px] font-medium text-green-700 dark:bg-green-500/15 dark:text-green-400"
+            >
               Linked · {card.linkedAccountName}
             </span>
           ) : (
