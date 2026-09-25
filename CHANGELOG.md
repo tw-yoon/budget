@@ -11,6 +11,9 @@ update), so nothing here is a stability promise.
 
 ## Unreleased
 
+- Flights under Benefits is part of Pro. In Normal it leaves the sidebar, and
+  `/benefits/flights` says where the switch is rather than showing the
+  comparison.
 - Venmo and Zelle move under Transactions in the sidebar, beside the ledger,
   at `/transactions/venmo` and `/transactions/zelle`. Both are the ledger
   narrowed to one kind of payment, so they sit with it rather than as two more

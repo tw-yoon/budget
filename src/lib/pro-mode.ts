@@ -2,8 +2,8 @@
  * How much of the app to show.
  *
  * Normal is the everyday view. Pro adds the dense, interactive extras: the
- * cash-flow diagram and cumulative spending graph on Analytics, and payment
- * splitting in the ledger. It gates controls and views, never data — a split
+ * cash-flow diagram and cumulative spending graph on Analytics, the flight
+ * comparison under Benefits, and payment splitting in the ledger. It gates controls and views, never data — a split
  * recorded in Pro still counts toward every total in Normal, because a display
  * preference must not be able to move a financial figure.
  *

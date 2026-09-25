@@ -11,7 +11,7 @@ type NavItem = {
   code: string;
   /** Only listed in Pro. The route still answers; it explains itself there. */
   pro?: true;
-  children?: { href: string; label: string }[];
+  children?: { href: string; label: string; pro?: true }[];
 };
 
 // Collapsed mode shows terminal-style three-letter codes instead of icons.
@@ -43,7 +43,7 @@ const NAV: NavItem[] = [
     children: [
       { href: "/benefits/cards", label: "Cards" },
       { href: "/benefits/best", label: "Best card" },
-      { href: "/benefits/flights", label: "Flights" },
+      { href: "/benefits/flights", label: "Flights", pro: true },
     ],
   },
   { href: "/subscriptions", label: "Subscriptions", code: "SUB" },
@@ -70,7 +70,11 @@ export default function SideNav({ version }: { version: string }) {
   // appear and then vanish. A Pro user's entries arrive a moment after mount,
   // which is the same way the Pro sections of Analytics behave.
   const { mode } = useProMode();
-  const items = NAV.filter((item) => !item.pro || mode === "pro");
+  const shown = (entry: { pro?: true }) => !entry.pro || mode === "pro";
+  const items = NAV.filter(shown).map((item) => ({
+    ...item,
+    children: item.children?.filter(shown),
+  }));
   // Collapsed by default; a saved preference (if any) overrides on mount.
   const [collapsed, setCollapsed] = useState(true);
 
