@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import {
+  cornerRadiusFor,
   detectCardRect,
   differenceMap,
   fromFractions,
@@ -57,6 +58,17 @@ async function cropToCard(
   out.height = cut.height;
   const outCtx = out.getContext("2d");
   if (!outCtx) throw new Error("This browser would not give a canvas to draw on.");
+
+  // Round the corners into the image itself. It cannot be done in CSS here:
+  // globals.css squares off every border-radius in the app, which is the
+  // terminal look everything else wants. A rounded clip leaves the corners
+  // transparent, and PNG keeps that.
+  const radius = cornerRadiusFor(cut.width);
+  if (radius > 0 && typeof outCtx.roundRect === "function") {
+    outCtx.beginPath();
+    outCtx.roundRect(0, 0, cut.width, cut.height, radius);
+    outCtx.clip();
+  }
   outCtx.drawImage(full, cut.x, cut.y, cut.width, cut.height, 0, 0, cut.width, cut.height);
 
   const blob = await new Promise<Blob | null>((res) => out.toBlob(res, "image/png"));

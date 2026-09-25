@@ -282,3 +282,18 @@ export function presetFor(width: number, height: number): CropPreset | null {
   const aspect = width / height;
   return CROP_PRESETS.find((p) => Math.abs(aspect - p.aspect) <= ASPECT_SLACK) ?? null;
 }
+
+/**
+ * A card's corner radius, as a fraction of its width.
+ *
+ * Measured at 18px on a 543-wide card, which is what Wallet draws — close to
+ * the 3.18mm on an 85.60mm card the physical spec calls for. Kept as a
+ * fraction so one number serves every scale: the same card at 1086 wide gets
+ * 36px, and a preset for another phone needs nothing extra.
+ */
+const CORNER_RADIUS = 18 / 543;
+
+/** The corner radius for a card cut to this width, in pixels. */
+export function cornerRadiusFor(width: number): number {
+  return Math.max(0, Math.round(width * CORNER_RADIUS));
+}

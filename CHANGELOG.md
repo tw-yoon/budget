@@ -19,6 +19,10 @@ update), so nothing here is a stability promise.
   way Settings is. It was one page holding every card's credits, rates and
   earnings plus two more tools, so anything below the first card was a long
   scroll away. `/benefits` lands on Cards.
+- Card images get the card's rounded corners, cut into the image itself —
+  18px on a 543-wide card, scaling with it — since the app squares off every
+  border-radius in CSS. Images saved before this keep square corners until
+  they are added again.
 - The crop comes from the screenshot's size. A given phone puts the card in the
   same place every time, so the app matches the screen and stamps out its known
   rectangle — 543 x 342 at 30, 192 for an iPhone of this shape, held as

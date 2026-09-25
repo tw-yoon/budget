@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   CROP_PRESETS,
+  cornerRadiusFor,
   detectCardRect,
   differenceMap,
   fromFractions,
@@ -262,4 +263,31 @@ test("no two presets claim the same screenshot", () => {
         Math.abs(CROP_PRESETS[i].aspect - CROP_PRESETS[j].aspect) > 0.04,
         `${CROP_PRESETS[i].name} and ${CROP_PRESETS[j].name} overlap`
       );
+});
+
+// ── corners ──────────────────────────────────────────────────────────────
+
+test("the corner radius is the measured one, at either scale", () => {
+  assert.equal(cornerRadiusFor(543), 18);
+  assert.equal(cornerRadiusFor(1086), 36);
+});
+
+test("it stays proportional at any size", () => {
+  // Twice the card, twice the radius — a card is a card at any resolution.
+  assert.equal(cornerRadiusFor(2172), 72);
+  assert.ok(Math.abs(cornerRadiusFor(200) / 200 - 18 / 543) < 0.005);
+});
+
+test("a degenerate width has no corners rather than a negative radius", () => {
+  assert.equal(cornerRadiusFor(0), 0);
+  assert.equal(cornerRadiusFor(-100), 0);
+});
+
+test("the radius never exceeds half the card's shorter side", () => {
+  // Past that a rounded rectangle stops being one, and canvas clamps it
+  // silently — so the numbers should never get near it.
+  for (const w of [92, 200, 543, 1086]) {
+    const h = Math.round(w / (85.6 / 53.98));
+    assert.ok(cornerRadiusFor(w) <= Math.min(w, h) / 2, `radius too big at ${w}`);
+  }
 });
