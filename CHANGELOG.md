@@ -9,7 +9,7 @@ middle number; one carrying fixes and small changes moves the last.
 Still `0.x`: the database schema changes between releases (migrations run on
 update), so nothing here is a stability promise.
 
-## Unreleased
+## 0.6.0 — 2026-09-25
 
 - Flights under Benefits is part of Pro. In Normal it leaves the sidebar, and
   `/benefits/flights` says where the switch is rather than showing the
@@ -40,8 +40,9 @@ update), so nothing here is a stability promise.
   fractions so one entry covers the full-resolution file too. A picture no
   preset covers falls back to reading its edges.
 - The crop's sides land on the card rather than on the glow around it, and its
-  bottom edge is worked out from the card's proportions rather than measured. The top and sides are where a card meets the backdrop cleanly; the
-  bottom is where it sits over its own drop shadow, and measuring it either
+  bottom edge is worked out from the card's proportions rather than measured.
+  The top and sides are where a card meets the backdrop cleanly; the bottom is
+  where it sits over its own drop shadow, and measuring it either
   stopped short or ran down into the shadow. A bank card has a fixed shape, so
   the reliable width gives the height exactly.
 - Saving is a button rather than a quiet link, with the preview marked "not
