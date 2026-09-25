@@ -1,6 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { detectCardRect, differenceMap } from "../src/lib/card-crop.ts";
+import {
+  detectCardRect,
+  differenceMap,
+  fromFractions,
+  isCropFractions,
+  toFractions,
+} from "../src/lib/card-crop.ts";
 
 // A synthetic screenshot: a background, with rectangles painted on it.
 function screenshot(width, height, bg, rects) {
@@ -200,4 +206,44 @@ test("art that fades down the card does not pull the sides inward", () => {
     color: [200, 140, 60].map((c, k) => Math.round(c + ((BG[k] - c) * i) / (h - 1))),
   }));
   assert.deepEqual(find(200, 300, rows), { x: 15, y: 50, width: w, height: h });
+});
+
+// ── a remembered crop ────────────────────────────────────────────────────
+
+test("a crop survives the round trip through fractions", () => {
+  const rect = { x: 24, y: 150, width: 342, height: 216 };
+  const f = toFractions(rect, 390, 844);
+  assert.deepEqual(fromFractions(f, 390, 844), rect);
+});
+
+test("the same crop lands proportionally on a bigger screen", () => {
+  // The same Wallet layout photographed at 3x rather than 2x.
+  const f = toFractions({ x: 24, y: 150, width: 342, height: 216 }, 390, 844);
+  assert.deepEqual(fromFractions(f, 780, 1688), { x: 48, y: 300, width: 684, height: 432 });
+});
+
+test("a crop reaching past a shorter picture is clamped to it", () => {
+  const f = toFractions({ x: 10, y: 700, width: 300, height: 130 }, 390, 844);
+  const rect = fromFractions(f, 390, 500);
+  assert.ok(rect.y + rect.height <= 500, `${rect.y}+${rect.height} ran off the bottom`);
+  assert.ok(rect.x + rect.width <= 390);
+});
+
+test("zero dimensions have no fractions", () => {
+  assert.equal(toFractions({ x: 0, y: 0, width: 1, height: 1 }, 0, 0), null);
+  assert.equal(fromFractions({ x: 0, y: 0, width: 1, height: 1 }, 0, 0), null);
+});
+
+test("only a sane stored crop is trusted", () => {
+  assert.ok(isCropFractions({ x: 0.1, y: 0.2, width: 0.8, height: 0.3 }));
+  assert.ok(isCropFractions({ x: 0, y: 0, width: 1, height: 1 }));
+  for (const junk of [
+    null, undefined, 42, "crop", [],
+    { x: 0, y: 0, width: 0, height: 0.5 },      // nothing to crop
+    { x: -0.1, y: 0, width: 0.5, height: 0.5 }, // off the picture
+    { x: 0, y: 0, width: 1.5, height: 0.5 },    // wider than the picture
+    { x: 0, y: 0, width: 0.5 },                 // half a rectangle
+    { x: NaN, y: 0, width: 0.5, height: 0.5 },
+  ])
+    assert.equal(isCropFractions(junk), false, JSON.stringify(junk));
 });

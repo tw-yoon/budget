@@ -1,7 +1,16 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { detectCardRect, differenceMap } from "@/lib/card-crop";
+import { useEffect, useRef, useState } from "react";
+import {
+  CROP_KEY,
+  detectCardRect,
+  differenceMap,
+  fromFractions,
+  isCropFractions,
+  toFractions,
+  type CropFractions,
+} from "@/lib/card-crop";
+import { loadSynced, pushSynced } from "@/lib/ui-state";
 
 /**
  * Turn a screenshot into a card face.
@@ -11,22 +20,34 @@ import { detectCardRect, differenceMap } from "@/lib/card-crop";
  * and the re-encode for free — so the server never needs an image library, and
  * what gets uploaded is exactly what was shown in the preview.
  */
-async function cropToCard(file: File): Promise<{ blob: Blob; detected: boolean }> {
+async function cropToCard(
+  file: File,
+  remembered: CropFractions | null
+): Promise<{ blob: Blob; used: "remembered" | "detected" | "whole"; crop: CropFractions | null }> {
   const bitmap = await createImageBitmap(file);
+  // Kept aside: close() releases the bitmap and leaves its width and height
+  // reading zero, which silently turned the remembered crop into nothing.
+  const srcW = bitmap.width;
+  const srcH = bitmap.height;
   const full = document.createElement("canvas");
-  full.width = bitmap.width;
-  full.height = bitmap.height;
+  full.width = srcW;
+  full.height = srcH;
   const fullCtx = full.getContext("2d");
   if (!fullCtx) throw new Error("This browser would not give a canvas to draw on.");
   fullCtx.drawImage(bitmap, 0, 0);
 
-  const { data } = fullCtx.getImageData(0, 0, bitmap.width, bitmap.height);
-  const diff = differenceMap(data, bitmap.width, bitmap.height);
-  const rect = diff && detectCardRect(diff, bitmap.width, bitmap.height);
+  const { data } = fullCtx.getImageData(0, 0, srcW, srcH);
+  // A crop that was right before is right again: Wallet puts the card in the
+  // same place on every screenshot from the same phone, and that beats reading
+  // the edges of art it has never seen.
+  const saved = remembered && fromFractions(remembered, srcW, srcH);
+  const diff = saved ? null : differenceMap(data, srcW, srcH);
+  const rect = diff && detectCardRect(diff, srcW, srcH);
   // Nothing card-shaped found — an image that is already cropped, or a photo
   // rather than a screenshot. Keep the whole thing: the preview shows what it
   // decided, so a wrong guess is visible before it is saved.
-  const box = rect ?? { x: 0, y: 0, width: bitmap.width, height: bitmap.height };
+  const box = saved ?? rect ?? { x: 0, y: 0, width: srcW, height: srcH };
+  const used = saved ? "remembered" : rect ? "detected" : "whole";
 
   const out = document.createElement("canvas");
   out.width = box.width;
@@ -38,7 +59,7 @@ async function cropToCard(file: File): Promise<{ blob: Blob; detected: boolean }
 
   const blob = await new Promise<Blob | null>((res) => out.toBlob(res, "image/png"));
   if (!blob) throw new Error("The image could not be re-encoded.");
-  return { blob, detected: rect !== null };
+  return { blob, used, crop: toFractions(box, srcW, srcH) };
 }
 
 export function CardArtPicker({
@@ -53,7 +74,29 @@ export function CardArtPicker({
   const input = useRef<HTMLInputElement | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [preview, setPreview] = useState<{ url: string; blob: Blob; detected: boolean } | null>(null);
+  const [preview, setPreview] = useState<
+    { url: string; blob: Blob; used: "remembered" | "detected" | "whole"; crop: CropFractions | null } | null
+  >(null);
+  // The crop last saved, reused for the next screenshot. Held in a ref as well
+  // so pick() reads the current value rather than the one captured at render.
+  const [remembered, setRemembered] = useState<CropFractions | null>(null);
+  const rememberedRef = useRef<CropFractions | null>(null);
+  // The picked file, so the crop can be redone the other way without asking
+  // for it again.
+  const source = useRef<File | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const stored = await loadSynced(CROP_KEY);
+      if (cancelled || !isCropFractions(stored)) return;
+      rememberedRef.current = stored;
+      setRemembered(stored);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   function clearPreview() {
     setPreview((p) => {
@@ -62,22 +105,34 @@ export function CardArtPicker({
     });
   }
 
-  async function pick(file: File | undefined) {
-    if (!file) return;
+  async function crop(file: File, useRemembered: boolean) {
     setError(null);
     setBusy(true);
     try {
-      const { blob, detected } = await cropToCard(file);
+      const out = await cropToCard(file, useRemembered ? rememberedRef.current : null);
       setPreview((p) => {
         if (p) URL.revokeObjectURL(p.url);
-        return { url: URL.createObjectURL(blob), blob, detected };
+        return { url: URL.createObjectURL(out.blob), ...out };
       });
     } catch (e) {
       setError(e instanceof Error ? e.message : "That image could not be read.");
     } finally {
       setBusy(false);
-      if (input.current) input.current.value = ""; // so the same file can be picked again
     }
+  }
+
+  async function pick(file: File | undefined) {
+    if (!file) return;
+    source.current = file;
+    await crop(file, true);
+    if (input.current) input.current.value = ""; // so the same file can be picked again
+  }
+
+  // Read this screenshot's own edges instead of reusing the saved position —
+  // for this picture only. The saved position stays, so the choice is
+  // reversible; saving replaces it with whatever was actually used.
+  function detectInstead() {
+    if (source.current) void crop(source.current, false);
   }
 
   async function save() {
@@ -91,6 +146,13 @@ export function CardArtPicker({
         body: preview.blob,
       });
       if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error ?? "Failed to save the image");
+      // Whatever was right for this screenshot is the starting point for the
+      // next one, since they come off the same phone and the same screen.
+      if (preview.crop) {
+        rememberedRef.current = preview.crop;
+        setRemembered(preview.crop);
+        pushSynced(CROP_KEY, preview.crop);
+      }
       clearPreview();
       onChanged();
     } catch (e) {
@@ -131,8 +193,32 @@ export function CardArtPicker({
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={preview.url} alt="The card as it will be saved" className="w-[92px] rounded-md" />
           <span className="text-[10px] text-black/45 dark:text-white/45">
-            {preview.detected ? "Cropped to the card" : "No card found — using the whole image"}
+            {preview.used === "remembered"
+              ? "Same position as the last card"
+              : preview.used === "detected"
+                ? "Cropped to the card"
+                : "No card found — using the whole image"}
           </span>
+
+          {/* Wallet puts the card in the same place every time, so the position
+              that worked is reused. When a screenshot is framed differently,
+              this drops back to reading the edges. */}
+          {preview.used === "remembered" ? (
+            <button type="button" onClick={detectInstead} disabled={busy} className={link}>
+              Find the edges instead
+            </button>
+          ) : (
+            remembered && (
+              <button
+                type="button"
+                onClick={() => source.current && crop(source.current, true)}
+                disabled={busy}
+                className={link}
+              >
+                Use the saved position
+              </button>
+            )
+          )}
 
           <div className="flex items-center gap-2">
             {/* Nothing is stored until this is pressed, so it reads as the

@@ -19,6 +19,11 @@ update), so nothing here is a stability promise.
   way Settings is. It was one page holding every card's credits, rates and
   earnings plus two more tools, so anything below the first card was a long
   scroll away. `/benefits` lands on Cards.
+- The position that worked for one card is reused for the next. Wallet puts the
+  card in the same place on every screenshot from a given phone, so a crop that
+  was right once is right again — more reliable than reading the edges of art
+  the app has never seen. Saving records the position; the next screenshot lands
+  on it, with one click to read that picture's own edges instead.
 - The crop's sides land on the card rather than on the glow around it, and its
   bottom edge is worked out from the card's proportions rather than measured. The top and sides are where a card meets the backdrop cleanly; the
   bottom is where it sits over its own drop shadow, and measuring it either

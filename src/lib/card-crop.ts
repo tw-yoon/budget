@@ -216,3 +216,58 @@ export function detectCardRect(
   const h = Math.min(Math.round(w / CARD_RATIO), height - y0);
   return { x: x0, y: y0, width: w, height: h };
 }
+
+/**
+ * A crop held as fractions of the picture rather than pixels.
+ *
+ * Wallet puts the card in the same place on every screenshot from the same
+ * phone, so a crop that was right once is right again — but only if it is kept
+ * in a form that survives a different screen. Fractions do; pixels do not.
+ */
+export interface CropFractions {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/** The key this remembered crop occupies in the shared ui-state store. */
+export const CROP_KEY = "card-art-crop";
+
+export function toFractions(rect: Rect, width: number, height: number): CropFractions | null {
+  if (width <= 0 || height <= 0) return null;
+  return {
+    x: rect.x / width,
+    y: rect.y / height,
+    width: rect.width / width,
+    height: rect.height / height,
+  };
+}
+
+/**
+ * Back to pixels for a given picture, clamped to it. A remembered crop from a
+ * taller screen can reach past the bottom of a shorter one, and a crop is only
+ * ever a window onto pixels that exist.
+ */
+export function fromFractions(f: CropFractions, width: number, height: number): Rect | null {
+  if (width <= 0 || height <= 0) return null;
+  const x = Math.max(0, Math.min(width - 1, Math.round(f.x * width)));
+  const y = Math.max(0, Math.min(height - 1, Math.round(f.y * height)));
+  const w = Math.max(1, Math.min(width - x, Math.round(f.width * width)));
+  const h = Math.max(1, Math.min(height - y, Math.round(f.height * height)));
+  return { x, y, width: w, height: h };
+}
+
+/**
+ * Whether a stored value is usable. The store is a plain JSON file a user can
+ * edit and is shared across app versions, so anything at all can come back.
+ */
+export function isCropFractions(v: unknown): v is CropFractions {
+  if (!v || typeof v !== "object") return false;
+  const c = v as Record<string, unknown>;
+  const ok = (n: unknown) => typeof n === "number" && Number.isFinite(n) && n >= 0 && n <= 1;
+  return (
+    ok(c.x) && ok(c.y) && ok(c.width) && ok(c.height) &&
+    (c.width as number) > 0 && (c.height as number) > 0
+  );
+}
