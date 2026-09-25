@@ -28,17 +28,14 @@ const MIN_ROW_FILL = 0.5;
 const MIN_COL_FILL = 0.5;
 /** How much of a line must still be covered for the box to grow over it. */
 const EDGE_FILL = 0.25;
+/** How far a channel may drift from the background and still count as background. */
+const DEFAULT_TOLERANCE = 22;
+
 /**
- * How far a channel may drift from the background and still count as
- * background. Lower means fussier: a card whose lower edge fades into its own
- * drop shadow needs a low number for that edge to register at all, while a
- * noisy or textured backdrop needs a high one to stay ignored. Exposed as a
- * choice rather than tuned to one screenshot, since which way is right depends
- * on the picture.
+ * 85.60 × 53.98 mm — the ID-1 format every bank card is cut to, and what Wallet
+ * draws them at. The bottom edge is derived from it rather than measured.
  */
-export const TOLERANCES = { high: 12, medium: 22, low: 36 } as const;
-export type Sensitivity = keyof typeof TOLERANCES;
-const DEFAULT_TOLERANCE = TOLERANCES.medium;
+const CARD_RATIO = 85.6 / 53.98;
 
 /**
  * Which pixels are not background, as one byte per pixel.
@@ -132,12 +129,17 @@ export function detectCardRect(
   if (!cols) return null;
   const [left, right] = cols;
 
-  // The pass above needs half a line covered, which the fade at a card's edge —
-  // a drop shadow, or art that dims into the backdrop — never is, so the box
-  // stops at the last solid line and clips it. Grow each edge outward while the
-  // next line is still substantially covered. A shadow runs the card's full
-  // width so it is kept; a caption below is far narrower, and the clear
-  // background between stops the growth before reaching it either way.
+  // The top and the sides are measured; the bottom is not.
+  //
+  // Those three edges are where the card meets the backdrop cleanly, so the
+  // pass above lands on them. The bottom is where a card sits over its own drop
+  // shadow: the fade never covers half a row, so a strict rule stops short of
+  // it, and a loose one runs down into the shadow instead. Either way the
+  // measurement is the worst of the four.
+  //
+  // So it is not measured. A bank card is cut to a fixed ratio, which is what
+  // Wallet draws and therefore what the screenshot holds, and the width here is
+  // reliable — so the height follows from it exactly.
   const rowCover = (y: number) => {
     let n = 0;
     for (let x = left; x < right; x++) n += mask[y * width + x];
@@ -151,14 +153,15 @@ export function detectCardRect(
   const rowFloor = (right - left) * EDGE_FILL;
   const colFloor = bandH * EDGE_FILL;
 
+  // Grow the three measured edges over any soft join with the backdrop.
   let y0 = top;
   while (y0 > 0 && rowCover(y0 - 1) >= rowFloor) y0--;
-  let y1 = bottom;
-  while (y1 < height && rowCover(y1) >= rowFloor) y1++;
   let x0 = left;
   while (x0 > 0 && colCover(x0 - 1) >= colFloor) x0--;
   let x1 = right;
   while (x1 < width && colCover(x1) >= colFloor) x1++;
 
-  return { x: x0, y: y0, width: x1 - x0, height: y1 - y0 };
+  const w = x1 - x0;
+  const h = Math.min(Math.round(w / CARD_RATIO), height - y0);
+  return { x: x0, y: y0, width: w, height: h };
 }
