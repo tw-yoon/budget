@@ -255,7 +255,7 @@ test("only a sane stored crop is trusted", () => {
 test("the built-in crop is a card, and fits the screen it was measured on", () => {
   const [W, H] = [603, 1311];
   const box = fromFractions(DEFAULT_CROP, W, H);
-  assert.deepEqual(box, { x: 30, y: 815, width: 543, height: 342 });
+  assert.deepEqual(box, { x: 30, y: 192, width: 543, height: 342 });
   assert.ok(box.x + box.width <= W, "runs off the side");
   assert.ok(box.y + box.height <= H, "runs off the bottom");
   // 85.60 x 53.98 mm, within a pixel of rounding.
@@ -265,7 +265,7 @@ test("the built-in crop is a card, and fits the screen it was measured on", () =
 test("the same crop lands on the full-resolution screenshot", () => {
   // The measurements were taken at half scale; the phone writes 1206 x 2622.
   const box = fromFractions(DEFAULT_CROP, 1206, 2622);
-  assert.deepEqual(box, { x: 60, y: 1629, width: 1086, height: 684 });
+  assert.deepEqual(box, { x: 60, y: 384, width: 1086, height: 684 });
 });
 
 test("it applies to that screen at any scale, and not to others", () => {

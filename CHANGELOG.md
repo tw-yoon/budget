@@ -20,7 +20,7 @@ update), so nothing here is a stability promise.
   earnings plus two more tools, so anything below the first card was a long
   scroll away. `/benefits` lands on Cards.
 - A Wallet screenshot from an iPhone of this shape starts at the right crop
-  without being told: 543 x 342 at y 814.5 of a 603 x 1311 screenshot, held as
+  without being told: 543 x 342 at 30, 192 of a 603 x 1311 screenshot, held as
   fractions so it applies to the full-resolution file and to any phone of the
   same proportions. Anything else falls back to reading the edges.
 - The crop is four numbers you can set: X, Y, width and height in the
