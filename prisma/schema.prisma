@@ -280,6 +280,17 @@ model Subcategory {
   @@unique([categoryId, name])
 }
 
+// A name of the user's choosing for one of Plaid's detailed labels (e.g.
+// FOOD_AND_DRINK_RESTAURANT). That label is the subcategory a row shows while
+// nobody has categorized it by hand, so renaming it here relabels those rows
+// without writing a userCategory onto them — rules still apply to them, and
+// they keep following Plaid. No row means the humanized Plaid wording.
+model PlaidDetailedName {
+  pfcDetailed String   @id
+  name        String
+  createdAt   DateTime @default(now())
+}
+
 // Which of Plaid's personal-finance-category primaries resolve to this
 // category, for transactions the user has not categorized by hand. A primary
 // resolves to exactly one category; the unique constraint makes that

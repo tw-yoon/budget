@@ -19,6 +19,9 @@ interface Subcategory {
   declared: boolean;
   transactionCount: number;
   ruleCount: number;
+  plaidLabels: string[];
+  plaidTransactionCount: number;
+  renamed: boolean;
 }
 
 interface UnmappedPrimary {
@@ -28,6 +31,17 @@ interface UnmappedPrimary {
 
 /** The `editing` key for a subcategory — category ids never contain a colon. */
 const subKey = (categoryId: string, name: string) => `${categoryId}:${name}`;
+
+/** Nothing but renamed Plaid labels, so deleting it only resets their names. */
+const isResetOnly = (s: Subcategory) =>
+  s.renamed && !s.declared && s.transactionCount + s.ruleCount === 0;
+
+/**
+ * Whether there is anything to delete. A Plaid label under Plaid's own name
+ * is Plaid's — it can be renamed, not removed.
+ */
+const isDeletable = (s: Subcategory) =>
+  s.declared || s.renamed || s.transactionCount + s.ruleCount > 0;
 
 export function SettingsCategories() {
   const [categories, setCategories] = useState<Category[]>([]);
@@ -202,12 +216,15 @@ export function SettingsCategories() {
 
   const deleteSub = (c: Category, s: Subcategory) => {
     const inUse = s.transactionCount + s.ruleCount > 0;
+    // Resetting renamed Plaid labels loses nothing, so it needs no warning.
     if (
+      !isResetOnly(s) &&
       !confirm(
         `Delete "${c.name} > ${s.name}"?` +
           (inUse
             ? `\n\n${s.transactionCount} transaction(s) and ${s.ruleCount} rule(s) using it will fall back to "${c.name}".`
-            : "")
+            : "") +
+          (s.renamed ? `\n\nPlaid labels renamed to "${s.name}" go back to Plaid's name.` : "")
       )
     ) {
       return;
@@ -216,12 +233,17 @@ export function SettingsCategories() {
       `/api/categories/${c.id}/subcategories?name=${encodeURIComponent(s.name)}`,
       { method: "DELETE" },
       (b) => {
-        const r = b as { movedTransactions: number; movedSplits: number };
+        const r = b as {
+          movedTransactions: number;
+          movedSplits: number;
+          resetPlaidLabels: number;
+        };
         const splitNote = r.movedSplits ? ` and ${r.movedSplits} split(s)` : "";
         if (r.movedTransactions || r.movedSplits)
           setNotice(
             `Deleted — ${r.movedTransactions} transaction(s)${splitNote} moved back to "${c.name}".`
           );
+        else if (r.resetPlaidLabels) setNotice("Back to Plaid's name.");
       }
     );
   };
@@ -244,7 +266,8 @@ export function SettingsCategories() {
         <p className="text-sm text-black/55 dark:text-white/55">
           Used by the ledger, Rules, Venmo and Zelle. Renaming one onto
           another merges them. Subcategories roll up into their category in
-          Analytics.
+          Analytics. Plaid&rsquo;s own subcategories are listed too — rename
+          one to change what uncategorized transactions show.
         </p>
       </header>
 
@@ -494,21 +517,41 @@ export function SettingsCategories() {
                             {sub.name}
                           </button>
                         )}
+                        {sub.plaidLabels.length > 0 && (
+                          <span
+                            className="mt-0.5 rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-medium text-sky-700 dark:bg-sky-500/15 dark:text-sky-300"
+                            title={`Plaid: ${sub.plaidLabels.join(", ")}`}
+                          >
+                            {sub.renamed
+                              ? `Plaid: ${sub.plaidLabels.map(humanizePfc).join(", ")}`
+                              : "Plaid"}
+                          </span>
+                        )}
                         </div>
                       </td>
                       <td className="whitespace-nowrap px-4 py-1.5 text-black/55 dark:text-white/55">
-                        {sub.transactionCount} tx · {sub.ruleCount} rule
+                        {sub.transactionCount + sub.plaidTransactionCount} tx
+                        {sub.plaidTransactionCount > 0 && sub.transactionCount > 0 && (
+                          <span className="text-black/35 dark:text-white/35">
+                            {" "}
+                            ({sub.transactionCount} direct)
+                          </span>
+                        )}{" "}
+                        · {sub.ruleCount} rule
                         {sub.ruleCount === 1 ? "" : "s"}
                       </td>
                       <td />
                       <td className="px-4 py-1.5 text-right">
-                        <button
-                          type="button"
-                          onClick={() => deleteSub(c, sub)}
-                          className="rounded px-2 py-1 text-xs text-black/50 hover:bg-black/[0.06] dark:text-white/50 dark:hover:bg-white/10"
-                        >
-                          Delete
-                        </button>
+                        {isDeletable(sub) && (
+                          <button
+                            type="button"
+                            onClick={() => deleteSub(c, sub)}
+                            title={isResetOnly(sub) ? "Go back to Plaid's name" : undefined}
+                            className="rounded px-2 py-1 text-xs text-black/50 hover:bg-black/[0.06] dark:text-white/50 dark:hover:bg-white/10"
+                          >
+                            {isResetOnly(sub) ? "Reset" : "Delete"}
+                          </button>
+                        )}
                       </td>
                     </tr>
                   );

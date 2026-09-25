@@ -3,7 +3,10 @@ import { prisma } from "@/lib/prisma";
 import { humanizePfc } from "@/lib/format";
 import { splitCategory } from "@/lib/categories";
 import { getCashoutBreakdowns } from "@/services/venmo.service";
-import { loadPlaidCategoryMap } from "@/services/categories.service";
+import {
+  loadPlaidCategoryMap,
+  loadPlaidDetailedNames,
+} from "@/services/categories.service";
 import { netAmount, resolveLinkedCategory } from "@/lib/links";
 import { remainderOf } from "@/lib/splits";
 import type { LinkedTargetDTO, RefundDTO } from "@/types";
@@ -167,8 +170,14 @@ export async function GET(req: NextRequest) {
         : Promise.resolve([]),
     ]);
 
-    const plaidMap = await loadPlaidCategoryMap();
+    const [plaidMap, detailedNames] = await Promise.all([
+      loadPlaidCategoryMap(),
+      loadPlaidDetailedNames(),
+    ]);
     const plaidName = (primary: string) => plaidMap.get(primary) ?? humanizePfc(primary);
+    // Plaid's detailed label, under the name given it in Settings if any.
+    const plaidSub = (detailed: string | null) =>
+      detailed ? detailedNames.get(detailed) ?? humanizePfc(detailed) : null;
 
     const refundsByPurchase = new Map<string, RefundDTO[]>();
     for (const r of refundRows) {
@@ -230,16 +239,12 @@ export async function GET(req: NextRequest) {
         name: t.name,
         merchantName: t.merchantName,
         category: uc ? uc.parent : plaidName(t.pfcPrimary),
-        categoryDetailed: uc
-          ? uc.sub
-          : t.pfcDetailed
-            ? humanizePfc(t.pfcDetailed)
-            : null,
+        categoryDetailed: uc ? uc.sub : plaidSub(t.pfcDetailed),
         userCategory: t.userCategory,
         // Plaid's own categorization, kept alongside the effective one so the
         // client can preview/revert overrides without refetching.
         plaidCategory: plaidName(t.pfcPrimary),
-        plaidCategoryDetailed: t.pfcDetailed ? humanizePfc(t.pfcDetailed) : null,
+        plaidCategoryDetailed: plaidSub(t.pfcDetailed),
         logoUrl: t.logoUrl,
         pending: t.pending,
         isTransfer: t.isTransfer,

@@ -9,6 +9,15 @@ middle number; one carrying fixes and small changes moves the last.
 Still `0.x`: the database schema changes between releases (migrations run on
 update), so nothing here is a stability promise.
 
+## Unreleased
+
+- Settings → Categories lists Plaid's own subcategories (the detailed label a
+  transaction shows until you categorize it by hand) under their category, and
+  they can be renamed there. Renaming one relabels those transactions without
+  setting their category by hand, so rules still apply to them; renaming onto
+  an existing subcategory merges them, and Reset goes back to Plaid's name.
+  They show up in the Rules and ledger subcategory pickers too.
+
 ## 0.6.0 — 2026-09-25
 
 - Flights under Benefits is part of Pro. In Normal it leaves the sidebar, and

@@ -91,7 +91,8 @@ export async function PATCH(
 }
 
 // DELETE /api/categories/:id/subcategories?name=<sub> — whatever used the sub
-// falls back to the bare category.
+// falls back to the bare category, and Plaid labels renamed onto it go back to
+// Plaid's wording.
 export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }

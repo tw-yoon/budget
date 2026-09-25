@@ -10,7 +10,12 @@
 
 import { prisma } from "@/lib/prisma";
 import { renameCategoryIn } from "@/lib/category-rename";
-import { groupSubcategories, type SubcategoryUsage } from "@/lib/subcategories";
+import { humanizePfc } from "@/lib/format";
+import {
+  groupSubcategories,
+  type PresetSub,
+  type SubcategoryUsage,
+} from "@/lib/subcategories";
 
 export interface CategoryDTO {
   id: string;
@@ -161,7 +166,7 @@ export async function listCategories(): Promise<CategoryDTO[]> {
 
   // Every "Parent > Sub" value in use, counted once per distinct value — two
   // grouped queries cover every category's subs.
-  const [txSubs, ruleSubs] = await Promise.all([
+  const [txSubs, ruleSubs, presets] = await Promise.all([
     prisma.transaction.groupBy({
       by: ["userCategory"],
       where: { userCategory: { contains: " > " } },
@@ -172,12 +177,14 @@ export async function listCategories(): Promise<CategoryDTO[]> {
       where: { category: { contains: " > " } },
       _count: { _all: true },
     }),
+    listPresets(),
   ]);
   const subs = groupSubcategories(
     rows.map((c) => c.name),
     rows.flatMap((c) => c.subcategories.map((s) => ({ parent: c.name, name: s.name }))),
     txSubs.map((g) => ({ value: g.userCategory!, count: g._count._all })),
-    ruleSubs.map((g) => ({ value: g.category, count: g._count._all }))
+    ruleSubs.map((g) => ({ value: g.category, count: g._count._all })),
+    presets
   );
 
   return Promise.all(
@@ -423,6 +430,54 @@ export async function loadPlaidCategoryMap(): Promise<Map<string, string>> {
   return new Map(rows.map((r) => [r.pfcPrimary, r.category.name]));
 }
 
+/** Plaid detailed label → the name the user gave it. Unnamed labels read as humanizePfc. */
+export async function loadPlaidDetailedNames(): Promise<Map<string, string>> {
+  const rows = await prisma.plaidDetailedName.findMany();
+  return new Map(rows.map((r) => [r.pfcDetailed, r.name]));
+}
+
+/**
+ * Every Plaid detailed label seen on a transaction, resolved the way the
+ * ledger resolves it: under the category its primary maps to (Plaid's own
+ * wording when unmapped), named by the user or else by Plaid. `count` is the
+ * rows actually showing it — those nobody has categorized by hand.
+ */
+async function listPresets(): Promise<PresetSub[]> {
+  const [all, showing, plaidMap, names] = await Promise.all([
+    prisma.transaction.groupBy({
+      by: ["pfcPrimary", "pfcDetailed"],
+      where: { pfcDetailed: { not: null } },
+    }),
+    prisma.transaction.groupBy({
+      by: ["pfcPrimary", "pfcDetailed"],
+      where: { pfcDetailed: { not: null }, userCategory: null },
+      _count: { _all: true },
+    }),
+    loadPlaidCategoryMap(),
+    loadPlaidDetailedNames(),
+  ]);
+  const key = (primary: string, detailed: string) => primary + "\0" + detailed;
+  const counts = new Map(
+    showing.map((g) => [key(g.pfcPrimary, g.pfcDetailed!), g._count._all])
+  );
+  return all.map((g) => {
+    const code = g.pfcDetailed!;
+    const custom = names.get(code);
+    return {
+      parent: plaidMap.get(g.pfcPrimary) ?? humanizePfc(g.pfcPrimary),
+      name: custom ?? humanizePfc(code),
+      code,
+      count: counts.get(key(g.pfcPrimary, code)) ?? 0,
+      renamed: custom !== undefined,
+    };
+  });
+}
+
+/** The Plaid labels showing as `name` under `category`. */
+async function presetsNamed(category: string, name: string): Promise<PresetSub[]> {
+  return (await listPresets()).filter((p) => p.parent === category && p.name === name);
+}
+
 /**
  * Declare a subcategory under a category, so it can be picked in the ledger
  * before anything uses it. Declaring one that is already in use (typed into
@@ -443,8 +498,12 @@ export async function createSubcategory(categoryId: string, name: string): Promi
 
 /**
  * Rename a subcategory, rewriting every "Parent > Sub" that names it. Renaming
- * onto a sub the category already has — declared or merely used — merges the
- * two, and like a category merge that has to be confirmed.
+ * onto a sub the category already has — declared, used, or a Plaid label —
+ * merges the two, and like a category merge that has to be confirmed.
+ *
+ * A Plaid label showing under this name is renamed by giving it a name, not
+ * by writing a userCategory onto its rows: they stay uncategorized by hand, so
+ * rules still apply to them.
  */
 export async function renameSubcategory(
   categoryId: string,
@@ -464,6 +523,11 @@ export async function renameSubcategory(
 
   const oldValue = cat.name + " > " + from;
   const newValue = cat.name + " > " + to;
+  const [fromPresets, toPresets] = await Promise.all([
+    presetsNamed(cat.name, from),
+    presetsNamed(cat.name, to),
+  ]);
+  const movedPlaid = fromPresets.reduce((n, p) => n + p.count, 0);
   // Carve-outs store the same "Parent > Sub" string as transactions and rules,
   // so they count on both sides of the merge test and move with the rename.
   const [
@@ -484,13 +548,17 @@ export async function renameSubcategory(
       prisma.transactionSplit.count({ where: { userCategory: newValue } }),
     ]);
   const merged =
-    Boolean(targetRow) || targetTx > 0 || targetRules > 0 || targetSplits > 0;
+    Boolean(targetRow) ||
+    targetTx > 0 ||
+    targetRules > 0 ||
+    targetSplits > 0 ||
+    toPresets.length > 0;
   if (merged && !allowMerge) {
     throw new MergeNotConfirmedError(
       to,
-      movedTransactions,
+      movedTransactions + movedPlaid,
       movedRules,
-      movedTransactions,
+      movedTransactions + movedPlaid,
       movedSplits
     );
   }
@@ -515,23 +583,47 @@ export async function renameSubcategory(
     } else {
       await tx.subcategory.updateMany({ where: { categoryId, name: from }, data: { name: to } });
     }
+    for (const p of fromPresets) {
+      // Renaming back to Plaid's own wording just drops the custom name.
+      if (to === humanizePfc(p.code)) {
+        await tx.plaidDetailedName.deleteMany({ where: { pfcDetailed: p.code } });
+      } else {
+        await tx.plaidDetailedName.upsert({
+          where: { pfcDetailed: p.code },
+          create: { pfcDetailed: p.code, name: to },
+          update: { name: to },
+        });
+      }
+    }
   });
 
-  return { merged, movedTransactions, movedRules, movedSplits };
+  return {
+    merged,
+    movedTransactions: movedTransactions + movedPlaid,
+    movedRules,
+    movedSplits,
+  };
 }
 
 /**
  * Remove a subcategory. Anything using it falls back to the bare parent
  * category — analytics already roll subs up into their parent, so no spend
- * moves between categories.
+ * moves between categories. Plaid labels renamed onto it go back to Plaid's
+ * wording; a Plaid label under its own wording is Plaid's, and stays.
  */
 export async function deleteSubcategory(
   categoryId: string,
   name: string
-): Promise<{ movedTransactions: number; movedRules: number; movedSplits: number }> {
+): Promise<{
+  movedTransactions: number;
+  movedRules: number;
+  movedSplits: number;
+  resetPlaidLabels: number;
+}> {
   const cat = await prisma.category.findUnique({ where: { id: categoryId } });
   if (!cat) throw new Error("Category not found");
   const value = cat.name + " > " + name;
+  const renamed = (await presetsNamed(cat.name, name)).filter((p) => p.renamed);
 
   return prisma.$transaction(async (tx) => {
     const txs = await tx.transaction.updateMany({
@@ -548,10 +640,14 @@ export async function deleteSubcategory(
       data: { userCategory: cat.name },
     });
     await tx.subcategory.deleteMany({ where: { categoryId, name } });
+    await tx.plaidDetailedName.deleteMany({
+      where: { pfcDetailed: { in: renamed.map((p) => p.code) } },
+    });
     return {
       movedTransactions: txs.count,
       movedRules: rules.count,
       movedSplits: splits.count,
+      resetPlaidLabels: renamed.length,
     };
   });
 }

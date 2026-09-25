@@ -1,11 +1,13 @@
 /**
  * Assembling each category's subcategory list for Settings.
  *
- * A subcategory reaches the list two ways: declared in Settings (a
- * Subcategory row, possibly unused so far), or simply used — a transaction or
+ * A subcategory reaches the list three ways: declared in Settings (a
+ * Subcategory row, possibly unused so far), simply used — a transaction or
  * rule storing "Parent > Sub" that nobody declared, because the ledger takes
- * free text. The list is the union, with usage counts, so what Settings shows
- * matches what the data actually holds.
+ * free text — or preset: one of Plaid's detailed labels, which is what a row
+ * shows as its sub until someone categorizes it by hand. The list is the
+ * union, with usage counts, so what Settings shows matches what the ledger
+ * shows.
  *
  * Deliberately free of imports so `node:test` can load it directly under
  * Node's native type stripping.
@@ -19,6 +21,21 @@ export interface SubcategoryUsage {
   declared: boolean;
   transactionCount: number;
   ruleCount: number;
+  /** Plaid detailed labels that show as this sub, e.g. FOOD_AND_DRINK_RESTAURANT. */
+  plaidLabels: string[];
+  /** Rows showing it through one of those labels, i.e. not categorized by hand. */
+  plaidTransactionCount: number;
+  /** Whether any of those labels carries a name the user gave it. */
+  renamed: boolean;
+}
+
+/** One of Plaid's detailed labels, already resolved to where the ledger shows it. */
+export interface PresetSub {
+  parent: string;
+  name: string;
+  code: string;
+  count: number;
+  renamed: boolean;
 }
 
 /** A stored category value and how many rows carry it. */
@@ -45,7 +62,8 @@ export function groupSubcategories(
   parents: string[],
   declared: { parent: string; name: string }[],
   transactions: ValueCount[],
-  rules: ValueCount[]
+  rules: ValueCount[],
+  presets: PresetSub[] = []
 ): Map<string, SubcategoryUsage[]> {
   const byParent = new Map<string, Map<string, SubcategoryUsage>>(
     parents.map((p) => [p, new Map()])
@@ -55,7 +73,15 @@ export function groupSubcategories(
     if (!subs) return null;
     let e = subs.get(name);
     if (!e) {
-      e = { name, declared: false, transactionCount: 0, ruleCount: 0 };
+      e = {
+        name,
+        declared: false,
+        transactionCount: 0,
+        ruleCount: 0,
+        plaidLabels: [],
+        plaidTransactionCount: 0,
+        renamed: false,
+      };
       subs.set(name, e);
     }
     return e;
@@ -75,11 +101,20 @@ export function groupSubcategories(
     const e = p && entry(p.parent, p.sub);
     if (e) e.ruleCount += r.count;
   }
+  for (const p of presets) {
+    const e = entry(p.parent, p.name);
+    if (!e) continue;
+    e.plaidLabels.push(p.code);
+    e.plaidTransactionCount += p.count;
+    e.renamed ||= p.renamed;
+  }
 
   return new Map(
     [...byParent].map(([parent, subs]) => [
       parent,
-      [...subs.values()].sort((a, b) => a.name.localeCompare(b.name)),
+      [...subs.values()]
+        .map((e) => ({ ...e, plaidLabels: e.plaidLabels.sort() }))
+        .sort((a, b) => a.name.localeCompare(b.name)),
     ])
   );
 }
