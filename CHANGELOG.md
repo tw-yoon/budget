@@ -9,7 +9,7 @@ middle number; one carrying fixes and small changes moves the last.
 Still `0.x`: the database schema changes between releases (migrations run on
 update), so nothing here is a stability promise.
 
-## Unreleased
+## 0.7.0 — 2026-09-26
 
 - Best card by category shows card images: the category on top, the best
   card's image beneath it with its name and rate beside it on one line, and
