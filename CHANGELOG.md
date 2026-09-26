@@ -11,6 +11,8 @@ update), so nothing here is a stability promise.
 
 ## Unreleased
 
+- The start page is gone: the app opens on the ledger, and the BUDGET logo
+  goes there too.
 - Settings → Categories lists Plaid's own subcategories (the detailed label a
   transaction shows until you categorize it by hand) under their category, and
   they can be renamed there. Renaming one relabels those transactions without

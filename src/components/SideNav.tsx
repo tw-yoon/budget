@@ -107,7 +107,7 @@ export default function SideNav({ version }: { version: string }) {
       }`}
     >
       <Link
-        href="/"
+        href="/transactions"
         className={`flex h-[46px] shrink-0 items-center whitespace-nowrap border-b border-line font-bold tracking-[.14em] text-accent ${
           collapsed ? "justify-center px-0" : "px-[18px]"
         }`}
