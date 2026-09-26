@@ -11,6 +11,9 @@ update), so nothing here is a stability promise.
 
 ## Unreleased
 
+- A card's image under Benefits is added or removed from a button on its
+  top-right corner — × to remove, + to add — shown while the card is hovered,
+  in place of the Replace and Remove links beneath it.
 - A name given an account on Accounts now shows on its ledger rows and on
   its linked card under Benefits, instead of the bank's ("CREDIT CARD").
 - The start page is gone: the app opens on the ledger, and the BUDGET logo

@@ -138,6 +138,7 @@ export function CardArtPicker({
   }
 
   async function remove() {
+    if (!confirm("Remove this card's image?")) return;
     setBusy(true);
     setError(null);
     try {
@@ -154,7 +155,7 @@ export function CardArtPicker({
   const link = "text-xs text-black/50 hover:text-foreground disabled:opacity-50 dark:text-white/50";
 
   return (
-    <div className="mt-1.5 flex flex-col gap-1">
+    <>
       <input
         ref={input}
         type="file"
@@ -163,8 +164,22 @@ export function CardArtPicker({
         onChange={(e) => pick(e.target.files?.[0])}
       />
 
-      {preview ? (
-        <>
+      {/* On the art's top-right corner — the parent is `relative group`. Out of
+          sight until the card is hovered, except on touch screens, which have
+          no hover to reveal it. */}
+      <button
+        type="button"
+        onClick={hasArt ? remove : () => input.current?.click()}
+        disabled={busy}
+        aria-label={hasArt ? "Remove image" : "Add image"}
+        title={hasArt ? "Remove image" : "Add image"}
+        className="absolute left-[74px] top-1 flex h-4 w-4 items-center justify-center rounded-full bg-black/60 text-[11px] leading-none text-white opacity-0 transition-opacity hover:bg-black/80 focus-visible:opacity-100 group-hover:opacity-100 disabled:opacity-50 [@media(hover:none)]:opacity-100"
+      >
+        {busy && !preview ? "…" : hasArt ? "×" : "+"}
+      </button>
+
+      {preview && (
+        <div className="mt-1.5 flex flex-col gap-1">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={preview.url} alt="The card as it will be saved" className="w-[92px] rounded-md" />
           <span className="text-[10px] text-black/45 dark:text-white/45">
@@ -186,21 +201,10 @@ export function CardArtPicker({
             </button>
           </div>
           <span className="text-[10px] text-amber-700 dark:text-amber-400">Not saved yet</span>
-        </>
-      ) : (
-        <div className="flex gap-2">
-          <button type="button" onClick={() => input.current?.click()} disabled={busy} className={link}>
-            {busy ? "Reading…" : hasArt ? "Replace image" : "Add image"}
-          </button>
-          {hasArt && (
-            <button type="button" onClick={remove} disabled={busy} className={link}>
-              Remove image
-            </button>
-          )}
         </div>
       )}
 
-      {error && <span className="text-[10px] text-red-600 dark:text-red-400">{error}</span>}
-    </div>
+      {error && <span className="mt-1.5 text-[10px] text-red-600 dark:text-red-400">{error}</span>}
+    </>
   );
 }

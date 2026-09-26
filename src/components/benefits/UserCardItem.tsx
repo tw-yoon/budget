@@ -149,7 +149,8 @@ export function UserCardItem({
     <section className="overflow-hidden rounded-xl border border-black/10 dark:border-white/10">
       <header className="flex flex-wrap items-start justify-between gap-3 border-b border-black/10 px-4 py-3 dark:border-white/10">
         <div className="flex min-w-0 items-start gap-3">
-          <div className="flex flex-col items-start">
+          {/* `group` so the picker's corner button shows while the card is hovered. */}
+          <div className="group relative flex flex-col items-start">
             <CardArt
               issuer={card.issuer}
               last4={card.last4}
