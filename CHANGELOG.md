@@ -11,6 +11,8 @@ update), so nothing here is a stability promise.
 
 ## Unreleased
 
+- Best card by category shows each card's image instead of its name; the
+  name is on hover.
 - A card's image under Benefits is added or removed from a button on its
   top-right corner — × to remove, + to add — shown while the card is hovered,
   in place of the Replace and Remove links beneath it.

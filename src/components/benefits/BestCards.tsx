@@ -8,10 +8,25 @@ import {
   formatRate,
 } from "@/lib/rewards";
 import { ISSUER_LABELS } from "@/lib/categories";
+import { CardArt } from "./CardArt";
 
 function shortLabel(c: UserCardDTO) {
   if (c.displayName) return c.displayName;
   return `${ISSUER_LABELS[c.issuer] ?? c.issuer}${c.name ? " " + c.name : ""}`;
+}
+
+/** The card's image, named on hover. */
+function Face({ card, width }: { card: UserCardDTO; width: number }) {
+  return (
+    <CardArt
+      issuer={card.issuer}
+      last4={card.last4}
+      name={card.name}
+      src={card.artUrl}
+      width={width}
+      label={shortLabel(card)}
+    />
+  );
 }
 
 export function BestCards({ cards }: { cards: UserCardDTO[] }) {
@@ -46,8 +61,8 @@ export function BestCards({ cards }: { cards: UserCardDTO[] }) {
               <div className="text-[11px] uppercase tracking-wide text-black/45 dark:text-white/45">
                 {REWARD_CATEGORY_LABELS[category]}
               </div>
-              <div className="mt-0.5 flex items-baseline justify-between gap-2">
-                <span className="truncate font-medium">{shortLabel(best.card)}</span>
+              <div className="mt-1 flex items-center justify-between gap-2">
+                <Face card={best.card} width={64} />
                 <span className="shrink-0 font-mono text-sm tabular-nums">
                   {formatRate(best.multiplier, best.unit)}
                   {!best.isBonus && (
@@ -56,11 +71,13 @@ export function BestCards({ cards }: { cards: UserCardDTO[] }) {
                 </span>
               </div>
               {runners.length > 0 && (
-                <div className="mt-1 text-xs text-black/45 dark:text-white/45">
-                  {runners.map((r, i) => (
-                    <span key={r.card.id}>
-                      {i > 0 && " · "}
-                      {shortLabel(r.card)} {formatRate(r.multiplier, r.unit)}
+                <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-black/45 dark:text-white/45">
+                  {runners.map((r) => (
+                    <span key={r.card.id} className="flex items-center gap-1.5">
+                      <Face card={r.card} width={28} />
+                      <span className="font-mono tabular-nums">
+                        {formatRate(r.multiplier, r.unit)}
+                      </span>
                     </span>
                   ))}
                 </div>
