@@ -176,10 +176,12 @@ export async function getUserCardsWithProgress(
   const accounts = linkedIds.length
     ? await prisma.account.findMany({
         where: { id: { in: linkedIds } },
-        select: { id: true, name: true },
+        select: { id: true, name: true, displayName: true },
       })
     : [];
-  const accountName = new Map(accounts.map((a) => [a.id, a.name]));
+  // The name given the account on Accounts wins over the bank's ("CREDIT CARD").
+  const accountName = new Map(accounts.map((a) => [a.id, a.displayName ?? a.name]));
+  const accountDisplayName = new Map(accounts.map((a) => [a.id, a.displayName]));
 
   // Pull this year's transactions for all linked accounts in one query, then
   // slice per benefit window in memory. Both outflows (category-spending mode)
@@ -407,6 +409,9 @@ export async function getUserCardsWithProgress(
       linked: !!card.accountId,
       linkedAccountName: card.accountId
         ? accountName.get(card.accountId) ?? null
+        : null,
+      displayName: card.accountId
+        ? accountDisplayName.get(card.accountId) ?? null
         : null,
       benefits,
       benefitCount: benefits.length,

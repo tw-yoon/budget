@@ -313,6 +313,8 @@ export interface UserCardDTO {
   artUrl: string | null;
   linked: boolean;
   linkedAccountName: string | null;
+  /** The linked account's name from Accounts, if one was given — shown over `name`. */
+  displayName: string | null;
   benefits: BenefitDTO[];
   benefitCount: number;
   benefitsUsedCount: number;

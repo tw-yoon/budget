@@ -163,7 +163,7 @@ export function UserCardItem({
               <span className="rounded bg-black/[0.06] px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide dark:bg-white/10">
                 {ISSUER_LABELS[card.issuer] ?? card.issuer}
               </span>
-              <span className="font-medium">{card.name || "Card"}</span>
+              <span className="font-medium">{card.displayName || card.name || "Card"}</span>
               <span className="text-black/45 dark:text-white/45">··{card.last4}</span>
             </div>
             <div className="mt-1 flex flex-wrap items-center gap-1 text-xs text-black/50 dark:text-white/50">

@@ -19,6 +19,7 @@ function num(raw: string): number {
 }
 
 function cardLabel(c: UserCardDTO): string {
+  if (c.displayName) return `${c.displayName} ••${c.last4}`;
   const issuer = ISSUER_LABELS[c.issuer] ?? c.issuer;
   return `${issuer} ${c.name ?? ""} ••${c.last4}`.replace(/\s+/g, " ").trim();
 }

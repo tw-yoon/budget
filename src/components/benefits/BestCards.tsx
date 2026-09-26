@@ -10,6 +10,7 @@ import {
 import { ISSUER_LABELS } from "@/lib/categories";
 
 function shortLabel(c: UserCardDTO) {
+  if (c.displayName) return c.displayName;
   return `${ISSUER_LABELS[c.issuer] ?? c.issuer}${c.name ? " " + c.name : ""}`;
 }
 

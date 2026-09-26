@@ -11,6 +11,8 @@ update), so nothing here is a stability promise.
 
 ## Unreleased
 
+- A name given an account on Accounts now shows on its ledger rows and on
+  its linked card under Benefits, instead of the bank's ("CREDIT CARD").
 - The start page is gone: the app opens on the ledger, and the BUDGET logo
   goes there too.
 - Settings → Categories lists Plaid's own subcategories (the detailed label a

@@ -119,7 +119,7 @@ export async function GET(req: NextRequest) {
       prisma.transaction.findMany({
         where,
         include: {
-          account: { select: { name: true, mask: true } },
+          account: { select: { name: true, displayName: true, mask: true } },
           splits: {
             select: { id: true, amount: true, userCategory: true },
             orderBy: { createdAt: "asc" },
@@ -234,7 +234,8 @@ export async function GET(req: NextRequest) {
         id: t.id,
         externalId: t.externalId,
         accountId: t.accountId,
-        accountName: t.source === "VENMO" ? "Venmo" : t.account.name,
+        accountName:
+          t.source === "VENMO" ? "Venmo" : t.account.displayName ?? t.account.name,
         accountMask: t.source === "VENMO" ? null : t.account.mask,
         amount: t.amount,
         date: t.date.toISOString(),
