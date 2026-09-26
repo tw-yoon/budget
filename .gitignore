@@ -63,3 +63,8 @@ next-env.d.ts
 
 # scratch files written by npm test (scripts/test-ui-state.mjs)
 /.test-tmp/
+
+# iPhone app: local signing settings and build output
+/ios/Config/Local.xcconfig
+/ios/build/
+xcuserdata/
