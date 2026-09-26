@@ -11,9 +11,9 @@ update), so nothing here is a stability promise.
 
 ## Unreleased
 
-- Best card by category shows card images: the best card large with its name
-  under it, the category and rate beside it, and the two runners-up small
-  beneath those.
+- Best card by category shows card images: the category on top, the best
+  card's image beneath it with its name and rate beside it on one line, and
+  the two runners-up as small images with their rates under the name.
 - A card's image under Benefits is added or removed from a button on its
   top-right corner — × to remove, + to add — shown while the card is hovered,
   in place of the Replace and Remove links beneath it.
