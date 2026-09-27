@@ -91,14 +91,12 @@ else
 fi
 [ -f "$ROOT/LICENSE" ] && pass "LICENSE exists" || fail "LICENSE exists" "file not found"
 
-# Picking the signing team from Xcode's Signing & Capabilities UI (instead of
-# putting it in the gitignored ios/Config/Local.xcconfig first) writes the
-# Team ID straight into the tracked project.pbxproj -- a public-repo leak,
-# and a target-level value that silently overrides Local.xcconfig. See
-# ios/README.md.
-signing_hits=$(cd "$ROOT" && git grep -nE 'DEVELOPMENT_TEAM = [A-Z0-9]{10}|DevelopmentTeam = ' -- ios/ 2>/dev/null)
-[ -z "$signing_hits" ] && pass "no signing team in the iPhone project" \
-                       || fail "no signing team in the iPhone project" "$signing_hits"
+# Picking a signing team in Xcode's Signing & Capabilities UI writes the
+# Team ID straight into the tracked project.pbxproj -- a public-repo leak.
+# Signing belongs in a gitignored xcconfig instead.
+signing_hits=$(cd "$ROOT" && git grep -nE 'DEVELOPMENT_TEAM = [A-Z0-9]{10}|DevelopmentTeam = ' -- '*.pbxproj' 2>/dev/null)
+[ -z "$signing_hits" ] && pass "no signing team in a tracked Xcode project" \
+                       || fail "no signing team in a tracked Xcode project" "$signing_hits"
 
 echo "$PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

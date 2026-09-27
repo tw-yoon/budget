@@ -157,6 +157,11 @@ the monorepo as a remote of the public clone — copy file contents, not objects
 Use `git am -3 --keep-cr`: `-3` for the merges, `--keep-cr` because a Venmo
 test fixture deliberately uses CRLF line endings.
 
+*Unpublished paths.* Some of the monorepo's `budget-claude/` tree is private
+and never published. The list, and how it changes the replay (finding
+`LAST`, cutting the patches, verifying the tree), is kept with those paths in
+the monorepo, not here. Follow it on every release.
+
 Scrub every commit, not only the tip — each private commit becomes a public
 one, so run the checks over each patch's added lines *and* its message,
 including merge messages, which carry no patch.
