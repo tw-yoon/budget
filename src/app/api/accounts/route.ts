@@ -1,22 +1,12 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import type { AccountDTO, AccountGroup } from "@/types";
-
-const LIABILITY_TYPES = new Set(["CREDIT", "LOAN"]);
-
-// Render order + friendly labels. Assets first, then liabilities.
-const TYPE_META: { type: string; label: string }[] = [
-  { type: "DEPOSITORY", label: "Cash" },
-  { type: "INVESTMENT", label: "Investments" },
-  { type: "CREDIT", label: "Credit Cards" },
-  { type: "LOAN", label: "Loans" },
-  { type: "OTHER", label: "Other" },
-];
+import { LIABILITY_TYPES, summarizeAccounts } from "@/lib/account-totals";
+import type { AccountDTO } from "@/types";
 
 export async function GET() {
   try {
     const rows = await prisma.account.findMany({
-      include: { item: { select: { institution: true } } },
+      include: { item: { select: { institution: true, disconnectedAt: true } } },
       orderBy: [{ name: "asc" }],
     });
 
@@ -39,43 +29,33 @@ export async function GET() {
       displayName: a.displayName,
       manualDueDay: a.manualDueDay,
       manualCreditLimit: a.manualCreditLimit,
+      disconnected: a.item.disconnectedAt != null,
     }));
 
-    // Group by type in the defined order; drop empty groups.
-    const groups: AccountGroup[] = TYPE_META.map(({ type, label }) => {
-      const inType = accounts.filter((a) => a.type === type);
-      return {
-        type,
-        label,
-        isLiability: LIABILITY_TYPES.has(type),
-        subtotal: inType.reduce((s, a) => s + a.currentBalance, 0),
-        accounts: inType,
-      };
-    }).filter((g) => g.accounts.length > 0);
-
-    const totalAssets = accounts
-      .filter((a) => !a.isLiability)
-      .reduce((s, a) => s + a.currentBalance, 0);
-    const totalLiabilities = accounts
-      .filter((a) => a.isLiability)
-      .reduce((s, a) => s + a.currentBalance, 0);
-
-    const lastRefreshed =
-      accounts.length > 0
-        ? accounts
-            .map((a) => a.balanceFetchedAt)
-            .sort()
-            .at(-1) ?? null
-        : null;
+    // A disconnected bank's accounts stay listed but count toward no total.
+    const { groups, summary } = summarizeAccounts(accounts);
 
     const items = await prisma.plaidItem.findMany({
       include: { _count: { select: { accounts: true } } },
       orderBy: { createdAt: "asc" },
     });
+    // Transactions per bank, named in the Delete confirm.
+    const txByAccount = await prisma.transaction.groupBy({
+      by: ["accountId"],
+      _count: { _all: true },
+    });
+    const itemOfAccount = new Map(rows.map((a) => [a.id, a.itemId]));
+    const txByItem = new Map<string, number>();
+    for (const g of txByAccount) {
+      const itemId = itemOfAccount.get(g.accountId);
+      if (itemId) txByItem.set(itemId, (txByItem.get(itemId) ?? 0) + g._count._all);
+    }
     const banks = items.map((i) => ({
       itemId: i.itemId,
       institution: i.institution,
       accountCount: i._count.accounts,
+      transactionCount: txByItem.get(i.itemId) ?? 0,
+      disconnectedAt: i.disconnectedAt?.toISOString() ?? null,
     }));
 
     const debitCardRows = await prisma.debitCard.findMany({
@@ -91,20 +71,7 @@ export async function GET() {
       available: d.account.availableBalance ?? d.account.currentBalance ?? null,
     }));
 
-    const round = (n: number) => Math.round(n * 100) / 100;
-
-    return NextResponse.json({
-      groups,
-      summary: {
-        totalAssets: round(totalAssets),
-        totalLiabilities: round(totalLiabilities),
-        netWorth: round(totalAssets - totalLiabilities),
-        accountCount: accounts.length,
-        lastRefreshed,
-      },
-      banks,
-      debitCards,
-    });
+    return NextResponse.json({ groups, summary, banks, debitCards });
   } catch (err) {
     console.error("[accounts]", err);
     return NextResponse.json(

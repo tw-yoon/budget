@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { syncTransactions } from "@/services/sync.service";
 import { prisma } from "@/lib/prisma";
+import { pickConnectedItems } from "@/lib/plaid-items";
 
 // Plaid error codes that mean "this item has no Transactions product" rather
 // than a real failure — e.g. an investments-only connection (Robinhood, a
@@ -16,13 +17,15 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({}));
     const { item_id } = body as { item_id?: string };
 
-    const items = item_id
-      ? await prisma.plaidItem.findMany({ where: { itemId: item_id } })
-      : await prisma.plaidItem.findMany();
-
-    if (items.length === 0) {
-      return NextResponse.json({ error: "No linked items found" }, { status: 404 });
+    // A disconnected bank has no token left: skip it, or 409 if asked by id.
+    const picked = pickConnectedItems(
+      await prisma.plaidItem.findMany(item_id ? { where: { itemId: item_id } } : undefined),
+      item_id
+    );
+    if (!picked.ok) {
+      return NextResponse.json({ error: picked.error }, { status: picked.status });
     }
+    const items = picked.items;
 
     // Investments-only items (Robinhood, a 401k) were linked with the
     // Investments product, not Transactions — calling /transactions/sync on

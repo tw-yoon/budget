@@ -2,7 +2,11 @@
 
 import { useState } from "react";
 import type { BankSummary } from "@/types";
+import { deleteConfirm, disconnectConfirm } from "@/lib/bank-actions";
+import { formatDate } from "@/lib/format";
 import { PlaidLink } from "./PlaidLink";
+
+type Action = "disconnect" | "delete";
 
 export function ConnectedBanks({
   banks,
@@ -11,28 +15,42 @@ export function ConnectedBanks({
   banks: BankSummary[];
   onChanged: () => void;
 }) {
-  const [busyId, setBusyId] = useState<string | null>(null);
+  const [busy, setBusy] = useState<{ itemId: string; action: Action } | null>(null);
   const [error, setError] = useState("");
 
   if (banks.length === 0) return null;
 
-  async function disconnect(bank: BankSummary) {
-    const ok = confirm(
-      `Disconnect ${bank.institution}?\n\nThis removes its ${bank.accountCount} account(s) and their transactions from this app and revokes the Plaid connection. It cannot be undone (you'd reconnect to get the data back).`
-    );
-    if (!ok) return;
-    setBusyId(bank.itemId);
+  // Disconnect keeps the bank's history; Delete removes it (and, on a
+  // connected bank, disconnects it in the same step).
+  async function run(bank: BankSummary, action: Action) {
+    const { title, message } =
+      action === "disconnect" ? disconnectConfirm(bank) : deleteConfirm(bank);
+    if (!confirm(`${title}\n\n${message}`)) return;
+    setBusy({ itemId: bank.itemId, action });
     setError("");
     try {
-      const res = await fetch(`/api/plaid/items/${bank.itemId}`, { method: "DELETE" });
+      const url =
+        action === "disconnect"
+          ? `/api/plaid/items/${bank.itemId}`
+          : `/api/plaid/items/${bank.itemId}/history`;
+      const res = await fetch(url, { method: "DELETE" });
       if (!res.ok) throw new Error(`Failed (HTTP ${res.status})`);
       onChanged();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to disconnect");
+      setError(
+        err instanceof Error
+          ? err.message
+          : action === "disconnect"
+            ? "Failed to disconnect"
+            : "Failed to delete"
+      );
     } finally {
-      setBusyId(null);
+      setBusy(null);
     }
   }
+
+  const isBusy = (bank: BankSummary, action: Action) =>
+    busy?.itemId === bank.itemId && busy.action === action;
 
   return (
     <section className="overflow-hidden rounded-lg border border-black/10 dark:border-white/10">
@@ -58,25 +76,45 @@ export function ConnectedBanks({
             className="flex items-center justify-between gap-4 px-4 py-2.5 text-sm"
           >
             <div className="min-w-0">
-              <span className="font-medium">{bank.institution}</span>
+              <span className={`font-medium ${bank.disconnectedAt ? "opacity-50" : ""}`}>
+                {bank.institution}
+              </span>
               <span className="ml-2 text-xs text-black/45 dark:text-white/45">
+                {bank.disconnectedAt && (
+                  <>Disconnected {formatDate(bank.disconnectedAt)} · </>
+                )}
                 {bank.accountCount} account{bank.accountCount !== 1 ? "s" : ""} · id …
                 {bank.itemId.slice(-6)}
               </span>
             </div>
             <div className="flex shrink-0 items-center gap-3">
-              <PlaidLink
-                itemId={bank.itemId}
-                label="Reconnect"
-                variant="link"
-                onConnected={onChanged}
-              />
+              {!bank.disconnectedAt && (
+                <>
+                  <PlaidLink
+                    itemId={bank.itemId}
+                    label="Reconnect"
+                    variant="link"
+                    onConnected={onChanged}
+                  />
+                  <button
+                    onClick={() => run(bank, "disconnect")}
+                    disabled={busy?.itemId === bank.itemId}
+                    className="text-xs font-medium text-red-600 hover:underline disabled:opacity-50 dark:text-red-400"
+                  >
+                    {isBusy(bank, "disconnect") ? "Disconnecting…" : "Disconnect"}
+                  </button>
+                </>
+              )}
               <button
-                onClick={() => disconnect(bank)}
-                disabled={busyId === bank.itemId}
+                onClick={() => run(bank, "delete")}
+                disabled={busy?.itemId === bank.itemId}
                 className="text-xs font-medium text-red-600 hover:underline disabled:opacity-50 dark:text-red-400"
               >
-                {busyId === bank.itemId ? "Disconnecting…" : "Disconnect"}
+                {isBusy(bank, "delete")
+                  ? "Deleting…"
+                  : bank.disconnectedAt
+                    ? "Delete History…"
+                    : "Delete…"}
               </button>
             </div>
           </div>

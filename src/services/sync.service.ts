@@ -45,8 +45,11 @@ function classify(tx: PlaidTransaction): {
 export async function syncTransactions(
   itemId: string
 ): Promise<{ added: number; modified: number; removed: number }> {
-  const accessToken = getAccessToken(itemId);
   const item = await prisma.plaidItem.findUniqueOrThrow({ where: { itemId } });
+  // A disconnected bank has no token left; never call Plaid for it. Callers
+  // already skip these (see pickConnectedItems); this is the backstop.
+  if (item.disconnectedAt) throw new Error(`${item.institution} is disconnected`);
+  const accessToken = getAccessToken(itemId);
 
   // Pick up accounts added since the last sync. Reconnecting a bank can add a
   // new card to a login that was already linked, and /transactions/sync starts

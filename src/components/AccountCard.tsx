@@ -63,13 +63,22 @@ export function AccountCard({
     "rounded border border-black/15 bg-transparent px-1.5 py-0.5 outline-none focus:border-black/40 dark:border-white/15 dark:focus:border-white/40";
 
   return (
-    <div className="flex items-start justify-between gap-4 px-4 py-3">
+    <div
+      className={`flex items-start justify-between gap-4 px-4 py-3 ${
+        account.disconnected ? "opacity-50" : ""
+      }`}
+    >
       <div className="min-w-0">
         <div className="truncate font-medium">{name}</div>
         <div className="mt-0.5 truncate text-xs text-black/50 dark:text-white/50">
           {account.mask && <span>··{account.mask} · </span>}
           {account.subtype ?? account.type.toLowerCase()} · {account.institution}
         </div>
+        {account.disconnected && (
+          <div className="mt-0.5 text-xs font-medium text-black/60 dark:text-white/60">
+            Disconnected · as of {formatDate(account.balanceFetchedAt)}
+          </div>
+        )}
 
         {payment && (
           <div className={`mt-1 text-xs font-medium ${payment.className}`}>

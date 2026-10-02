@@ -25,7 +25,9 @@ export function AccountsDashboard() {
     );
   }
 
-  if (data && data.summary.accountCount === 0) {
+  // No accounts at all. (summary.accountCount leaves out disconnected banks,
+  // whose accounts are still listed below.)
+  if (data && data.groups.length === 0) {
     return (
       <div className="flex flex-col items-center gap-3 rounded-lg border border-black/10 px-6 py-16 text-center dark:border-white/10">
         <p className="text-sm font-medium">No accounts connected</p>

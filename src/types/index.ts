@@ -175,12 +175,15 @@ export interface AccountDTO {
   displayName: string | null;
   manualDueDay: number | null;
   manualCreditLimit: number | null;
+  // The account's bank is disconnected: still listed, balance frozen as of
+  // balanceFetchedAt, counted in no total.
+  disconnected: boolean;
 }
 
 export interface AccountGroup {
   type: string;
   label: string;
-  subtotal: number;
+  subtotal: number; // connected accounts only
   isLiability: boolean;
   accounts: AccountDTO[];
 }
@@ -197,6 +200,8 @@ export interface BankSummary {
   itemId: string;
   institution: string;
   accountCount: number;
+  transactionCount: number; // named in the Delete confirm
+  disconnectedAt: string | null; // ISO; null while connected
 }
 
 export interface DebitCardDTO {

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { plaidClient } from "@/lib/plaid";
 import { getAccessToken } from "@/lib/token-store";
 import { CountryCode, Products } from "plaid";
+import { isDisconnected } from "@/services/plaid-items.service";
 
 // POST /api/plaid/create-link-token
 //   body: {}                       — new bank connection (Transactions)
@@ -22,6 +23,15 @@ export async function POST(req: NextRequest) {
 
     let linkToken: string;
     if (itemId) {
+      // A disconnected item was revoked at Plaid and its token deleted; there
+      // is nothing left to re-authenticate. Connecting the bank again is a
+      // new connection.
+      if (await isDisconnected(itemId)) {
+        return NextResponse.json(
+          { error: "This bank is disconnected. Connect it again as a new bank." },
+          { status: 409 }
+        );
+      }
       // Update mode: re-authenticate an existing item (fixes ITEM_LOGIN_REQUIRED)
       // and refresh its history window. `products` is omitted in update mode.
       const accessToken = getAccessToken(itemId);

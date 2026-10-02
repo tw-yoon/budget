@@ -9,6 +9,14 @@ middle number; one carrying fixes and small changes moves the last.
 Still `0.x`: the database schema changes between releases (migrations run on
 update), so nothing here is a stability promise.
 
+## Unreleased
+
+- Disconnecting a bank keeps its history. Its accounts stay on Accounts,
+  greyed and marked "Disconnected · as of <date>", but count toward no total;
+  its transactions stay everywhere they were. Under Settings → Connections a
+  connected bank also offers Delete…, which disconnects it and removes
+  everything it recorded; a disconnected bank offers Delete History….
+
 ## 0.7.0 — 2026-09-26
 
 - Best card by category shows card images: the category on top, the best

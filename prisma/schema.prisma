@@ -14,6 +14,11 @@ model PlaidItem {
   cursor      String?
   lastSynced  DateTime?
   createdAt   DateTime  @default(now())
+  // Set when the bank is disconnected: the Plaid Item is revoked and its
+  // access token deleted, but its accounts and transactions stay. Nothing
+  // calls Plaid for a disconnected item, and its accounts count toward no
+  // total. Null while connected.
+  disconnectedAt DateTime?
 
   accounts Account[]
   syncLogs SyncLog[]

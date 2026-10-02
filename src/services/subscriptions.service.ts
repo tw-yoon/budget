@@ -22,7 +22,9 @@ export async function detectSubscriptions(): Promise<{
   found: number;
   errors: { institution: string; error: string }[];
 }> {
+  // A disconnected bank has no token left; its recorded subscriptions stay.
   const items = await prisma.plaidItem.findMany({
+    where: { disconnectedAt: null },
     include: { accounts: { select: { id: true, plaidAccountId: true } } },
   });
 

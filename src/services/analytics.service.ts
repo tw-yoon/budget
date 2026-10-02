@@ -342,10 +342,14 @@ export function buildCashflow(
   });
 }
 
-/** Cash on hand right now: the sum of depository (checking/savings) balances. */
+/**
+ * Cash on hand right now: the sum of depository (checking/savings) balances.
+ * A disconnected bank's balances are frozen, so like every other total this
+ * leaves them out.
+ */
 async function getCurrentCash(): Promise<{ currentCash: number; cashAsOf: string | null }> {
   const accts = await prisma.account.findMany({
-    where: { type: "DEPOSITORY" },
+    where: { type: "DEPOSITORY", item: { disconnectedAt: null } },
     select: { currentBalance: true, balanceFetchedAt: true },
   });
   const currentCash = accts.reduce((s, a) => s + a.currentBalance, 0);

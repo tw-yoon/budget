@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { plaidClient } from "@/lib/plaid";
 import { getAccessToken } from "@/lib/token-store";
 import { prisma } from "@/lib/prisma";
+import { pickConnectedItems } from "@/lib/plaid-items";
 import { syncLiabilities } from "@/services/liabilities.service";
 import { upsertAccounts } from "@/services/accounts.service";
 
@@ -11,13 +12,15 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({}));
     const { item_id } = body as { item_id?: string };
 
-    const items = item_id
-      ? await prisma.plaidItem.findMany({ where: { itemId: item_id } })
-      : await prisma.plaidItem.findMany();
-
-    if (items.length === 0) {
-      return NextResponse.json({ error: "No linked items found" }, { status: 404 });
+    // A disconnected bank has no token left: skip it, or 409 if asked by id.
+    const picked = pickConnectedItems(
+      await prisma.plaidItem.findMany(item_id ? { where: { itemId: item_id } } : undefined),
+      item_id
+    );
+    if (!picked.ok) {
+      return NextResponse.json({ error: picked.error }, { status: picked.status });
     }
+    const items = picked.items;
 
     const updated: { accountId: string; name: string; current: number; available: number | null }[] = [];
     const liabilities: { itemId: string; institution: string; ok: boolean; updated: number; error?: string }[] = [];

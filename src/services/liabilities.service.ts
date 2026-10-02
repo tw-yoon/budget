@@ -23,6 +23,13 @@ export async function syncLiabilities(
   itemId: string
 ): Promise<{ ok: boolean; updated: number; error?: string }> {
   try {
+    // A disconnected bank has no token left; never call Plaid for it.
+    const item = await prisma.plaidItem.findUnique({
+      where: { itemId },
+      select: { disconnectedAt: true },
+    });
+    if (item?.disconnectedAt) return { ok: false, updated: 0, error: "DISCONNECTED" };
+
     const accessToken = getAccessToken(itemId);
     const res = await plaidClient.liabilitiesGet({ access_token: accessToken });
     const credits = res.data.liabilities.credit ?? [];
