@@ -56,6 +56,7 @@ next-env.d.ts
 # parallel-session dev build dir (see next.config.ts NEXT_DIST_DIR)
 /.next-preview/
 .server.log
+.launchd.log
 
 # machine-local Claude Code settings
 .claude/settings.local.json
