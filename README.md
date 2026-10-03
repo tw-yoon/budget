@@ -139,6 +139,8 @@ never does is build or start the app.
 
 - `prisma/dev.db` — the SQLite database: accounts, transactions, balances.
 - `data/tokens.enc` — your Plaid access tokens, encrypted at rest.
+- `data/access-token` — the access token other devices need (see Settings →
+  Remote Access). Delete it to make a new one.
 - `prisma/backups/` — a daily snapshot of `dev.db`, kept for 30 days, written
   automatically each time you launch. `--update` also writes its own
   `pre-update-*.db` snapshot right before running migrations, kept on the
@@ -175,6 +177,13 @@ WSL — there's no native-Windows path.
   you can read the error).
 - **Port in use?** Set `BUDGET_PORT` before launching (e.g.
   `BUDGET_PORT=3001 ./Budget.command`) to run on something other than 3000.
+
+## Using Budget from another device
+
+Budget listens on the Mac only, so devices on your Wi-Fi cannot reach it.
+Reach it through Tailscale (see `ios/README.md`). Anything that is not the
+Mac must send the access token: browsers ask for it once, and the token is
+under Settings → Remote Access.
 
 ## Two ways to run
 

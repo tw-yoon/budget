@@ -11,6 +11,10 @@ update), so nothing here is a stability promise.
 
 ## Unreleased
 
+- Budget only accepts connections from the Mac it runs on and, with the access
+  token, from your tailnet. Find the token under Settings → Remote Access;
+  other browsers ask for it once, and the iPhone app has a field for it under
+  Settings → Server. Devices on your Wi-Fi can no longer reach Budget directly.
 - Disconnecting a bank keeps its history. Its accounts stay on Accounts,
   greyed and marked "Disconnected · as of <date>", but count toward no total;
   its transactions stay everywhere they were. Under Settings → Connections a
