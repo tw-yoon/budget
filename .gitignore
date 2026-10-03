@@ -39,6 +39,7 @@ yarn-error.log*
 
 # encrypted token store
 /data/
+access-token
 
 # sqlite database, plus the daily snapshots Budget.command archives into
 # prisma/backups/ — both hold real financial data.
