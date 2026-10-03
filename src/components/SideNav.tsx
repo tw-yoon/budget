@@ -56,6 +56,7 @@ const NAV: NavItem[] = [
       { href: "/settings/categories", label: "Categories" },
       { href: "/settings/rules", label: "Rules" },
       { href: "/settings/connections", label: "Connections" },
+      { href: "/settings/access", label: "Remote Access" },
       { href: "/settings/mode", label: "Mode" },
     ],
   },
