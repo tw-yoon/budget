@@ -101,6 +101,13 @@ model Transaction {
   // no category of its own — it derives one through this link.
   linkedToId String?
 
+  // The itemId of the earlier connection that recorded this row, set when a
+  // reconnect merge folds its account into the new connection's. Cleared when
+  // the row absorbs its duplicate from the new connection (it then tracks the
+  // new Plaid id). It is how a merged account tells old-connection rows from
+  // new ones. docs/superpowers/specs/2026-10-02-reconnect-merges-history-design.md
+  priorItemId String?
+
   account Account @relation(fields: [accountId], references: [id])
   linkedTo Transaction?  @relation("TxRefunds", fields: [linkedToId], references: [id], onDelete: SetNull)
   refunds  Transaction[] @relation("TxRefunds")
@@ -113,6 +120,7 @@ model Transaction {
   @@index([source])
   @@index([fundsCashoutId])
   @@index([linkedToId])
+  @@index([priorItemId])
 }
 
 // A carve-out: part of one transaction placed under its own category, without
@@ -308,6 +316,26 @@ model CategoryMapping {
   category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
 
   @@index([categoryId])
+}
+
+// One confirmed "merge a disconnected bank into its reconnection". The old
+// accounts survive (they take over the new connection), duplicates in the
+// overlap collapse onto the old rows. `detail` holds the before-image of every
+// row it changed or deleted (JSON), and `snapshotFile` names the full database
+// copy taken just before, in prisma/backups/.
+// docs/superpowers/specs/2026-10-02-reconnect-merges-history-design.md
+model ReconnectMerge {
+  id           String   @id @default(cuid())
+  fromItemId   String // the disconnected PlaidItem.itemId
+  intoItemId   String // the connected PlaidItem.itemId
+  createdAt    DateTime @default(now())
+  snapshotFile String?
+  accountIds   String   @default("[]") // JSON array of survivor Account ids
+  duplicates   Int      @default(0)
+  detail       String   @default("{}")
+
+  @@index([fromItemId])
+  @@index([intoItemId])
 }
 
 model SyncLog {

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { LIABILITY_TYPES, summarizeAccounts } from "@/lib/account-totals";
+import { mergeLinks } from "@/lib/reconnect-merge";
 import type { AccountDTO } from "@/types";
 
 export async function GET() {
@@ -50,13 +51,30 @@ export async function GET() {
       const itemId = itemOfAccount.get(g.accountId);
       if (itemId) txByItem.set(itemId, (txByItem.get(itemId) ?? 0) + g._count._all);
     }
-    const banks = items.map((i) => ({
-      itemId: i.itemId,
-      institution: i.institution,
-      accountCount: i._count.accounts,
-      transactionCount: txByItem.get(i.itemId) ?? 0,
-      disconnectedAt: i.disconnectedAt?.toISOString() ?? null,
-    }));
+    // Merge suggestions and history; a bank emptied by a merge is left out.
+    const merges = await prisma.reconnectMerge.findMany({
+      select: { fromItemId: true, intoItemId: true, createdAt: true },
+    });
+    const links = mergeLinks(
+      items.map((i) => ({
+        itemId: i.itemId,
+        institution: i.institution,
+        accountCount: i._count.accounts,
+        disconnectedAt: i.disconnectedAt,
+      })),
+      merges
+    );
+    const banks = items
+      .filter((i) => !links.get(i.itemId)?.hidden)
+      .map((i) => ({
+        itemId: i.itemId,
+        institution: i.institution,
+        accountCount: i._count.accounts,
+        transactionCount: txByItem.get(i.itemId) ?? 0,
+        disconnectedAt: i.disconnectedAt?.toISOString() ?? null,
+        mergeInto: links.get(i.itemId)?.mergeInto ?? [],
+        mergedFrom: links.get(i.itemId)?.mergedFrom ?? [],
+      }));
 
     const debitCardRows = await prisma.debitCard.findMany({
       include: { account: { select: { name: true, displayName: true, availableBalance: true, currentBalance: true } } },

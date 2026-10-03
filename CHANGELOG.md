@@ -16,6 +16,13 @@ update), so nothing here is a stability promise.
   its transactions stay everywhere they were. Under Settings → Connections a
   connected bank also offers Delete…, which disconnects it and removes
   everything it recorded; a disconnected bank offers Delete History….
+- Reconnecting a bank no longer leaves its history twice. Under Settings →
+  Connections a disconnected bank offers "Merge into <bank>…" when a bank of
+  the same name is connected: it pairs the old accounts with the new ones and
+  lists the transactions both connections recorded, then merges what you tick.
+  Merged accounts and transactions keep your names, categories, splits, links
+  and notes. A copy of the database is saved to prisma/backups first. The
+  connected bank keeps a "Review duplicates…" for history that arrives later.
 
 ## 0.7.0 — 2026-09-26
 

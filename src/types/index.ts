@@ -202,6 +202,41 @@ export interface BankSummary {
   accountCount: number;
   transactionCount: number; // named in the Delete confirm
   disconnectedAt: string | null; // ISO; null while connected
+  // Reconnect merge (docs/superpowers/specs/2026-10-02-reconnect-merges-history-design.md).
+  // On a disconnected bank with accounts left: the connected banks of the same
+  // name it can be merged into. On a connected bank: the banks merged into it.
+  mergeInto: { itemId: string; institution: string }[];
+  mergedFrom: { itemId: string; institution: string; mergedAt: string }[];
+}
+
+// GET /api/plaid/items/:itemId/merge — the reconnect-merge review.
+export interface MergeAccountBrief {
+  id: string;
+  name: string;
+  mask: string | null;
+  type: string;
+  subtype: string | null;
+  transactionCount: number;
+}
+
+export interface MergeTxBrief {
+  id: string;
+  label: number | null;
+  date: string;
+  name: string;
+  amount: number;
+  pending: boolean;
+  edited: boolean; // the owner has put a category, note, link or split on it
+}
+
+export interface MergePreview {
+  from: { itemId: string; institution: string; disconnectedAt: string };
+  into: { itemId: string; institution: string };
+  oldAccounts: MergeAccountBrief[];
+  newAccounts: MergeAccountBrief[];
+  mergedAccounts: MergeAccountBrief[];
+  pairs: { from: string; to: string }[];
+  duplicates: { old: MergeTxBrief; new: MergeTxBrief; confident: boolean }[];
 }
 
 export interface DebitCardDTO {

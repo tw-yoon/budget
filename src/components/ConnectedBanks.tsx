@@ -5,6 +5,7 @@ import type { BankSummary } from "@/types";
 import { deleteConfirm, disconnectConfirm } from "@/lib/bank-actions";
 import { formatDate } from "@/lib/format";
 import { PlaidLink } from "./PlaidLink";
+import { MergeReview } from "./MergeReview";
 
 type Action = "disconnect" | "delete";
 
@@ -17,6 +18,8 @@ export function ConnectedBanks({
 }) {
   const [busy, setBusy] = useState<{ itemId: string; action: Action } | null>(null);
   const [error, setError] = useState("");
+  // The open reconnect-merge review, if any.
+  const [review, setReview] = useState<{ from: string; into: string } | null>(null);
 
   if (banks.length === 0) return null;
 
@@ -88,6 +91,27 @@ export function ConnectedBanks({
               </span>
             </div>
             <div className="flex shrink-0 items-center gap-3">
+              {bank.mergeInto.map((target) => (
+                <button
+                  key={target.itemId}
+                  onClick={() => setReview({ from: bank.itemId, into: target.itemId })}
+                  disabled={busy?.itemId === bank.itemId}
+                  className="text-xs font-medium text-indigo-600 hover:underline disabled:opacity-50 dark:text-indigo-400"
+                >
+                  Merge into {target.institution}
+                  {bank.mergeInto.length > 1 && ` …${target.itemId.slice(-6)}`}…
+                </button>
+              ))}
+              {bank.mergedFrom.map((source) => (
+                <button
+                  key={source.itemId}
+                  onClick={() => setReview({ from: source.itemId, into: bank.itemId })}
+                  title={`Merged from the disconnected ${source.institution} on ${formatDate(source.mergedAt)}`}
+                  className="text-xs font-medium text-indigo-600 hover:underline dark:text-indigo-400"
+                >
+                  Review duplicates…
+                </button>
+              ))}
               {!bank.disconnectedAt && (
                 <>
                   <PlaidLink
@@ -120,6 +144,17 @@ export function ConnectedBanks({
           </div>
         ))}
       </div>
+      {review && (
+        <div className="border-t border-black/10 p-3 dark:border-white/10">
+          <MergeReview
+            key={`${review.from}|${review.into}`}
+            fromItemId={review.from}
+            intoItemId={review.into}
+            onClose={() => setReview(null)}
+            onMerged={onChanged}
+          />
+        </div>
+      )}
     </section>
   );
 }

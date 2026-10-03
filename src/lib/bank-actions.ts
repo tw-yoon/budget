@@ -37,3 +37,28 @@ export function deleteConfirm(bank: Bank): { title: string; message: string } {
           `with their categories, splits and links. It cannot be undone.`,
       };
 }
+
+/**
+ * The Merge button's confirm in the reconnect-merge review
+ * (docs/superpowers/specs/2026-10-02-reconnect-merges-history-design.md).
+ */
+export function mergeConfirm(
+  from: string,
+  into: string,
+  accounts: number,
+  duplicates: number
+): { title: string; message: string } {
+  const what = [
+    accounts > 0 ? countNoun(accounts, "account") : null,
+    duplicates > 0 ? countNoun(duplicates, "duplicate transaction") : null,
+  ]
+    .filter(Boolean)
+    .join(" and ");
+  return {
+    title: `Merge ${what}?`,
+    message:
+      `History from the disconnected ${from} moves into ${into}. ` +
+      `Merged rows keep your categories, splits, links and notes. ` +
+      `A copy of the database is saved first, in prisma/backups.`,
+  };
+}
