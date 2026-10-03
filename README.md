@@ -183,14 +183,16 @@ WSL — there's no native-Windows path.
 Budget listens on the Mac only, so devices on your Wi-Fi cannot reach it.
 Reach it through Tailscale (see `ios/README.md`). Anything that is not the
 Mac must send the access token: browsers ask for it once, and the token is
-under Settings → Remote Access.
+under Settings → Remote Access. Reset Token there signs out every other
+device until it gets the new token. The Mac's own browser at `localhost`
+needs no token.
 
 ## Two ways to run
 
 | Command | When to use |
 | --- | --- |
 | `Budget.command` | **Everyday use** — checks for updates, rebuilds when code changed, runs the built app in the background. |
-| `npm run dev` | While making changes — auto-reloads on edits (a little slower). |
+| `npm run dev` | While making changes — auto-reloads on edits (a little slower). Listens on the Mac only, like the built app. |
 
 ## Tests
 

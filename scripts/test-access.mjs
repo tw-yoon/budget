@@ -78,8 +78,8 @@ test("safeNext keeps same-origin paths only", () => {
 });
 
 const remote = { host: "example-mac.example-tailnet.ts.net", "x-forwarded-for": "100.64.0.1" };
-const decide = (pathname, headers, cookie, search = "") =>
-  decideAccess({ pathname, search, headers: h(headers), cookie, token: TOKEN });
+const decide = (pathname, headers, cookie, search = "", method = "GET") =>
+  decideAccess({ method, pathname, search, headers: h(headers), cookie, token: TOKEN });
 
 test("decideAccess: local passes without a token", () => {
   assert.deepEqual(decide("/api/accounts", { host: "localhost:3000" }), { kind: "pass" });
@@ -105,6 +105,24 @@ test("decideAccess: sign-in page and its routes are open", () => {
     assert.deepEqual(decide(p, remote), { kind: "pass" }, p);
   }
   assert.deepEqual(decide("/api/access/token", remote), { kind: "unauthorized" });
+});
+
+test("decideAccess: cross-site writes are refused", () => {
+  const post = (headers, cookie) => decide("/api/access/reset", headers, cookie, "", "POST");
+  const local = { host: "localhost:3000" };
+  assert.deepEqual(post({ ...local, origin: "http://localhost:3000" }), { kind: "pass" });
+  assert.deepEqual(post({ ...local, origin: "https://evil.example" }), { kind: "forbidden" });
+  assert.deepEqual(post({ ...local, "sec-fetch-site": "cross-site" }), { kind: "forbidden" });
+  assert.deepEqual(post({ ...local, "sec-fetch-site": "same-origin" }), { kind: "pass" });
+  assert.deepEqual(post(local), { kind: "pass" }, "no Origin (curl, the iPhone app)");
+  assert.deepEqual(post({ ...local, origin: "null" }), { kind: "forbidden" });
+  assert.deepEqual(post({ ...local, origin: "not a url" }), { kind: "forbidden" });
+  assert.deepEqual(decide("/api/accounts", { ...local, origin: "https://evil.example" }), { kind: "pass" }, "reads are not the concern");
+  const auth = { ...remote, authorization: `Bearer ${TOKEN}` };
+  assert.deepEqual(post({ ...auth, origin: `https://${remote.host}` }), { kind: "pass" });
+  assert.deepEqual(post({ ...auth, origin: "https://evil.example" }), { kind: "forbidden" });
+  assert.deepEqual(post({ ...auth, "sec-fetch-site": "cross-site" }), { kind: "forbidden" });
+  assert.deepEqual(post({ ...auth, origin: "null" }), { kind: "forbidden" });
 });
 
 const tmpFile = () => path.join(fs.mkdtempSync(path.join(os.tmpdir(), "access-")), "data", "access-token");

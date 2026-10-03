@@ -7,6 +7,7 @@ import { accessTokens } from "@/lib/access-token-store";
 // is ever added it must check access itself (a matcher can skip it).
 export function proxy(req: NextRequest) {
   const decision = decideAccess({
+    method: req.method,
     pathname: req.nextUrl.pathname,
     search: req.nextUrl.search,
     headers: req.headers,
@@ -14,6 +15,9 @@ export function proxy(req: NextRequest) {
     token: accessTokens.read(),
   });
   if (decision.kind === "pass") return NextResponse.next();
+  if (decision.kind === "forbidden") {
+    return NextResponse.json({ error: "Cross-site request refused." }, { status: 403 });
+  }
   if (decision.kind === "unauthorized") {
     return NextResponse.json({ error: "Sign-in required." }, { status: 401 });
   }

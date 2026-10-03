@@ -8,6 +8,7 @@ export function SettingsAccess() {
   const [state, setState] = useState<State>({ kind: "loading" });
   const [shown, setShown] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/access/token", { cache: "no-store" })
@@ -20,17 +21,29 @@ export function SettingsAccess() {
   }, []);
 
   async function copy(token: string) {
-    await navigator.clipboard.writeText(token);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+    try {
+      await navigator.clipboard.writeText(token);
+      setProblem(null);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      setProblem("Couldn't copy — select the field and copy it.");
+    }
   }
 
   async function reset() {
     if (!confirm("Every other device (your iPhone, other browsers) will be signed out until you give it the new token.")) return;
-    const r = await fetch("/api/access/reset", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
-    if (r.ok) {
-      setState({ kind: "local", token: (await r.json()).token });
-      setShown(true);
+    setProblem(null);
+    try {
+      const r = await fetch("/api/access/reset", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+      if (r.ok) {
+        setState({ kind: "local", token: (await r.json()).token });
+        setShown(true);
+      } else {
+        setProblem((await r.json().catch(() => null))?.error ?? "Couldn't reset the token.");
+      }
+    } catch {
+      setProblem("Couldn't reset the token.");
     }
   }
 
@@ -74,6 +87,7 @@ export function SettingsAccess() {
           <button type="button" onClick={reset} className="self-start text-sm text-red-600 hover:underline dark:text-red-400">
             Reset Token…
           </button>
+          {problem && <p className="text-sm text-red-600 dark:text-red-400">{problem}</p>}
         </div>
       )}
 

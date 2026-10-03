@@ -34,9 +34,10 @@ it forwards:
 - It sets `X-Forwarded-For` to the tailnet client's address (`100.x.y.z` or
   a `fd7a:` IPv6), and adds `Tailscale-User-Login` for tailnet users.
 
-Next fills `x-forwarded-for` from the socket address when it is absent
-(`base-server.js`, `??=`), so a plain local request arrives with
-`127.0.0.1` / `::1` there.
+In Next 16.2.9 the proxy runs (router-server's resolve-routes) before
+base-server fills `x-forwarded-for`, so a plain local request reaches the
+proxy with the header absent. Absent is treated as local; present must be
+all loopback.
 
 A request is **local** only when all of these hold:
 
@@ -51,9 +52,20 @@ loopback bind; the bind is part of this change, not an option.
 
 ## Server
 
-- **Bind:** `package.json` `"start": "next start -H 127.0.0.1"`. `next dev`
-  is left alone (it is a developer's own choice, and `-H` can be passed).
+- **Bind:** `package.json` `"start": "next start -H 127.0.0.1"`. `"dev": "next dev -H 127.0.0.1"`,
+  so `next dev` binds loopback too.
   `Budget.command` already runs `npm run start`.
+### Cross-site requests
+
+A web page open in the Mac's browser can POST to `http://localhost:3000`, and
+loopback is trusted, so the proxy refuses cross-site writes before the local
+pass (`isCrossSiteWrite`). For any method other than GET/HEAD/OPTIONS: refuse
+when `Sec-Fetch-Site` is `cross-site`, or when `Origin` is present and
+unparseable (`null` included) or its hostname is not loopback (local request)
+or not equal to the request's `Host` hostname (remote request). No Origin and
+no Sec-Fetch-Site (curl, the iPhone's URLSession) falls through to the normal
+rules. The response is `403 { "error": "Cross-site request refused." }`.
+
 - **Token file:** `data/access-token`, 64 hex characters (32 random bytes
   from `crypto.randomBytes`), mode `0600`, gitignored. Created on first read
   if missing, so a fresh clone, `next dev` and `next start` all work with no
@@ -118,7 +130,7 @@ gives for free.
   whitespace; empty → nil) and storage behind a protocol
   `TokenStore { read() -> String?; write(String?) }`. The app uses
   `KeychainTokenStore` (generic password, service = bundle id,
-  account `"accessToken"`, `kSecAttrAccessibleAfterFirstUnlock`); tests use
+  account `"accessToken"`, `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`); tests use
   an in-memory store.
 - **`APIClient`** gains `var token: String?`. `sendRaw` sets
   `Authorization: Bearer <token>` when present. Every `APIClient(baseURL:)`
