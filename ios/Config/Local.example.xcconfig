@@ -12,3 +12,7 @@ DEVELOPMENT_TEAM =
 // Bundle IDs must be unique per Apple ID. Change this if Xcode reports the
 // identifier is taken.
 BUNDLE_ID_PREFIX = local.budget
+
+// Name or identifier of the iPhone that scripts/phone.sh installs on. Leave
+// empty to use the only paired iPhone.
+PHONE_DEVICE =
