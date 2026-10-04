@@ -133,11 +133,12 @@ two of them were passes at the same unfinished change, and one shipped a bug the
 next fixed. None of it was installable, and the changelog dated them all as if
 they had shipped. Work now lands under a `## Unreleased` heading and is given a
 number here, at the moment it is published: rename that heading to the version
-with today's date, and set `version` in `package.json` to match. A release
-carrying new features moves the middle number; one carrying fixes and small
-changes moves the last. `scripts/test-version.mjs` fails if `package.json` and
-the newest dated entry disagree, if `Unreleased` is dated, or if it is not at
-the top.
+with today's date, and set `version` in `package.json` and `MARKETING_VERSION`
+in `ios/Config/Shared.xcconfig` to match. A release carrying new features moves
+the middle number; one carrying fixes and small changes moves the last.
+`scripts/test-version.mjs` fails if `package.json`, the iPhone app and the
+newest dated entry disagree, if `Unreleased` is dated, or if it is not at the
+top.
 
 Between releases `package.json` therefore names the last *published* version,
 not what main contains — which is also what the launcher wants, since it

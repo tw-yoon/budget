@@ -29,6 +29,15 @@ test("package.json carries the newest released version", () => {
   assert.equal(releases[0].version, version);
 });
 
+test("the iPhone app carries the same version", () => {
+  // The app ships in the same release as the web app, so it shows the same
+  // number. Xcode reads it from Shared.xcconfig into CFBundleShortVersionString.
+  const xcconfig = read("../ios/Config/Shared.xcconfig");
+  const m = xcconfig.match(/^MARKETING_VERSION = (.+)$/m);
+  assert.ok(m, "no MARKETING_VERSION in ios/Config/Shared.xcconfig");
+  assert.equal(m[1].trim(), version);
+});
+
 test("every heading is either Unreleased or a dated release", () => {
   // Dating the Unreleased section would make unshipped work look published; it
   // gets a number and a date at the moment it is released, and not before.
