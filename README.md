@@ -1,214 +1,440 @@
-# Budget Claude
+# Budget
 
-A local-first personal budgeting app. It connects to your bank accounts through
-Plaid, and everything it stores — accounts, transactions, balances — lives in a
-SQLite database on your own machine, not in someone else's cloud. It tracks
-account balances and net worth, gives you a searchable transaction ledger,
-shows spending analytics (by category, by month, by merchant), and works out
-which of your credit cards earns the most for each kind of purchase.
+Budget is a money app that runs on your own Mac. It connects to your bank and
+credit card accounts and shows you, in one place:
 
-Every transaction carries a permanent number. Money that comes in but isn't
-really income — a refund, or a friend paying you back — can be connected to the
-purchase it covers by that number. It then takes on that purchase's category and
-nets against it, instead of inflating your income and leaving the spending
-overstated.
+- how much money you have, and what you owe
+- every purchase, with search
+- where your money goes each month (food, rent, shopping…)
+- which credit card earns the most for each kind of purchase
 
-## Quick start
+Everything is kept **on your Mac**. Your bank data isn't sent to anyone
+else's servers, except Plaid, the service that talks to your banks for you.
 
-You need a Mac with [Node 20+](https://nodejs.org) and git, and a free
-[Plaid](https://dashboard.plaid.com) account. The iPhone app also needs
-Xcode 26 and an iPhone on iOS 26. Each step is covered in detail further down.
+```
+  Your banks  ──►  Plaid  ──►  Budget on your Mac  ──►  your browser / iPhone
+```
 
-**Web app**
+- **Plaid** is a company many money apps use to read bank accounts. You make a
+  free Plaid account and give Budget its keys.
+- **Your Mac** is the brain. It stores everything, so it has to be on for
+  Budget to work.
+- **Your iPhone** (optional) is a window into your Mac. It reaches your Mac
+  through a free app called Tailscale, even when you're away from home.
 
-1. `git clone https://github.com/tw-yoon/budget.git`, then run
-   `./Budget.command` in that folder. If macOS blocks it, right-click it →
-   **Open** → **Open**.
-2. The first run creates `.env.local` and stops. Sign up at
-   [dashboard.plaid.com](https://dashboard.plaid.com) and paste your client
-   ID and sandbox secret into it as `PLAID_CLIENT_ID` and `PLAID_SECRET`.
-3. Run `./Budget.command` again. It installs everything, sets up the
-   database, builds the app (a minute or two the first time) and opens it at
-   `http://localhost:3000`.
-4. For fake data, run
-   `curl -X POST http://localhost:3000/api/plaid/sandbox-seed`, wait a
-   moment, then `curl -X POST http://localhost:3000/api/plaid/sync`
-   ([Seeing data](#seeing-data)). Sandbox connects only fake test banks; real
-   banks need production access, which you apply to Plaid for.
+## Contents
 
-Day to day, double-click `Budget.command` to start it, even after a reboot,
-and run `./Budget.command --update` to update. Your data stays in files on the
-Mac.
+1. [What you need](#what-you-need)
+2. [How to use Terminal](#how-to-use-terminal)
+3. [Step 1: Install Node.js](#step-1-install-nodejs)
+4. [Step 2: Install Git](#step-2-install-git)
+5. [Step 3: Get your Plaid keys](#step-3-get-your-plaid-keys)
+6. [Step 4: Download Budget](#step-4-download-budget)
+7. [Step 5: Add your Plaid keys](#step-5-add-your-plaid-keys)
+8. [Step 6: Start Budget](#step-6-start-budget)
+9. [Step 7: Add a pretend bank](#step-7-add-a-pretend-bank)
+10. [Step 8: Open Budget on your phone or another computer](#step-8-open-budget-on-your-phone-or-another-computer-optional)
+11. [Step 9: The iPhone app](#step-9-the-iphone-app-optional)
+12. [Everyday use](#everyday-use)
+13. [Where your data is kept](#where-your-data-is-kept)
 
-**From another device** ([details](#using-budget-from-another-device))
+## What you need
 
-1. Install [Tailscale](https://tailscale.com) on the Mac and the other device,
-   signed in to the same account.
-2. In the Tailscale admin console, turn on MagicDNS and HTTPS certificates.
-3. On the Mac, run `tailscale serve --bg 3000`. It prints an address ending
-   in `.ts.net`.
-4. Open that address on the other device. It asks once for the access token,
-   which is under Budget → Settings → Remote Access.
+| What | Where to get it | Cost | Needed for |
+| --- | --- | --- | --- |
+| A Mac | — | — | Everything |
+| **Node.js**: lets the Mac run Budget | [nodejs.org](https://nodejs.org) ([Step 1](#step-1-install-nodejs)) | Free | Everything |
+| **Git**: downloads Budget and its updates | Comes with the Mac; you switch it on ([Step 2](#step-2-install-git)) | Free | Everything |
+| A **Plaid** account | [dashboard.plaid.com](https://dashboard.plaid.com) ([Step 3](#step-3-get-your-plaid-keys)) | Free to try | Everything |
+| **Tailscale**, on the Mac and on your phone | [tailscale.com/download](https://tailscale.com/download) | Free | Opening Budget away from the Mac ([Step 8](#step-8-open-budget-on-your-phone-or-another-computer-optional)) |
+| **Xcode**: Apple's app for building iPhone apps | [Mac App Store](https://apps.apple.com/app/xcode/id497799835) | Free | The iPhone app ([Step 9](#step-9-the-iphone-app-optional)) |
+| An iPhone on iOS 26, a cable, an Apple ID | — | Free Apple ID is fine | The iPhone app |
 
-**iPhone app** ([details](ios/README.md))
+Plan on about **30 minutes** for Steps 1 to 7.
 
-1. With the web app running, open `ios/BudgetPhone.xcodeproj` in Xcode.
-2. Simulator: press Run and enter `http://localhost:3000` as the server.
-3. Your own phone:
-   1. `cp ios/Config/Local.example.xcconfig ios/Config/Local.xcconfig`.
-   2. Add your Apple ID under Xcode → Settings → Accounts, and put your
-      Personal Team's ID in `Local.xcconfig` as `DEVELOPMENT_TEAM`. Do this
-      before opening the project; don't pick the team in Xcode's Signing
-      screen.
-   3. Connect the phone by cable and turn on Developer Mode (Settings →
-      Privacy & Security).
-   4. Choose the phone in Xcode and press Run. The first time, trust the
-      developer on the phone under Settings → General → VPN & Device
-      Management.
-   5. In the app's Settings → Server, enter the `.ts.net` address and the
-      access token.
-4. With a free Apple ID the app stops opening every 7 days. Run
-   `bash ios/scripts/phone.sh schedule on` once and the Mac reinstalls it over
-   Wi-Fi on its own ([details](ios/README.md#reinstall-automatically)).
+> **About real banks.** A new Plaid account comes with "sandbox" keys. They
+> connect only to *pretend* banks with *made-up* money, which is enough to see
+> everything Budget does. To connect your *real* banks, you apply to Plaid for
+> "production" access. Plaid reviews the application and charges for each bank
+> you connect. Start with pretend banks.
 
-## Before you start
+## How to use Terminal
 
-You'll need:
+Some steps say **Paste into Terminal**. Terminal is an app that comes with
+every Mac. You type (or paste) a line into it, and the Mac does it.
 
-- macOS (the launcher below is macOS-only — see [Other platforms](#other-platforms) if you're not)
-- [Node 20+](https://nodejs.org)
-- git
-- A [Plaid](https://dashboard.plaid.com) account (free to sign up)
+**To open Terminal**, either:
 
-**Read this before you spend time on setup.** Plaid sandbox keys are free and
-issued the moment you sign up — they connect to fake test banks with fake
-data, which is enough to see everything this app does. Connecting your *real*
-banks is a separate, gated step: you have to apply to Plaid for production
-access, it's reviewed per account, and it's billed per connected institution.
-Most people who try this out will only ever use sandbox, and that's fine — just
-know going in that "real bank" isn't a checkbox, it's an application.
+- press **⌘ Command + Space**, type `Terminal`, and press **Return**, or
+- open **Finder → Applications → Utilities → Terminal**.
 
-## Setup
+A window opens with a line ending in `%`. That's where you paste.
+
+**To run a command:**
+
+1. On this page, click the copy button at the top right of the grey box (or
+   select the text and press **⌘ C**).
+2. Click inside the Terminal window and press **⌘ V**.
+3. Press **Return**.
+4. Wait until a new line ending in `%` appears. That means it's finished.
+
+Paste **one grey box at a time**, in order. Leave Terminal open between steps.
+
+---
+
+## Step 1: Install Node.js
+
+1. Go to [nodejs.org](https://nodejs.org) and click the big **Download** button
+   (the **LTS** version).
+2. Open your **Downloads** folder and double-click the file that ends in
+   `.pkg`.
+3. Click **Continue** and **Agree** through the installer, enter your Mac
+   password when asked, and click **Close** at the end.
+4. **Quit Terminal (⌘ Q) and open it again**, so it notices Node.js.
+5. Paste into Terminal:
+
+   ```bash
+   node --version
+   ```
+
+✅ **You should see** a version number starting with `v20`, `v22` or higher,
+like `v22.12.0`.
+
+❌ **If you see** `zsh: command not found: node`: Node.js isn't installed yet,
+or Terminal was opened before it was. Do sub-steps 1 to 4 again, making sure
+you quit and reopen Terminal.
+
+❌ **If you see** a number lower than `v20` (like `v18.17.0`): you have an old
+Node.js. Install the new one from [nodejs.org](https://nodejs.org) over it.
+
+## Step 2: Install Git
+
+1. Paste into Terminal:
+
+   ```bash
+   git --version
+   ```
+
+✅ **You should see** something like `git version 2.39.5`. Git is ready; go to
+Step 3.
+
+🪟 **Or a window pops up** saying the `git` command requires the "command line
+developer tools". This is normal on a new Mac:
+
+1. Click **Install** (not "Get Xcode"), then **Agree**.
+2. Wait for it to finish. It can take 5 to 15 minutes.
+3. Click **Done**, then paste `git --version` again. You should now see a
+   version number.
+
+❌ **If it says** "can't install the software because it is not currently
+available": check your internet connection and try again later.
+
+## Step 3: Get your Plaid keys
+
+1. Go to [dashboard.plaid.com](https://dashboard.plaid.com) and click **Sign
+   up**. Fill in the form and confirm your email.
+2. Once you're signed in, open **Developers → Keys** (in the menu on the
+   left, or under your account at the top right).
+3. You'll see two things you need. Keep this page open for Step 5:
+   - **client_id**: a long line of letters and numbers.
+   - **Sandbox** secret: click to reveal it, then copy. Use the **Sandbox**
+     one, not "Production".
+
+## Step 4: Download Budget
+
+This puts Budget in a folder called `budget` inside your **Documents** folder.
+
+1. Paste into Terminal:
+
+   ```bash
+   cd ~/Documents
+   ```
+
+   ✅ **You should see** nothing new except a fresh line ending in `%`.
+   That's correct: it just moved Terminal into your Documents folder.
+
+2. Paste into Terminal:
+
+   ```bash
+   git clone https://github.com/tw-yoon/budget.git
+   ```
+
+   ✅ **You should see** `Cloning into 'budget'...` and a few lines ending in
+   `done.`
+
+   ❌ **If you see** `fatal: destination path 'budget' already exists`: you
+   already downloaded it. Skip to sub-step 3.
+
+   ❌ **If you see** `Could not resolve host`: you're offline. Connect to the
+   internet and paste it again.
+
+3. Paste into Terminal:
+
+   ```bash
+   cd ~/Documents/budget
+   ```
+
+   ✅ **You should see** the line before `%` now ends in `budget`.
+
+## Step 5: Add your Plaid keys
+
+1. Paste into Terminal:
+
+   ```bash
+   ./Budget.command
+   ```
+
+   ✅ **You should see:**
+
+   ```
+   Created .env.local and generated your encryption key.
+
+   One thing left — Budget needs Plaid credentials to fetch bank data:
+   ```
+
+   …and a few more lines. This is expected. Budget made its settings file and
+   now needs your Plaid keys.
+
+   ❌ **If you see** `no such file or directory: ./Budget.command`: Terminal is
+   in the wrong folder. Paste `cd ~/Documents/budget` and try again.
+
+2. Paste into Terminal to open the settings file in TextEdit:
+
+   ```bash
+   open -e .env.local
+   ```
+
+   ✅ **You should see** a TextEdit window with lines of text.
+
+3. In TextEdit, find these two lines:
+
+   ```
+   PLAID_CLIENT_ID=
+   PLAID_SECRET=
+   ```
+
+   Click right after the first `=` and paste your **client_id**. Click right
+   after the second `=` and paste your **Sandbox secret**. When you're done
+   they look like this, with your own keys:
+
+   ```
+   PLAID_CLIENT_ID=6501a2b3c4d5e6f7a8b9c0d1
+   PLAID_SECRET=0123456789abcdef0123456789abcd
+   ```
+
+   - No spaces, no quote marks, nothing else on those lines.
+   - Don't change any other line.
+
+4. Press **⌘ S** to save, then close TextEdit.
+
+## Step 6: Start Budget
+
+1. Paste into Terminal:
+
+   ```bash
+   ./Budget.command
+   ```
+
+2. Wait. **The first time takes 3 to 5 minutes**, and lots of text scrolls by.
+   That's normal.
+
+✅ **You should see**, at the end:
+
+```
+Budget v0.9.1 is ready at http://localhost:3000
+```
+
+(Your version number may be different.) Your web browser opens Budget by
+itself. It's empty for now; Step 7 fills it.
+
+❌ **If you see** `Build failed` or `Server didn't start`: paste
+`open -e .server.log` to open the error log. The problem is usually described
+near the bottom. Make sure Step 1 worked, then paste `./Budget.command` again.
+
+❌ **If you see** `Database setup failed`: paste `./Budget.command` again. If
+it fails the same way, open the log with `open -e .server.log`.
+
+🪟 **If macOS says** "Budget.command can't be opened because it is from an
+unidentified developer" (this can happen when you double-click it later): open
+your `budget` folder in Finder, **right-click** `Budget.command`, choose
+**Open**, then **Open** again. You only do this once.
+
+## Step 7: Add a pretend bank
+
+A new Budget has no banks. Add Plaid's pretend bank to see how it all looks.
+
+1. Paste into Terminal:
+
+   ```bash
+   curl -X POST http://localhost:3000/api/plaid/sandbox-seed
+   ```
+
+   ✅ **You should see** one long line that includes
+   `"institution":"First Platypus Bank (Sandbox)"`. The pretend bank and its
+   accounts are added.
+
+   ❌ **If you see** `INVALID_API_KEYS` or `invalid client_id or secret`: a Plaid
+   key is wrong. Do Step 5 again (sub-steps 2 to 4), checking you used the
+   **Sandbox** secret. Then restart Budget so it reads the new keys:
+
+   ```bash
+   lsof -ti:3000 | xargs kill; ./Budget.command
+   ```
+
+   …and paste the `curl` line above again.
+
+   ❌ **If you see** `Failed to connect to localhost port 3000`: Budget isn't
+   running. Paste `./Budget.command`, wait for "ready", then try again.
+
+2. **Wait one minute.** Plaid needs a moment to make the pretend purchases.
+3. Paste into Terminal:
+
+   ```bash
+   curl -X POST http://localhost:3000/api/plaid/sync
+   ```
+
+   ✅ **You should see** a line starting with `{"summary":`.
+
+4. Go back to Budget in your browser and refresh the page (**⌘ R**).
+
+✅ **You should see** accounts on the Accounts page, and a few dozen purchases
+under Transactions.
+
+❌ **If there are accounts but no purchases**: Plaid wasn't finished yet. Wait
+another minute and paste the `sync` line again. Doing it more than once never
+adds anything twice.
+
+**That's it — Budget is set up.** Steps 8 and 9 are optional.
+
+## Step 8: Open Budget on your phone or another computer (optional)
+
+Budget only answers the Mac it runs on, so other devices can't open it, even
+on your home Wi-Fi. **Tailscale** connects your own devices privately and
+securely, from anywhere.
+
+1. **Install Tailscale on the Mac:** go to
+   [tailscale.com/download](https://tailscale.com/download), choose **macOS**,
+   and install it. Open it, then sign in (with Google, Apple, or another
+   account).
+   ✅ A Tailscale icon appears in the menu bar at the top right of the screen.
+2. **Install Tailscale on the phone:** on the iPhone, open the **App Store**,
+   search **Tailscale**, install it, and sign in with the **same** account as
+   on the Mac. Allow the VPN setup when asked.
+3. **Turn on two settings:** on the Mac, go to
+   [login.tailscale.com/admin/dns](https://login.tailscale.com/admin/dns).
+   Make sure **MagicDNS** is on, then scroll down and click **Enable HTTPS**.
+4. **Give Budget an address:** paste into Terminal:
+
+   ```bash
+   /Applications/Tailscale.app/Contents/MacOS/Tailscale serve --bg 3000
+   ```
+
+   ✅ **You should see** an address like
+   `https://your-mac.tail1234.ts.net`. **Copy it and keep it**; you'll use it
+   on every device. It keeps working after restarts, so you only do this
+   once.
+
+   🪟 **If instead it prints a link and says Serve isn't enabled**: open the
+   link, click to allow it, then paste the command again.
+
+   ❌ **If you see** `no such file or directory`: Tailscale isn't in your
+   Applications folder. Install it (sub-step 1) and try again.
+
+5. **Copy your access token:** in Budget on your Mac, open **Settings →
+   Remote Access** and copy the token. This is the password other devices use.
+6. **Open Budget on the other device:** make sure Tailscale is on there, open
+   the web browser, and go to your `https://…ts.net` address. Paste the access
+   token when asked. It only asks once per device.
+
+❌ **If the page won't load on the other device**: check that Tailscale is
+switched on there, and that Budget is running on the Mac.
+
+> **Reset Token** (under Settings → Remote Access) makes a new token. Every
+> other device then needs the new one. Use it if you think someone else has
+> your token.
+
+## Step 9: The iPhone app (optional)
+
+The iPhone app isn't in the App Store. You put it on your phone yourself with
+Xcode, using your own free Apple ID. Do Step 8 first, since the app reaches
+your Mac through Tailscale.
+
+**Follow the steps in [ios/README.md](ios/README.md).**
+
+---
+
+## Everyday use
+
+| To… | Do this |
+| --- | --- |
+| **Start Budget** (also after restarting the Mac) | In Finder, open **Documents → budget** and double-click **Budget.command** |
+| **Open Budget** on the Mac | Go to `http://localhost:3000` in your browser |
+| **Stop Budget** | Paste `lsof -ti:3000 \| xargs kill` into Terminal. You don't have to: leaving it on is fine and uses little memory. |
+| **Update Budget** | Paste `cd ~/Documents/budget && ./Budget.command --update` into Terminal |
+
+**When there's an update**, starting Budget prints something like:
+
+```
+v0.10.0 available (you have v0.9.1) — run ./Budget.command --update
+```
+
+[CHANGELOG.md](CHANGELOG.md) says what changed in each version. Your version
+is shown at the bottom of Budget's sidebar.
+
+**Stopping Budget never loses data.** Everything stays on your Mac and is
+there next time.
+
+### If an update goes wrong
+
+❌ **If you see** `You have uncommitted changes, so the update stopped`: some
+files in the `budget` folder were changed. Paste these one at a time:
 
 ```bash
-git clone https://github.com/tw-yoon/budget.git
-cd budget
-./Budget.command
+git stash
 ```
-
-The first run writes `.env.local` (generating an encryption key for you) and
-then stops, because it has nothing to connect to yet:
-
-1. Sign up at [dashboard.plaid.com](https://dashboard.plaid.com) — sandbox keys are free and instant.
-2. Copy your `client_id` and sandbox `secret`.
-3. Paste them into `.env.local` as `PLAID_CLIENT_ID` and `PLAID_SECRET`.
-4. Run `./Budget.command` again. This time it installs dependencies, sets up
-   the database, builds the app (~1–2 min the first time), starts it, and
-   opens your browser.
-
-> First time you double-click `Budget.command` (or the first time you run it
-> at all), macOS may warn it's from an unidentified developer. Right-click the
-> file → **Open** → **Open** to allow it (only needed once).
-
-## Seeing data
-
-A fresh sandbox account has no accounts or transactions, so the app starts
-empty. Populate it with fake data:
-
-```bash
-curl -X POST http://localhost:3000/api/plaid/sandbox-seed
-```
-
-(If you set `BUDGET_PORT`, use that port instead of 3000 — here and below.)
-
-This mints a Plaid sandbox item (a fake bank called "First Platypus Bank")
-and syncs it in. It only works while `PLAID_ENV=sandbox`, which is the
-default.
-
-Accounts show up immediately. Transactions usually don't — Plaid is still
-generating them while the seed's own sync runs, so that first pass reports
-`"added":0`. Pull them with a second call once it has caught up:
-
-```bash
-curl -X POST http://localhost:3000/api/plaid/sync
-```
-
-That brings in a few dozen transactions across the sandbox accounts. It's
-idempotent, so running it again when nothing is new adds nothing.
-
-## Turn it OFF
-
-```bash
-lsof -ti:3000 | xargs kill
-```
-
-(Or whichever port you set `BUDGET_PORT` to.)
-
-(Leaving it running is fine too — it's a local server and uses little memory.)
-
-## Updating
-
-Every normal launch checks in the background for a newer published version and
-tells you if one exists:
-
-```
-v0.5.0 available (you have v0.4.0) — run ./Budget.command --update
-```
-
-[CHANGELOG.md](CHANGELOG.md) says what each version changed. The version you
-are running is shown at the bottom of the sidebar, and by
-`./Budget.command --check-only`. (A release published without a version bump
-is reported as a count of commits instead.)
-
-To apply it:
 
 ```bash
 ./Budget.command --update
 ```
 
-This fast-forwards your clone to the latest commit, applies any new database
-migrations, rebuilds, and restarts the server. `--update` refuses to run if:
-
-- this folder isn't a git clone (including being a subfolder of a larger one)
-- the clone has no `origin` remote to update from
-- this folder is a linked git worktree rather than the main checkout — run
-  `--update` from the main checkout instead
-- you have uncommitted local changes (`git stash` them first)
-
-It can also fail partway through if history has diverged because you have
-commits of your own — that's reported separately, after the pull is attempted.
-
-To check setup and update status without building or starting the app:
-
 ```bash
-./Budget.command --check-only
+git stash pop
 ```
 
-`--check-only` and `--update` can't be combined — one only reports, the other
-changes things, and combining them is rejected outright.
+❌ **If you see** `Could not update`: open the log with `open -e .server.log`
+to see why.
 
-`--check-only` isn't perfectly side-effect-free, though. Setup runs before the
-flag is consulted, so a first run still writes `.env` and `.env.local` (and
-generates your encryption key); and if dependencies are installed but the
-database hasn't been created yet, it creates and migrates that too. What it
-never does is build or start the app.
+### Other problems
 
-## Where your data lives
+| What you see | What to do |
+| --- | --- |
+| A bank shows an error in Budget | Go to **Settings → Connections** and click **Reconnect** next to that bank. |
+| Budget won't open after a restart | It isn't running. Double-click **Budget.command** (see the table above). |
+| The window closes too fast to read an error | Paste `cd ~/Documents/budget && open -e .server.log`. The error is near the bottom. |
+| The log mentions port 3000 being in use | Another app is using that spot. Paste `cd ~/Documents/budget && BUDGET_PORT=3001 ./Budget.command`, then use `3001` instead of `3000` everywhere. |
 
-- `prisma/dev.db` — the SQLite database: accounts, transactions, balances.
-- `data/tokens.enc` — your Plaid access tokens, encrypted at rest.
-- `data/access-token` — the access token other devices need (see Settings →
-  Remote Access). Delete it to make a new one.
-- `prisma/backups/` — a daily snapshot of `dev.db`, kept for 30 days, written
-  automatically each time you launch. `--update` also writes its own
-  `pre-update-*.db` snapshot right before running migrations, kept on the
-  same 30-day schedule.
+## Where your data is kept
 
-None of this is tracked in git, and none of it leaves your machine except to
-talk to Plaid, which you connected yourself — there is no other server this
-app reports back to.
+All inside **Documents → budget**, on your Mac only:
 
-## Other platforms
+- `prisma/dev.db`: your accounts, purchases and balances.
+- `prisma/backups/`: a copy of that file saved each day you start Budget, kept
+  for 30 days. Updating also saves a copy first.
+- `data/tokens.enc`: the keys Plaid gives Budget to read your banks, locked
+  with encryption.
+- `data/access-token`: the access token for your other devices (Step 8).
+  Delete it to make a new one.
+
+None of this is uploaded anywhere. Budget doesn't report back to any server;
+it only talks to Plaid, which you connected yourself.
+
+---
+
+## For developers
+
+The rest of this page is for people who want to change Budget's code.
+
+### Other platforms
 
 `Budget.command` is macOS-only. Elsewhere, the underlying app is a normal
 Next.js project:
@@ -225,70 +451,61 @@ your Plaid keys, generate a `TOKEN_STORE_KEY` (`openssl rand -hex 32`), and run
 `npx prisma migrate deploy` before the first start. On Windows, do this inside
 WSL — there's no native-Windows path.
 
-## Good to know
+### The launcher in detail
 
-- **Your data is safe across on/off.** Everything lives in `dev.db` on disk.
-  Stopping the server never touches it — next start, it's all still there.
-- **After a reboot**, just double-click `Budget.command` again.
-- **Server logs** go to `.server.log` in this folder — check it if a launch
-  fails silently (e.g. when double-clicked, where the window may close before
-  you can read the error).
-- **Port in use?** Set `BUDGET_PORT` before launching (e.g.
-  `BUDGET_PORT=3001 ./Budget.command`) to run on something other than 3000.
+`./Budget.command --update` fast-forwards your clone to the latest commit,
+applies any new database migrations, rebuilds, and restarts the server. It
+refuses to run if:
 
-## Using Budget from another device
+- this folder isn't a git clone (including being a subfolder of a larger one)
+- the clone has no `origin` remote to update from
+- this folder is a linked git worktree rather than the main checkout — run
+  `--update` from the main checkout instead
+- you have uncommitted local changes (`git stash` them first)
 
-Budget listens on the Mac only, so devices on your Wi-Fi cannot reach it,
-even at home. Reach it through [Tailscale](https://tailscale.com) instead:
+It can also fail partway through if history has diverged because you have
+commits of your own — that's reported separately, after the pull is attempted.
+A release published without a version bump is reported as a count of commits
+instead of a version.
 
-1. Install Tailscale on the Mac and on the other device, and sign in to the
-   same account on both.
-2. In the Tailscale admin console, enable MagicDNS and HTTPS certificates
-   (DNS page), and allow Serve when the CLI prints its link.
-3. On the Mac, run `tailscale serve --bg 3000` (or your `BUDGET_PORT`). It
-   prints `https://<mac-name>.<tailnet>.ts.net` and keeps running across
-   restarts. The CLI is at
-   `/Applications/Tailscale.app/Contents/MacOS/Tailscale`.
-4. On the other device, open that address (no port).
-5. It asks for the access token once. On the Mac, open Budget → Settings →
-   Remote Access, copy the token, and paste it in.
+`./Budget.command --check-only` reports setup and update status without
+building or starting the app. It can't be combined with `--update`. It isn't
+perfectly side-effect-free: setup runs before the flag is consulted, so a
+first run still writes `.env` and `.env.local` (and generates your encryption
+key), and if dependencies are installed but the database hasn't been created
+yet, it creates and migrates that too.
 
-Reset Token under Settings → Remote Access signs out every other device until
-it gets the new token. The Mac's own browser at `localhost` needs no token.
+Server logs go to `.server.log`. Set `BUDGET_PORT` to run on a port other than
+3000.
 
-## iPhone app
-
-`ios/` holds a native iPhone app for the same server. There is no App Store
-build: you build it with Xcode, on your own Apple ID. Setup, from the
-simulator to your own phone, is in [ios/README.md](ios/README.md). It reaches
-the Mac through Tailscale, as above, and needs the access token.
-
-## Two ways to run
+### Two ways to run
 
 | Command | When to use |
 | --- | --- |
 | `Budget.command` | **Everyday use** — checks for updates, rebuilds when code changed, runs the built app in the background. |
 | `npm run dev` | While making changes — auto-reloads on edits (a little slower). Listens on the Mac only, like the built app. |
 
-## Tests
+### Tests
 
 ```bash
 npm test
 ```
 
 No test framework is installed. `scripts/test-scrub.sh` checks that no personal
-data or absolute home path is about to be published, and
+data or absolute home path is about to be published,
 `scripts/test-launcher.sh` drives `Budget.command` against throwaway clones to
-cover setup, updating, and the cases where it must refuse — both plain Bash.
-The `scripts/test-*.mjs` suites cover pure logic — refund linking, the wording
-of a failed sync, category renaming, the version and changelog, the analytics detail mode, payment
-splits, reward earnings and the best-card rates, Venmo statement parsing, Zelle
-detection, subscription costs, the shared UI-state store — on Node's built-in
-test runner, importing the TypeScript directly (Node 22.18+ strips the types,
-and `scripts/resolve-alias.mjs` resolves the app's `@/` imports), so they need
-no build step and no dependency. Run them before sending a change.
+cover setup, updating, and the cases where it must refuse, and
+`scripts/test-phone-reinstall.sh` covers `ios/scripts/phone.sh` — all plain
+Bash. The `scripts/test-*.mjs` suites cover pure logic — refund linking, the
+wording of a failed sync, category renaming, the version and changelog, the
+analytics detail mode, payment splits, reward earnings and the best-card
+rates, Venmo statement parsing, Zelle detection, subscription costs, the
+shared UI-state store — on Node's built-in test runner, importing the
+TypeScript directly (Node 22.18+ strips the types, and
+`scripts/resolve-alias.mjs` resolves the app's `@/` imports), so they need no
+build step and no dependency. Run them before sending a change.
 
-## Pages
+### Pages
 
 - `/` — home
 - `/accounts` — balances, net worth, due dates
@@ -304,7 +521,13 @@ no build step and no dependency. Run them before sending a change.
 - `/settings/connections` — connect/disconnect banks, reconnect, manage debit cards
 - `/settings/analytics` — how much detail the Analytics page shows
 
-## Configuration
+Every transaction carries a permanent number. Money that comes in but isn't
+really income — a refund, or a friend paying you back — can be connected to
+the purchase it covers by that number. It then takes on that purchase's
+category and nets against it, instead of inflating your income and leaving the
+spending overstated.
+
+### Configuration
 
 Settings live in **`.env.local`** (kept on your machine, never committed):
 
@@ -318,7 +541,7 @@ Bank access tokens are stored **encrypted** in `data/tokens.enc`, never in plain
 or in git. See `.env.example` for optional overrides (`TOKEN_STORE_PATH`,
 `VENMO_STATEMENT_DIR`).
 
-## If you change the database schema
+### If you change the database schema
 
 After editing `prisma/schema.prisma`:
 

@@ -9,6 +9,16 @@ middle number; one carrying fixes and small changes moves the last.
 Still `0.x`: the database schema changes between releases (migrations run on
 update), so nothing here is a stability promise.
 
+## Unreleased
+
+- The setup guides (this README and `ios/README.md`) are rewritten as plain
+  step-by-step instructions: where to download each app, what to paste into
+  Terminal, what you should see, and how to fix common errors.
+- The Mac can reinstall the iPhone app on its own over Wi-Fi before the free
+  Apple ID's 7 days run out: `bash ios/scripts/phone.sh schedule on`.
+- iPhone app: the bottom of every page now scrolls clear of the tab bar, and
+  the ledger's last row clears the search field, at every text size.
+
 ## 0.9.1 — 2026-10-03
 
 - The iPhone app shows the release's version (it said 0.1.0), and from now on
