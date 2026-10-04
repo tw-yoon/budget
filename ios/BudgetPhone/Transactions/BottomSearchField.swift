@@ -13,6 +13,9 @@ import SwiftUI
 struct BottomSearchField: View {
   @Binding var text: String
   var isFocused: FocusState<Bool>.Binding
+  /// The field's own height, before scaling. It grows past `minHeight` at
+  /// large text sizes; the ledger reads it to keep its last row clear.
+  @Binding var height: CGFloat
 
   /// Absent in previews.
   @Environment(TabBarState.self) private var tabBar: TabBarState?
@@ -22,6 +25,15 @@ struct BottomSearchField: View {
   /// The field's scale: the bar's, or full size over the keyboard.
   nonisolated static func scale(progress: CGFloat, showsLabels: Bool, keyboardUp: Bool) -> CGFloat {
     keyboardUp ? 1 : AppTabBar.scale(progress: progress, showsLabels: showsLabels)
+  }
+
+  /// The field's height at default text sizes.
+  nonisolated static let minHeight: CGFloat = 48
+
+  /// Room a list leaves under its last row, on top of the bar's: the field
+  /// plus the gap above it.
+  nonisolated static func room(fieldHeight: CGFloat) -> CGFloat {
+    fieldHeight + AppTabBar.Metrics.clearance
   }
 
   /// Before scaling, from the bar's bottom to the field's bottom edge: the
@@ -35,6 +47,7 @@ struct BottomSearchField: View {
   var body: some View {
     let progress = tabBar?.progress ?? 0
     field
+      .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height = $0 }
       .padding(.bottom, Self.lift(showsLabels: showsTabLabels, keyboardUp: keyboardUp))
       .frame(maxHeight: .infinity, alignment: .bottom)
       // Anchored at the bar's bottom centre, as AppTabBar scales.
@@ -61,7 +74,7 @@ struct BottomSearchField: View {
       }
     }
     .padding(.horizontal, 16)
-    .frame(minHeight: 48)
+    .frame(minHeight: Self.minHeight)
     .glassEffect(.regular.interactive(), in: .capsule)
     .contentShape(.capsule)
     .onTapGesture { isFocused.wrappedValue = true }

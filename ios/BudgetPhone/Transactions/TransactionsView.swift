@@ -22,6 +22,8 @@ struct TransactionsView: View {
   @Environment(TabBarState.self) private var tabBar: TabBarState?
   /// The screen's width, for SwitcherBar.
   @State private var width: CGFloat = 0
+  /// The search field's height, measured; it grows at large text sizes.
+  @State private var searchHeight = BottomSearchField.minHeight
 
   @State private var ledger = TransactionsStore(client: Self.client)
   @State private var venmo = P2PStore(source: .venmo, client: Self.client)
@@ -42,7 +44,7 @@ struct TransactionsView: View {
       ZStack {
         Group {
           switch segment {
-          case .ledger: LedgerView(store: ledger, catalog: catalog, proMode: proMode)
+          case .ledger: LedgerView(store: ledger, catalog: catalog, proMode: proMode, searchHeight: searchHeight)
           case .venmo: P2PCategorizerView(store: venmo, ledger: ledger)
           case .zelle: P2PCategorizerView(store: zelle, ledger: ledger)
           }
@@ -58,7 +60,7 @@ struct TransactionsView: View {
       }
       // The ledger's search, above the tab bar; it fades out on Venmo and
       // Zelle rather than popping.
-      .overlay(alignment: .bottom) { LedgerSearchField(store: ledger, shown: segment == .ledger) }
+      .overlay(alignment: .bottom) { LedgerSearchField(store: ledger, shown: segment == .ledger, height: $searchHeight) }
       .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
       .navigationTitle("Transactions")
       .navigationBarTitleDisplayMode(.inline)

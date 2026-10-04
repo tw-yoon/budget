@@ -81,4 +81,12 @@ struct BottomSearchFieldTests {
     #expect(BottomSearchField.scale(progress: 1, showsLabels: false, keyboardUp: true) == 1)
     #expect(BottomSearchField.lift(showsLabels: false, keyboardUp: true) == m.clearance)
   }
+
+  /// The room a list leaves under its last row follows the field's measured
+  /// height, which grows at large text sizes.
+  @Test func roomFollowsTheFieldsHeight() {
+    let m = AppTabBar.Metrics.self
+    #expect(BottomSearchField.room(fieldHeight: BottomSearchField.minHeight) == 56)
+    #expect(BottomSearchField.room(fieldHeight: 80) == 80 + m.clearance)
+  }
 }

@@ -8,12 +8,14 @@ import SwiftUI
 struct LedgerSearchField: View {
   let store: TransactionsStore
   let shown: Bool
+  /// The field's height, for the ledger's room under its last row.
+  @Binding var height: CGFloat
 
   @State private var text = ""
   @FocusState private var focused: Bool
 
   var body: some View {
-    BottomSearchField(text: $text, isFocused: $focused)
+    BottomSearchField(text: $text, isFocused: $focused, height: $height)
       .opacity(shown ? 1 : 0)
       .allowsHitTesting(shown)
       .accessibilityHidden(!shown)

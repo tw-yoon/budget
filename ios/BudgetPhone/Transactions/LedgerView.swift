@@ -8,6 +8,8 @@ struct LedgerView: View {
   let store: TransactionsStore
   let catalog: CategoryCatalog
   let proMode: ProMode
+  /// LedgerSearchField's measured height, so the last row scrolls clear of it.
+  var searchHeight = BottomSearchField.minHeight
 
   @AppStorage(ServerAddress.storageKey) private var server = ""
   /// Filters and sort, kept per device (search is not kept).
@@ -77,7 +79,7 @@ struct LedgerView: View {
         }
       }
     }
-    .tabBarScrollTracking(extraBottom: Self.searchRoom)
+    .tabBarScrollTracking(extraBottom: BottomSearchField.room(fieldHeight: searchHeight))
     .scrollDismissesKeyboard(.immediately)
     .refreshable { await store.sync() }
     .modifier(CompactRowsSync(compact: $compactRows))
@@ -97,9 +99,6 @@ struct LedgerView: View {
       LedgerRowCell(row: row, store: store, compact: compact, visible: visible)
     }
   }
-
-  /// The search field's height plus its gap, so the last row scrolls clear of it.
-  private static let searchRoom: CGFloat = 56
 
   @ViewBuilder private var pagingFooter: some View {
     if store.loadMoreFailed {
