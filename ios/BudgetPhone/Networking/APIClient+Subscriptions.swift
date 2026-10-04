@@ -4,8 +4,10 @@ extension APIClient {
   /// GET /api/subscriptions — the list (active first, then by name) and the
   /// monthly total of the active ones.
   func subscriptions() async throws(APIError) -> SubscriptionsResponse {
-    try decode(await send("GET", "api/subscriptions", timeout: 15))
+    try await get("api/subscriptions", timeout: 15, saveAs: "subscriptions")
   }
+
+  func savedSubscriptions() -> SubscriptionsResponse? { saved("subscriptions", "api/subscriptions") }
 
   /// POST /api/subscriptions — add one manually. A 400 carries the reason.
   func addSubscription(_ subscription: NewSubscription) async throws(APIError) {

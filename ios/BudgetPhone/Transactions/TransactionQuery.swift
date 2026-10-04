@@ -20,6 +20,9 @@ struct TransactionQuery: Equatable, Sendable, Codable {
     accountId == nil && hideInternal && !showLinked && sort == .date && !ascending
   }
 
+  /// True when the search field sends a search (queryItems trims it).
+  var hasSearch: Bool { !search.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+
   /// The web's URLSearchParams, in its order. Search and account are left
   /// out when empty, as the web does.
   func queryItems(page: Int) -> [URLQueryItem] {
@@ -31,8 +34,9 @@ struct TransactionQuery: Equatable, Sendable, Codable {
       URLQueryItem(name: "sort", value: sort.rawValue),
       URLQueryItem(name: "dir", value: ascending ? "asc" : "desc"),
     ]
-    let trimmed = search.trimmingCharacters(in: .whitespacesAndNewlines)
-    if !trimmed.isEmpty { items.append(URLQueryItem(name: "search", value: trimmed)) }
+    if hasSearch {
+      items.append(URLQueryItem(name: "search", value: search.trimmingCharacters(in: .whitespacesAndNewlines)))
+    }
     if let accountId, !accountId.isEmpty { items.append(URLQueryItem(name: "accountId", value: accountId)) }
     return items
   }

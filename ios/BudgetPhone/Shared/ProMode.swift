@@ -10,8 +10,8 @@ import Observation
 @MainActor
 @Observable
 final class ProMode {
-  static let key = "pro-mode"
-  static let legacyKey = "analytics-mode"
+  nonisolated static let key = "pro-mode"
+  nonisolated static let legacyKey = "analytics-mode"
 
   private(set) var isPro = false
   /// True after the first successful read or a choice — useProMode's

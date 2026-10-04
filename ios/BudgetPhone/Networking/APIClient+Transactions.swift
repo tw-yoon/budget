@@ -2,7 +2,16 @@ import Foundation
 
 extension APIClient {
   func transactions(_ query: TransactionQuery, page: Int) async throws(APIError) -> TransactionsResponse {
-    try decode(await send("GET", "api/transactions", query: query.queryItems(page: page), timeout: 15))
+    // Only the first page of an unsearched ledger is saved: it is what the
+    // screen opens with. Later pages and searches are never shown at launch.
+    try await get(
+      "api/transactions", query: query.queryItems(page: page), timeout: 15,
+      saveAs: page == 1 && !query.hasSearch ? "ledger" : nil)
+  }
+
+  /// The first page last saved for exactly this filter set; nil for a search.
+  func savedTransactions(_ query: TransactionQuery) -> TransactionsResponse? {
+    query.hasSearch ? nil : saved("ledger", "api/transactions", query: query.queryItems(page: 1))
   }
 
   /// Pulls new transactions from Plaid for every linked bank. A bank that
@@ -39,8 +48,19 @@ extension APIClient {
 
   /// GET /api/ui-state?key= → `{ value }`.
   func uiState(_ key: String) async throws(APIError) -> UIStateValue {
-    try decode(
-      await send("GET", "api/ui-state", query: [URLQueryItem(name: "key", value: key)], timeout: 15))
+    // Only the Pro-mode keys are saved: they decide which screens open.
+    try await get(
+      "api/ui-state", query: [URLQueryItem(name: "key", value: key)], timeout: 15,
+      saveAs: Self.savesUIState(key) ? "ui-state-\(key)" : nil)
+  }
+
+  func savedUIState(_ key: String) -> UIStateValue? {
+    Self.savesUIState(key)
+      ? saved("ui-state-\(key)", "api/ui-state", query: [URLQueryItem(name: "key", value: key)]) : nil
+  }
+
+  private static func savesUIState(_ key: String) -> Bool {
+    key == ProMode.key || key == ProMode.legacyKey
   }
 }
 

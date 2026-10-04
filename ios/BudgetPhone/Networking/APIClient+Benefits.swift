@@ -7,8 +7,10 @@ import Foundation
 extension APIClient {
   /// GET /api/user-cards — the cards Benefits shows, in the user's order.
   func userCards() async throws(APIError) -> UserCardsResponse {
-    try decode(await send("GET", "api/user-cards", timeout: 15))
+    try await get("api/user-cards", timeout: 15, saveAs: "cards")
   }
+
+  func savedUserCards() -> UserCardsResponse? { saved("cards", "api/user-cards") }
 
   /// A card's `artUrl` is a server path ("/api/card-art/x.png"); this is the
   /// full URL for it.

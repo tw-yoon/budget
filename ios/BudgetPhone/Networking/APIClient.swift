@@ -46,8 +46,11 @@ struct APIClient: Sendable {
   }
 
   func accounts() async throws(APIError) -> AccountsResponse {
-    try decode(await send("GET", "api/accounts", timeout: 15))
+    try await get("api/accounts", timeout: 15, saveAs: "accounts")
   }
+
+  /// The accounts last saved, for the next launch to show before the server answers.
+  func savedAccounts() -> AccountsResponse? { saved("accounts", "api/accounts") }
 
   /// Calls Plaid once per linked bank, hence the long timeout. A bank that
   /// fails comes back in `errors`; the call itself still succeeds.
