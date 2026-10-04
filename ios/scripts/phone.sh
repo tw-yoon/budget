@@ -121,6 +121,36 @@ cmd_install() {
   log "install: ok"
 }
 
+# What the schedule runs. Reinstalls once the last install is 2 or more days
+# old, which leaves about 5 days to retry before the 7-day signature runs out.
+cmd_auto() {
+  local last=""
+  [ -f "$STATE_DIR/last-success" ] && last=$(cat "$STATE_DIR/last-success")
+  if [ -n "$last" ] && [ $((NOW - last)) -lt $((2 * DAY)) ]; then
+    return 0
+  fi
+  log "auto: reinstalling"
+  cmd_install && return 0
+  if [ -z "$last" ] || [ $((NOW - last)) -ge $((5 * DAY)) ]; then
+    notify_failed "$last"
+  fi
+  return 1
+}
+
+# A macOS notification that the app is close to expiring. $1 is the time of
+# the last good install, or empty if there never was one.
+notify_failed() {
+  local when="soon" left
+  if [ -n "$1" ]; then
+    left=$(( ($1 + 7 * DAY - NOW) / DAY ))
+    if [ "$left" -eq 1 ]; then when="in about 1 day"
+    elif [ "$left" -gt 1 ]; then when="in about $left days"
+    fi
+  fi
+  log "auto: notified ($when)"
+  "$OSASCRIPT" -e "display notification \"Unlock your iPhone on home Wi-Fi with the Mac awake. It stops opening $when.\" with title \"Budget: couldn't update the iPhone app\"" >>"$LOG" 2>&1
+}
+
 usage() {
   echo "usage: bash scripts/phone.sh install | schedule on | schedule off" >&2
   return 2
@@ -128,5 +158,6 @@ usage() {
 
 case "${1:-} ${2:-}" in
   "install ") cmd_install ;;
+  "auto ") cmd_auto ;;
   *) usage ;;
 esac

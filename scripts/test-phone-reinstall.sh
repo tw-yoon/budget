@@ -161,6 +161,65 @@ phone bogus
 assert_eq "$RC" 2 "unknown command exits 2"
 assert_has "$OUT" "usage" "unknown command prints usage"
 
+echo "phone.sh auto"
+
+new_case
+echo $((NOW - DAY)) >"$CASE/state/last-success"
+phone auto
+assert_eq "$RC" 0 "under 2 days exits cleanly"
+assert_lacks "$CALLS" "xcodebuild" "under 2 days doesn't rebuild"
+
+new_case
+echo $((NOW - 2 * DAY)) >"$CASE/state/last-success"
+phone auto
+assert_eq "$RC" 0 "at 2 days reinstalls"
+assert_has "$CALLS" "xcodebuild" "at 2 days rebuilds"
+assert_eq "$(cat "$CASE/state/last-success")" "$NOW" "at 2 days records the new install"
+
+new_case
+phone auto
+assert_has "$CALLS" "xcodebuild" "never installed: rebuilds"
+
+echo "expiry alert"
+
+new_case
+echo $((NOW - 5 * DAY)) >"$CASE/state/last-success"
+export STUB_INSTALL_RC=1
+phone auto
+assert_fails "failed run fails"
+assert_has "$CALLS" "osascript -e display notification" "failure at 5 days notifies"
+assert_has "$CALLS" "with title \"Budget: couldn't update the iPhone app\"" "notification title"
+assert_has "$CALLS" "It stops opening in about 2 days." "5 days old: about 2 days left"
+assert_eq "$(cat "$CASE/state/last-success")" "$((NOW - 5 * DAY))" "failure keeps the old time"
+
+new_case
+echo $((NOW - 6 * DAY)) >"$CASE/state/last-success"
+export STUB_INSTALL_RC=1
+phone auto
+assert_has "$CALLS" "It stops opening in about 1 day." "6 days old: about 1 day left"
+
+new_case
+echo $((NOW - 6 * DAY - DAY / 2)) >"$CASE/state/last-success"
+export STUB_INSTALL_RC=1
+phone auto
+assert_has "$CALLS" "It stops opening soon." "under a day left: soon"
+
+new_case
+export STUB_INSTALL_RC=1
+phone auto
+assert_has "$CALLS" "It stops opening soon." "never installed and failing: soon"
+
+new_case
+echo $((NOW - 3 * DAY)) >"$CASE/state/last-success"
+export STUB_INSTALL_RC=1
+phone auto
+assert_lacks "$CALLS" "osascript" "failure under 5 days stays quiet"
+
+new_case
+echo $((NOW - 6 * DAY)) >"$CASE/state/last-success"
+phone auto
+assert_lacks "$CALLS" "osascript" "success never notifies"
+
 # Summary
 echo
 echo "$PASS passed, $FAIL failed"
