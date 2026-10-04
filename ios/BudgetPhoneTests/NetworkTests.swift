@@ -378,6 +378,10 @@ extension StubbedNetworkTests.NetworkTests {
     let store = AccountsStore { c }
     await store.load()
     #expect(store.data == nil)
-    #expect(store.error != nil)
+    guard case .unreachable = store.error else {
+      Issue.record("expected .unreachable, got \(String(describing: store.error))")
+      return
+    }
+    #expect(store.banner == nil)
   }
 }

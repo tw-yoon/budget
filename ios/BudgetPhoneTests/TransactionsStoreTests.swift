@@ -397,7 +397,11 @@ extension StubbedNetworkTests.TransactionsStoreTests {
     let store = TransactionsStore { c }
     await store.reload()
     #expect(store.rows.isEmpty)
-    #expect(store.error != nil)
+    guard case .unreachable = store.error else {
+      Issue.record("expected .unreachable, got \(String(describing: store.error))")
+      return
+    }
+    #expect(store.banner == nil)
   }
 
   // MARK: Saved Pro mode
@@ -447,6 +451,38 @@ extension StubbedNetworkTests.TransactionsStoreTests {
     gate.open()
     await load.value
     #expect(!mode.isPro)
+  }
+
+  @Test func aSavedNullModeWithNoSavedLegacyKeyIsNotApplied() async throws {
+    let cache = TestData.cache()
+    try await saveMode(in: cache, [ProMode.key: #"{"value":null}"#])
+    let c = client(cache: cache) { _ in throw URLError(.cannotConnectToHost) }
+    let mode = ProMode { c }
+    await mode.load()
+    #expect(!mode.isPro)
+    #expect(!mode.hasLoaded)
+  }
+
+  @Test func aSavedChoiceIsWhatTheNextLaunchOpensWith() async throws {
+    let cache = TestData.cache()
+    try await saveMode(in: cache, [ProMode.key: #"{"value":"pro"}"#])
+    let c = client(cache: cache) { _ in (200, Data(#"{"ok":true}"#.utf8)) }
+    await ProMode { c }.choose(false)
+    #expect(c.savedUIState(ProMode.key)?.string == "normal")
+
+    let offline = client(cache: cache) { _ in throw URLError(.cannotConnectToHost) }
+    let next = ProMode { offline }
+    await next.load()
+    #expect(next.hasLoaded)
+    #expect(!next.isPro)
+  }
+
+  @Test func aFailedChoiceLeavesTheSavedModeAlone() async throws {
+    let cache = TestData.cache()
+    try await saveMode(in: cache, [ProMode.key: #"{"value":"pro"}"#])
+    let c = client(cache: cache) { _ in throw URLError(.cannotConnectToHost) }
+    await ProMode { c }.choose(false)
+    #expect(c.savedUIState(ProMode.key)?.string == "pro")
   }
 
   @Test func withNoSavedModeAFailedReadStaysNormalAndUnloaded() async {

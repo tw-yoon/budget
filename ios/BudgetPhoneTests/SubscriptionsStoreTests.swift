@@ -293,6 +293,10 @@ extension StubbedNetworkTests.SubscriptionsStoreTests {
     let s = store(cache: cache, unreachable: true)
     await s.load()
     #expect(s.data == nil)
-    #expect(s.error != nil)
+    guard case .unreachable = s.error else {
+      Issue.record("expected .unreachable, got \(String(describing: s.error))")
+      return
+    }
+    #expect(s.banner == nil)
   }
 }

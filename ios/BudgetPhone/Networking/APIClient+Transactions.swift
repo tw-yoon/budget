@@ -50,13 +50,24 @@ extension APIClient {
   func uiState(_ key: String) async throws(APIError) -> UIStateValue {
     // Only the Pro-mode keys are saved: they decide which screens open.
     try await get(
-      "api/ui-state", query: [URLQueryItem(name: "key", value: key)], timeout: 15,
+      "api/ui-state", query: Self.uiStateQuery(key), timeout: 15,
       saveAs: Self.savesUIState(key) ? "ui-state-\(key)" : nil)
   }
 
   func savedUIState(_ key: String) -> UIStateValue? {
-    Self.savesUIState(key)
-      ? saved("ui-state-\(key)", "api/ui-state", query: [URLQueryItem(name: "key", value: key)]) : nil
+    Self.savesUIState(key) ? saved("ui-state-\(key)", "api/ui-state", query: Self.uiStateQuery(key)) : nil
+  }
+
+  /// Records a string the phone just wrote under a Pro-mode key as that
+  /// key's saved answer, so the next launch opens with it rather than with
+  /// the value read before the write.
+  func saveUIState(_ key: String, string: String) {
+    guard Self.savesUIState(key), let data = try? JSONEncoder().encode(["value": string]) else { return }
+    save(data, as: "ui-state-\(key)", "api/ui-state", query: Self.uiStateQuery(key))
+  }
+
+  private static func uiStateQuery(_ key: String) -> [URLQueryItem] {
+    [URLQueryItem(name: "key", value: key)]
   }
 
   private static func savesUIState(_ key: String) -> Bool {

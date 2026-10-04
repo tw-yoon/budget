@@ -80,6 +80,8 @@ final class ProMode {
     defer { savesInFlight -= 1 }
     do throws(APIError) {
       try await client.putUIState(key: Self.key, value: pro ? "pro" : "normal")
+      // The next launch opens with this choice, not the value read before it.
+      if mine == choices { client.saveUIState(Self.key, string: pro ? "pro" : "normal") }
     } catch {
       if error != .cancelled && mine == choices { saveFailed = true }
     }

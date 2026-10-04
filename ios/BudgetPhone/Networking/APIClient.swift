@@ -110,10 +110,14 @@ struct APIClient: Sendable {
   ) async throws(APIError) -> T {
     let data = try await send("GET", path, query: query, timeout: timeout)
     let value: T = try decode(data)
-    if let name, let cache {
-      cache.write(data, name: name, request: cacheRequest(path, query), owner: owner)
-    }
+    if let name { save(data, as: name, path, query: query) }
     return value
+  }
+
+  /// Keeps `data` as the saved answer to a GET of `path`, for a write whose
+  /// result the next launch should open with.
+  func save(_ data: Data, as name: String, _ path: String, query: [URLQueryItem] = []) {
+    cache?.write(data, name: name, request: cacheRequest(path, query), owner: owner)
   }
 
   /// The answer last saved for exactly this request, or nil. Bytes that no

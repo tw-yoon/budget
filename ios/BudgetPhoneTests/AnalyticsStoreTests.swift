@@ -8,6 +8,9 @@ final class AnalyticsStub: @unchecked Sendable {
   var txCount = 4
   var limit = "null"
   var cancel = false
+  /// Cash flow and spending answer with two entries instead of one, so a
+  /// test can tell a fresh answer from a saved one.
+  var fresh = false
 }
 
 extension StubbedNetworkTests {
@@ -21,6 +24,10 @@ extension StubbedNetworkTests {
     nonisolated static let cashflowJSON =
       #"{"months":[{"key":"2026-08","label":"Aug 2026","income":[{"source":"Paycheck","amount":300}],"spend":[{"category":"Groceries","amount":100}]}],"currentCash":0,"cashAsOf":null}"#
     nonisolated static let spendingJSON = #"{"days":[{"date":"2026-08-03","amount":100}]}"#
+    nonisolated static let freshCashflowJSON =
+      #"{"months":[{"key":"2026-08","label":"Aug 2026","income":[],"spend":[]},{"key":"2026-09","label":"Sep 2026","income":[],"spend":[]}],"currentCash":0,"cashAsOf":null}"#
+    nonisolated static let freshSpendingJSON =
+      #"{"days":[{"date":"2026-09-01","amount":20},{"date":"2026-09-02","amount":30}]}"#
 
     nonisolated static func answer(_ r: URLRequest, _ stub: AnalyticsStub) throws -> (Int, Data) {
       if stub.cancel { throw URLError(.cancelled) }
@@ -32,8 +39,8 @@ extension StubbedNetworkTests {
       case "/api/analytics":
         return (200, Data(
           #"{"summary":{"totalSpent":100,"totalIncome":300,"net":200,"txCount":\#(stub.txCount)},"byCategory":[],"byMonth":[],"topMerchants":[{"name":"Sample Mart","amount":80,"count":\#(stub.txCount)}],"rangeMonths":6}"#.utf8))
-      case "/api/analytics/cashflow": return (200, Data(cashflowJSON.utf8))
-      case "/api/analytics/spending": return (200, Data(spendingJSON.utf8))
+      case "/api/analytics/cashflow": return (200, Data((stub.fresh ? freshCashflowJSON : cashflowJSON).utf8))
+      case "/api/analytics/spending": return (200, Data((stub.fresh ? freshSpendingJSON : spendingJSON).utf8))
       case "/api/ui-state":
         return r.httpMethod == "PUT"
           ? (200, Data(#"{"ok":true}"#.utf8)) : (200, Data(#"{"value":\#(stub.limit)}"#.utf8))
@@ -359,6 +366,7 @@ extension StubbedNetworkTests.AnalyticsStoreTests {
     let cache = TestData.cache()
     await saveAnalytics(in: cache)
     stub.txCount = 9
+    stub.fresh = true
     let gate = Gate(Self.isAnalytics)
     let s = store(cache: cache, gates: [gate])
     let load = Task { await s.load(isPro: true) }
@@ -369,7 +377,21 @@ extension StubbedNetworkTests.AnalyticsStoreTests {
     gate.open()
     await load.value
     #expect(s.summary?.txCount == 9)
+    #expect(s.topMerchants.first?.count == 9)
+    #expect(s.cashflow?.count == 2 && s.spending?.count == 2)
     #expect(s.error == nil && s.banner == nil)
+  }
+
+  @Test func withDataShowingTheCacheIsNotReadAgain() async {
+    let cache = TestData.cache()
+    await saveAnalytics(in: cache)
+    let s = store(cache: cache)
+    await s.load(isPro: false)
+    #expect(s.hasData && s.spending == nil)
+    stub.failing = ["/api/analytics/spending"]
+    await s.load(isPro: true)
+    #expect(s.spending == nil, "switching to Pro must not bring back the saved spending")
+    #expect(s.banner != nil)
   }
 
   @Test func withNothingSavedAFailureIsStillFullScreen() async {
@@ -389,6 +411,10 @@ extension StubbedNetworkTests.AnalyticsStoreTests {
     let s = store(cache: cache, unreachable: true)
     await s.load(isPro: true)
     #expect(!s.hasData && s.spending == nil)
-    #expect(s.error != nil)
+    guard case .unreachable = s.error else {
+      Issue.record("expected .unreachable, got \(String(describing: s.error))")
+      return
+    }
+    #expect(s.banner == nil)
   }
 }
