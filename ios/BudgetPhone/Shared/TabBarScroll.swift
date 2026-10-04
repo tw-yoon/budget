@@ -101,9 +101,22 @@ struct TabBarScrollTracking: ViewModifier {
   @Environment(\.appTab) private var tab
   /// Bumped when this page should scroll to the top.
   @State private var topRequests = 0
+  @AppStorage(AppTabBar.labelsKey) private var showsTabLabels = false
+  /// The home indicator's height, or the keyboard's while it is up.
+  @State private var bottomSafeArea: CGFloat = 0
+
+  /// Room for the bar under the last row. Given here rather than once in
+  /// RootView: a safe-area inset outside a tab's NavigationStack doesn't
+  /// reach the scroll views inside it.
+  private var barRoom: CGFloat {
+    guard state != nil else { return 0 }
+    return AppTabBar.contentInset(bottomSafeArea: bottomSafeArea, showsLabels: showsTabLabels)
+  }
 
   func body(content: Content) -> some View {
     content
+      .contentMargins(.bottom, barRoom)
+      .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.bottom } action: { bottomSafeArea = $0 }
       .background(ScrollToTopProbe(requests: topRequests))
       .onScrollGeometryChange(for: TabBarScrollOffsets.self) { geometry in
         TabBarScrollOffsets(geometry)

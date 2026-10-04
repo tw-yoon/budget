@@ -13,6 +13,63 @@ purchase it covers by that number. It then takes on that purchase's category and
 nets against it, instead of inflating your income and leaving the spending
 overstated.
 
+## Quick start
+
+You need a Mac with [Node 20+](https://nodejs.org) and git, and a free
+[Plaid](https://dashboard.plaid.com) account. The iPhone app also needs
+Xcode 26 and an iPhone on iOS 26. Each step is covered in detail further down.
+
+**Web app**
+
+1. `git clone https://github.com/tw-yoon/budget.git`, then run
+   `./Budget.command` in that folder. If macOS blocks it, right-click it →
+   **Open** → **Open**.
+2. The first run creates `.env.local` and stops. Sign up at
+   [dashboard.plaid.com](https://dashboard.plaid.com) and paste your client
+   ID and sandbox secret into it as `PLAID_CLIENT_ID` and `PLAID_SECRET`.
+3. Run `./Budget.command` again. It installs everything, sets up the
+   database, builds the app (a minute or two the first time) and opens it at
+   `http://localhost:3000`.
+4. For fake data, run
+   `curl -X POST http://localhost:3000/api/plaid/sandbox-seed`, wait a
+   moment, then `curl -X POST http://localhost:3000/api/plaid/sync`
+   ([Seeing data](#seeing-data)). Sandbox connects only fake test banks; real
+   banks need production access, which you apply to Plaid for.
+
+Day to day, double-click `Budget.command` to start it, even after a reboot,
+and run `./Budget.command --update` to update. Your data stays in files on the
+Mac.
+
+**From another device** ([details](#using-budget-from-another-device))
+
+1. Install [Tailscale](https://tailscale.com) on the Mac and the other device,
+   signed in to the same account.
+2. In the Tailscale admin console, turn on MagicDNS and HTTPS certificates.
+3. On the Mac, run `tailscale serve --bg 3000`. It prints an address ending
+   in `.ts.net`.
+4. Open that address on the other device. It asks once for the access token,
+   which is under Budget → Settings → Remote Access.
+
+**iPhone app** ([details](ios/README.md))
+
+1. With the web app running, open `ios/BudgetPhone.xcodeproj` in Xcode.
+2. Simulator: press Run and enter `http://localhost:3000` as the server.
+3. Your own phone:
+   1. `cp ios/Config/Local.example.xcconfig ios/Config/Local.xcconfig`.
+   2. Add your Apple ID under Xcode → Settings → Accounts, and put your
+      Personal Team's ID in `Local.xcconfig` as `DEVELOPMENT_TEAM`. Do this
+      before opening the project; don't pick the team in Xcode's Signing
+      screen.
+   3. Connect the phone by cable and turn on Developer Mode (Settings →
+      Privacy & Security).
+   4. Choose the phone in Xcode and press Run. The first time, trust the
+      developer on the phone under Settings → General → VPN & Device
+      Management.
+   5. In the app's Settings → Server, enter the `.ts.net` address and the
+      access token.
+4. With a free Apple ID the app stops opening every 7 days. Connect the phone
+   and press Run again; nothing on it is lost.
+
 ## Before you start
 
 You'll need:
