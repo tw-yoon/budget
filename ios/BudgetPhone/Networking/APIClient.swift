@@ -36,10 +36,13 @@ struct APIClient: Sendable {
   let baseURL: URL
   var session: URLSession = .shared
   var token: String? = nil
+  var cache: ResponseCache? = nil
 
   /// The saved server with the saved token; nil until a server is set.
   static func saved() -> APIClient? {
-    ServerAddress.saved().map { APIClient(baseURL: $0, token: AccessToken.saved()) }
+    ServerAddress.saved().map {
+      APIClient(baseURL: $0, token: AccessToken.saved(), cache: .shared)
+    }
   }
 
   func accounts() async throws(APIError) -> AccountsResponse {
@@ -70,13 +73,9 @@ struct APIClient: Sendable {
     return nsError.domain == "Swift.CancellationError"
   }
 
-  /// The request itself: any HTTP status comes back with its body, for the
-  /// few routes whose non-2xx bodies carry more than `{ error }` (a
-  /// category merge prompt, a delete refused in use).
-  func sendRaw(
-    _ method: String, _ path: String, query: [URLQueryItem] = [], body: Data? = nil,
-    timeout: TimeInterval
-  ) async throws(APIError) -> (status: Int, data: Data) {
+  /// The address a request goes to. The cache keys on it, so what is saved
+  /// matches what was sent.
+  func url(_ path: String, query: [URLQueryItem] = []) -> URL {
     var url = baseURL.appending(path: path)
     if !query.isEmpty {
       url.append(queryItems: query)
@@ -88,6 +87,49 @@ struct APIClient: Sendable {
         url = components.url ?? url
       }
     }
+    return url
+  }
+
+  /// Server and token, as the cache's owner. Hashed there, never stored.
+  private var owner: String { baseURL.absoluteString + "\n" + (token ?? "") }
+
+  /// Path plus query: what tells one saved answer from another.
+  private func cacheRequest(_ path: String, _ query: [URLQueryItem]) -> String {
+    let built = url(path, query: query)
+    let q = URLComponents(url: built, resolvingAgainstBaseURL: false)?.percentEncodedQuery
+    return built.path + (q.map { "?" + $0 } ?? "")
+  }
+
+  /// A GET that decodes, then — only once it decoded — saves the bytes under
+  /// `saveAs` for `saved(_:_:query:)` to show at the next launch.
+  func get<T: Decodable>(
+    _ path: String, query: [URLQueryItem] = [], timeout: TimeInterval, saveAs name: String? = nil
+  ) async throws(APIError) -> T {
+    let data = try await send("GET", path, query: query, timeout: timeout)
+    let value: T = try decode(data)
+    if let name, let cache {
+      cache.write(data, name: name, request: cacheRequest(path, query), owner: owner)
+    }
+    return value
+  }
+
+  /// The answer last saved for exactly this request, or nil. Bytes that no
+  /// longer decode count as nothing saved.
+  func saved<T: Decodable>(_ name: String, _ path: String, query: [URLQueryItem] = []) -> T? {
+    guard
+      let data = cache?.read(name, request: cacheRequest(path, query), owner: owner)
+    else { return nil }
+    return try? JSONDecoder().decode(T.self, from: data)
+  }
+
+  /// The request itself: any HTTP status comes back with its body, for the
+  /// few routes whose non-2xx bodies carry more than `{ error }` (a
+  /// category merge prompt, a delete refused in use).
+  func sendRaw(
+    _ method: String, _ path: String, query: [URLQueryItem] = [], body: Data? = nil,
+    timeout: TimeInterval
+  ) async throws(APIError) -> (status: Int, data: Data) {
+    let url = url(path, query: query)
     var request = URLRequest(url: url, timeoutInterval: timeout)
     request.httpMethod = method
     request.setValue("application/json", forHTTPHeaderField: "Accept")
