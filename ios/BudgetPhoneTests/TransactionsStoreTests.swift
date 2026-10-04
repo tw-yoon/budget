@@ -406,42 +406,42 @@ extension StubbedNetworkTests.TransactionsStoreTests {
 
   // MARK: Saved Pro mode
 
-  /// Saves each key's answer for `token`, as the reads of an earlier launch.
-  func saveMode(
-    in cache: ResponseCache, token: String = "sample-token", _ values: [String: String]
-  ) async throws {
-    let c = client(cache: cache, token: token) { r in
-      (200, Data(values[TestData.query(of: r, "key")!]!.utf8))
-    }
-    for key in [ProMode.key, ProMode.legacyKey] where values[key] != nil {
-      _ = try await c.uiState(key)
-    }
+  /// The mode an earlier launch settled on, saved for `token`.
+  func saveMode(in cache: ResponseCache, token: String = "sample-token", _ mode: String) {
+    client(cache: cache, token: token) { _ in (404, Data()) }.saveUIState(ProMode.key, string: mode)
   }
 
-  @Test func theSavedModeAppliesWhenTheServerIsUnreachable() async throws {
+  /// A client on `cache` with no server, as a launch offline.
+  func offline(_ cache: ResponseCache) -> APIClient {
+    client(cache: cache) { _ in throw URLError(.cannotConnectToHost) }
+  }
+
+  @Test func theSavedModeAppliesWhenTheServerIsUnreachable() async {
     let cache = TestData.cache()
-    try await saveMode(in: cache, [ProMode.key: #"{"value":"pro"}"#])
-    let c = client(cache: cache) { _ in throw URLError(.cannotConnectToHost) }
+    saveMode(in: cache, "pro")
+    let c = offline(cache)
     let mode = ProMode { c }
     await mode.load()
     #expect(mode.isPro)
     #expect(mode.hasLoaded)
   }
 
-  @Test func theSavedModeFallsBackToTheSavedLegacyKey() async throws {
+  @Test func aLoadSavesTheResolvedModeIncludingALegacyFallback() async {
     let cache = TestData.cache()
-    try await saveMode(
-      in: cache, [ProMode.key: #"{"value":null}"#, ProMode.legacyKey: #"{"value":"pro"}"#])
-    let c = client(cache: cache) { _ in throw URLError(.cannotConnectToHost) }
-    let mode = ProMode { c }
-    await mode.load()
-    #expect(mode.isPro)
-    #expect(mode.hasLoaded)
+    let values = [ProMode.key: #"{"value":null}"#, ProMode.legacyKey: #"{"value":"pro"}"#]
+    let c = client(cache: cache) { r in (200, Data(values[TestData.query(of: r, "key")!]!.utf8)) }
+    await ProMode { c }.load()
+    #expect(c.savedUIState(ProMode.key)?.string == "pro")
+    #expect(c.savedUIState(ProMode.legacyKey) == nil, "the legacy answer itself is not kept")
+
+    let next = ProMode { [c = offline(cache)] in c }
+    await next.load()
+    #expect(next.isPro && next.hasLoaded)
   }
 
-  @Test func theSavedModeAppliesWhileLoadingThenTheServersAnswerReplacesIt() async throws {
+  @Test func theSavedModeAppliesWhileLoadingThenTheServersAnswerReplacesIt() async {
     let cache = TestData.cache()
-    try await saveMode(in: cache, [ProMode.key: #"{"value":"pro"}"#])
+    saveMode(in: cache, "pro")
     let gate = Gate { _ in true }
     let c = client(cache: cache, gates: [gate]) { _ in (200, Data(#"{"value":"normal"}"#.utf8)) }
     let mode = ProMode { c }
@@ -451,52 +451,72 @@ extension StubbedNetworkTests.TransactionsStoreTests {
     gate.open()
     await load.value
     #expect(!mode.isPro)
+    #expect(c.savedUIState(ProMode.key)?.string == "normal")
   }
 
-  @Test func aSavedNullModeWithNoSavedLegacyKeyIsNotApplied() async throws {
+  @Test func aSavedNullModeIsNotApplied() async {
     let cache = TestData.cache()
-    try await saveMode(in: cache, [ProMode.key: #"{"value":null}"#])
-    let c = client(cache: cache) { _ in throw URLError(.cannotConnectToHost) }
+    let c = offline(cache)
+    c.save(
+      Data(#"{"value":null}"#.utf8), as: "ui-state-\(ProMode.key)", "api/ui-state",
+      query: [URLQueryItem(name: "key", value: ProMode.key)])
+    #expect(c.savedUIState(ProMode.key)?.isStored == false)
     let mode = ProMode { c }
     await mode.load()
     #expect(!mode.isPro)
     #expect(!mode.hasLoaded)
   }
 
-  @Test func aSavedChoiceIsWhatTheNextLaunchOpensWith() async throws {
+  @Test func aSavedChoiceIsWhatTheNextLaunchOpensWith() async {
     let cache = TestData.cache()
-    try await saveMode(in: cache, [ProMode.key: #"{"value":"pro"}"#])
+    saveMode(in: cache, "pro")
     let c = client(cache: cache) { _ in (200, Data(#"{"ok":true}"#.utf8)) }
     await ProMode { c }.choose(false)
     #expect(c.savedUIState(ProMode.key)?.string == "normal")
 
-    let offline = client(cache: cache) { _ in throw URLError(.cannotConnectToHost) }
-    let next = ProMode { offline }
+    let next = ProMode { [c = offline(cache)] in c }
     await next.load()
     #expect(next.hasLoaded)
     #expect(!next.isPro)
   }
 
-  @Test func aFailedChoiceLeavesTheSavedModeAlone() async throws {
+  @Test func aFailedChoiceLeavesTheSavedModeAlone() async {
     let cache = TestData.cache()
-    try await saveMode(in: cache, [ProMode.key: #"{"value":"pro"}"#])
-    let c = client(cache: cache) { _ in throw URLError(.cannotConnectToHost) }
+    saveMode(in: cache, "pro")
+    let c = offline(cache)
     await ProMode { c }.choose(false)
     #expect(c.savedUIState(ProMode.key)?.string == "pro")
   }
 
+  @Test func aReadThatLandsAfterAChoiceDoesNotChangeTheSavedMode() async {
+    let cache = TestData.cache()
+    let read = Gate { $0.httpMethod == "GET" }
+    let c = client(cache: cache, gates: [read]) { r in
+      r.httpMethod == "PUT" ? (200, Data(#"{"ok":true}"#.utf8)) : (200, Data(#"{"value":"pro"}"#.utf8))
+    }
+    let mode = ProMode { c }
+    let load = Task { await mode.load() }
+    await read.arrival()
+    await mode.choose(false)
+    #expect(c.savedUIState(ProMode.key)?.string == "normal")
+    read.open()
+    await load.value
+    #expect(!mode.isPro)
+    #expect(c.savedUIState(ProMode.key)?.string == "normal")
+  }
+
   @Test func withNoSavedModeAFailedReadStaysNormalAndUnloaded() async {
-    let c = client(cache: TestData.cache()) { _ in throw URLError(.cannotConnectToHost) }
+    let c = offline(TestData.cache())
     let mode = ProMode { c }
     await mode.load()
     #expect(!mode.isPro)
     #expect(!mode.hasLoaded)
   }
 
-  @Test func aModeSavedUnderAnotherTokenIsNotApplied() async throws {
+  @Test func aModeSavedUnderAnotherTokenIsNotApplied() async {
     let cache = TestData.cache()
-    try await saveMode(in: cache, token: "other-token", [ProMode.key: #"{"value":"pro"}"#])
-    let c = client(cache: cache) { _ in throw URLError(.cannotConnectToHost) }
+    saveMode(in: cache, token: "other-token", "pro")
+    let c = offline(cache)
     let mode = ProMode { c }
     await mode.load()
     #expect(!mode.isPro)

@@ -15,7 +15,10 @@ final class AnalyticsStore {
   static let ranges = [3, 6, 12]
 
   /// The web opens on 6 months; the phone opens on 3 by the owner's choice.
-  private(set) var range = 3
+  /// Only this range's summary is saved, since it is the one a launch shows.
+  nonisolated static let launchRange = 3
+
+  private(set) var range = AnalyticsStore.launchRange
   private(set) var summary: AnalyticsSummary?
   /// The range's top merchants, from the same call as `summary`. Phone-only:
   /// the server sends them but the web page doesn't show them.

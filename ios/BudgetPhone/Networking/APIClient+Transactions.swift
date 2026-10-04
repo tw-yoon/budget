@@ -47,20 +47,19 @@ extension APIClient {
   }
 
   /// GET /api/ui-state?key= → `{ value }`.
+  /// Saves nothing itself: a read can land after a newer choice, so ProMode
+  /// saves the mode it settles on instead (`saveUIState`).
   func uiState(_ key: String) async throws(APIError) -> UIStateValue {
-    // Only the Pro-mode keys are saved: they decide which screens open.
-    try await get(
-      "api/ui-state", query: Self.uiStateQuery(key), timeout: 15,
-      saveAs: Self.savesUIState(key) ? "ui-state-\(key)" : nil)
+    try await get("api/ui-state", query: Self.uiStateQuery(key), timeout: 15)
   }
 
   func savedUIState(_ key: String) -> UIStateValue? {
     Self.savesUIState(key) ? saved("ui-state-\(key)", "api/ui-state", query: Self.uiStateQuery(key)) : nil
   }
 
-  /// Records a string the phone just wrote under a Pro-mode key as that
-  /// key's saved answer, so the next launch opens with it rather than with
-  /// the value read before the write.
+  /// Records the mode ProMode settled on (a read that was still current, or
+  /// a choice the server took) as the `pro-mode` key's saved answer, for the
+  /// next launch to open with.
   func saveUIState(_ key: String, string: String) {
     guard Self.savesUIState(key), let data = try? JSONEncoder().encode(["value": string]) else { return }
     save(data, as: "ui-state-\(key)", "api/ui-state", query: Self.uiStateQuery(key))
@@ -70,9 +69,9 @@ extension APIClient {
     [URLQueryItem(name: "key", value: key)]
   }
 
-  private static func savesUIState(_ key: String) -> Bool {
-    key == ProMode.key || key == ProMode.legacyKey
-  }
+  /// Only the Pro-mode key is saved: it decides which screens open. A
+  /// legacy value is saved under it once resolved.
+  private static func savesUIState(_ key: String) -> Bool { key == ProMode.key }
 }
 
 /// `{ value: <any JSON> }` from the shared ui-state store, a plain JSON file

@@ -57,11 +57,19 @@ extension StubbedNetworkTests {
       #expect(c.savedTransactions(other) == nil)
     }
 
-    @Test func analyticsAreSavedPerRange() async throws {
+    @Test func analyticsAreSavedOnlyForTheLaunchRange() async throws {
       let c = client(try TestData.fixture("analytics"))
-      let got = try await c.analytics(months: 6)
-      #expect(c.savedAnalytics(months: 6) == got)
-      #expect(c.savedAnalytics(months: 3) == nil)
+      let got = try await c.analytics(months: AnalyticsStore.launchRange)
+      #expect(c.savedAnalytics(months: AnalyticsStore.launchRange) == got)
+      _ = try await c.analytics(months: 6)
+      #expect(c.savedAnalytics(months: 6) == nil)
+    }
+
+    @Test func anotherRangeLeavesTheLaunchRangeSaved() async throws {
+      let c = client(try TestData.fixture("analytics"))
+      let launch = try await c.analytics(months: 3)
+      _ = try await c.analytics(months: 12)
+      #expect(c.savedAnalytics(months: 3) == launch)
     }
 
     @Test func cashflowIsSaved() async throws {
@@ -88,13 +96,22 @@ extension StubbedNetworkTests {
       #expect(c.savedUserCards() == got)
     }
 
-    @Test func proModeKeysAreSaved() async throws {
+    @Test func uiStateReadsSaveNothing() async throws {
       let c = client(Data(#"{"value":"pro"}"#.utf8))
       for key in [ProMode.key, ProMode.legacyKey] {
-        let got = try await c.uiState(key)
-        #expect(got.isStored)
-        #expect(c.savedUIState(key) == got)
+        #expect(try await c.uiState(key).isStored)
+        #expect(c.savedUIState(key) == nil)
       }
+      #expect(files(c).isEmpty)
+    }
+
+    @Test func theSettledModeIsSavedUnderTheProModeKeyOnly() {
+      let c = client(Data())
+      c.saveUIState(ProMode.key, string: "pro")
+      #expect(c.savedUIState(ProMode.key)?.string == "pro")
+      c.saveUIState(ProMode.legacyKey, string: "pro")
+      #expect(c.savedUIState(ProMode.legacyKey) == nil)
+      #expect(files(c).count == 1)
     }
 
     @Test func otherUIStateKeysSaveNothing() async throws {

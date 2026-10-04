@@ -15,11 +15,11 @@ Saved answers:
 |---|---|---|
 | Accounts | `GET api/accounts` | always |
 | Ledger | `GET api/transactions`, page 1 | page 1 and an empty search (filters are part of the match) |
-| Analytics | `GET api/analytics?months=` | always (the match includes the range, so only the last range asked for is kept) |
+| Analytics | `GET api/analytics?months=` | only for the launch range (3 months); other ranges are never saved |
 | Analytics | `GET api/analytics/cashflow`, `GET api/analytics/spending` | always |
 | Analytics → Subscriptions | `GET api/subscriptions` | always |
 | Benefits | `GET api/user-cards` | always |
-| Normal / Pro | `GET api/ui-state?key=pro-mode` and the legacy key | always |
+| Normal / Pro | `GET api/ui-state?key=pro-mode` and the legacy key | the resolved mode, saved under `pro-mode` after a current load or an accepted choice (the GETs themselves save nothing) |
 
 Venmo / Zelle, Settings lists, link candidates and the spending limit are
 not saved: they are second-level screens and load quickly enough.

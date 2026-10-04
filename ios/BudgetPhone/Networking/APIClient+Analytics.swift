@@ -3,7 +3,11 @@ import Foundation
 extension APIClient {
   /// GET /api/analytics?months=N — the summary cards (AnalyticsDashboard).
   func analytics(months: Int) async throws(APIError) -> AnalyticsResult {
-    try await get("api/analytics", query: Self.monthsQuery(months), timeout: 15, saveAs: "analytics")
+    // Only the range the app opens on is saved; another range would replace
+    // it and leave the next launch with nothing to show.
+    try await get(
+      "api/analytics", query: Self.monthsQuery(months), timeout: 15,
+      saveAs: months == AnalyticsStore.launchRange ? "analytics" : nil)
   }
 
   func savedAnalytics(months: Int) -> AnalyticsResult? {

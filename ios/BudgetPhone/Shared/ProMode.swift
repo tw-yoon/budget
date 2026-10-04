@@ -56,16 +56,17 @@ final class ProMode {
       guard read == reads, choice == choices, !savingAtStart, savesInFlight == 0 else { return }
       isPro = pro
       hasLoaded = true
+      // Saved only here, past the guards, so a stale read never replaces a
+      // newer choice in what the next launch opens with.
+      client.saveUIState(Self.key, string: pro ? "pro" : "normal")
     } catch {
       // Keep whatever was last known; a failed read is not a mode change.
     }
   }
 
-  /// The saved answers: the key when stored, else the legacy key; nil when
-  /// neither was saved.
+  /// The mode last settled on ("pro" or "normal"), or nil if none was saved.
   private static func saved(_ client: APIClient) -> Bool? {
-    if let stored = client.savedUIState(key), stored.isStored { return resolve(stored) }
-    return client.savedUIState(legacyKey).map(resolve)
+    client.savedUIState(key).flatMap { $0.isStored ? resolve($0) : nil }
   }
 
   /// useProMode's choose: applies at once, then saves.
