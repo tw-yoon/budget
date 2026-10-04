@@ -77,9 +77,8 @@ struct LedgerView: View {
         }
       }
     }
-    .tabBarScrollTracking()
+    .tabBarScrollTracking(extraBottom: Self.searchRoom)
     .scrollDismissesKeyboard(.immediately)
-    .contentMargins(.bottom, Self.searchRoom, for: .scrollContent)
     .refreshable { await store.sync() }
     .modifier(CompactRowsSync(compact: $compactRows))
     }

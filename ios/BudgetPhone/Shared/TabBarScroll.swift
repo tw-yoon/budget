@@ -99,6 +99,8 @@ struct TabBarScrollTracking: ViewModifier {
   @State private var rule = TabBarScrollRule()
   @State private var isOnScreen = false
   @Environment(\.appTab) private var tab
+  /// Room the page needs above the bar, such as the ledger's search field.
+  var extraBottom: CGFloat = 0
   /// Bumped when this page should scroll to the top.
   @State private var topRequests = 0
   @AppStorage(AppTabBar.labelsKey) private var showsTabLabels = false
@@ -107,10 +109,11 @@ struct TabBarScrollTracking: ViewModifier {
 
   /// Room for the bar under the last row. Given here rather than once in
   /// RootView: a safe-area inset outside a tab's NavigationStack doesn't
-  /// reach the scroll views inside it.
+  /// reach the scroll views inside it. A page's own extra room is added
+  /// here too: a second bottom content margin would replace this one.
   private var barRoom: CGFloat {
-    guard state != nil else { return 0 }
-    return AppTabBar.contentInset(bottomSafeArea: bottomSafeArea, showsLabels: showsTabLabels)
+    guard state != nil else { return extraBottom }
+    return AppTabBar.contentInset(bottomSafeArea: bottomSafeArea, showsLabels: showsTabLabels) + extraBottom
   }
 
   func body(content: Content) -> some View {
@@ -146,9 +149,10 @@ struct TabBarScrollTracking: ViewModifier {
 }
 
 extension View {
-  /// See `TabBarScrollTracking`.
-  func tabBarScrollTracking() -> some View {
-    modifier(TabBarScrollTracking())
+  /// See `TabBarScrollTracking`. `extraBottom` is room the page needs above
+  /// the bar.
+  func tabBarScrollTracking(extraBottom: CGFloat = 0) -> some View {
+    modifier(TabBarScrollTracking(extraBottom: extraBottom))
   }
 }
 
