@@ -66,6 +66,13 @@ final class AnalyticsStore {
     isLoading = true
     defer { if generation == loadGeneration { isLoading = false } }
     if !hasData { error = nil }
+    // Whatever the last launch saved shows until the server answers.
+    if summary == nil, let saved = client.savedAnalytics(months: range) {
+      summary = saved.summary
+      topMerchants = saved.topMerchants ?? []
+    }
+    if cashflow == nil { cashflow = client.savedCashflow()?.months }
+    if isPro, spending == nil { spending = client.savedSpending()?.days }
     var failure: APIError?
 
     do throws(APIError) {

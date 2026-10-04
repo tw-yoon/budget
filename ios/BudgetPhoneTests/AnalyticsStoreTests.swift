@@ -308,3 +308,87 @@ extension StubbedNetworkTests {
     }
   }
 }
+
+/// What a launch shows before the server answers: the summary, cash flow and
+/// Pro spending saved last time.
+extension StubbedNetworkTests.AnalyticsStoreTests {
+  func store(
+    cache: ResponseCache, token: String = "sample-token", gates: [Gate] = [],
+    unreachable: Bool = false
+  ) -> AnalyticsStore {
+    let stub = self.stub
+    let c = APIClient(
+      baseURL: base,
+      session: StubURLProtocol.session(
+        { r in
+          if unreachable { throw URLError(.cannotConnectToHost) }
+          return try Self.answer(r, stub)
+        }, gates: gates),
+      token: token, cache: cache)
+    return AnalyticsStore { c }
+  }
+
+  /// One Pro load's answers (summary with `txCount` 4), saved for `token`.
+  func saveAnalytics(in cache: ResponseCache, token: String = "sample-token") async {
+    await store(cache: cache, token: token).load(isPro: true)
+  }
+
+  @Test func savedAnalyticsShowWhenTheServerIsUnreachable() async {
+    let cache = TestData.cache()
+    await saveAnalytics(in: cache)
+    let s = store(cache: cache, unreachable: true)
+    await s.load(isPro: true)
+    #expect(s.summary?.txCount == 4)
+    #expect(s.topMerchants.map(\.name) == ["Sample Mart"])
+    #expect(s.cashflow?.count == 1)
+    #expect(s.spending?.count == 1)
+    #expect(s.error == nil)
+    #expect(s.banner != nil)
+  }
+
+  @Test func savedSpendingShowsOnlyInPro() async {
+    let cache = TestData.cache()
+    await saveAnalytics(in: cache)
+    let s = store(cache: cache, unreachable: true)
+    await s.load(isPro: false)
+    #expect(s.summary != nil)
+    #expect(s.spending == nil)
+  }
+
+  @Test func savedAnalyticsShowWhileLoadingThenTheServersAnswerReplacesThem() async {
+    let cache = TestData.cache()
+    await saveAnalytics(in: cache)
+    stub.txCount = 9
+    let gate = Gate(Self.isAnalytics)
+    let s = store(cache: cache, gates: [gate])
+    let load = Task { await s.load(isPro: true) }
+    await gate.arrival()
+    #expect(s.summary?.txCount == 4)
+    #expect(s.cashflow?.count == 1 && s.spending?.count == 1)
+    #expect(s.isLoading)
+    gate.open()
+    await load.value
+    #expect(s.summary?.txCount == 9)
+    #expect(s.error == nil && s.banner == nil)
+  }
+
+  @Test func withNothingSavedAFailureIsStillFullScreen() async {
+    let s = store(cache: TestData.cache(), unreachable: true)
+    await s.load(isPro: true)
+    #expect(!s.hasData)
+    guard case .unreachable = s.error else {
+      Issue.record("expected .unreachable, got \(String(describing: s.error))")
+      return
+    }
+    #expect(s.banner == nil)
+  }
+
+  @Test func analyticsSavedUnderAnotherTokenAreNotShown() async {
+    let cache = TestData.cache()
+    await saveAnalytics(in: cache, token: "other-token")
+    let s = store(cache: cache, unreachable: true)
+    await s.load(isPro: true)
+    #expect(!s.hasData && s.spending == nil)
+    #expect(s.error != nil)
+  }
+}

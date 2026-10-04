@@ -39,10 +39,13 @@ final class AccountsStore {
       error = .notConfigured
       return
     }
-    // Nothing to show yet (or an earlier error is showing): let the view
-    // fall back to its progress state instead of leaving a stale error up
-    // for the length of the whole request.
-    if data == nil { error = nil }
+    // Nothing to show yet (or an earlier error is showing): show what the
+    // last launch saved, else let the view fall back to its progress state
+    // instead of leaving a stale error up for the length of the whole request.
+    if data == nil {
+      error = nil
+      data = client.savedAccounts()
+    }
     isLoading = true
     defer { if generation == loadGeneration { isLoading = false } }
     do {

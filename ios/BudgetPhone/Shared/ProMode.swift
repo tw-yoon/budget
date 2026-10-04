@@ -14,7 +14,7 @@ final class ProMode {
   nonisolated static let legacyKey = "analytics-mode"
 
   private(set) var isPro = false
-  /// True after the first successful read or a choice — useProMode's
+  /// True after the first successful or saved read, or a choice — useProMode's
   /// `!loading`. Until then `isPro` is just the untrue-but-safe default, so
   /// callers that would otherwise show a Normal-mode-only hint should wait
   /// for this.
@@ -42,6 +42,12 @@ final class ProMode {
 
   func load() async {
     guard let client = client() else { return }
+    // Until the first read, the setting the last launch saved, resolved the
+    // same way, so a Pro screen opens as Pro.
+    if !hasLoaded, let pro = Self.saved(client) {
+      isPro = pro
+      hasLoaded = true
+    }
     reads += 1
     let read = reads, choice = choices, savingAtStart = savesInFlight > 0
     do throws(APIError) {
@@ -53,6 +59,13 @@ final class ProMode {
     } catch {
       // Keep whatever was last known; a failed read is not a mode change.
     }
+  }
+
+  /// The saved answers: the key when stored, else the legacy key; nil when
+  /// neither was saved.
+  private static func saved(_ client: APIClient) -> Bool? {
+    if let stored = client.savedUIState(key), stored.isStored { return resolve(stored) }
+    return client.savedUIState(legacyKey).map(resolve)
   }
 
   /// useProMode's choose: applies at once, then saves.

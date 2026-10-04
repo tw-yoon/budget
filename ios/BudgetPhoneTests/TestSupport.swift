@@ -223,3 +223,11 @@ final class Gate: @unchecked Sendable {
     }
   }
 }
+
+extension TestData {
+  /// A response cache in a fresh temporary folder, so a test never reads or
+  /// writes the app's own saved answers.
+  static func cache() -> ResponseCache {
+    ResponseCache(root: FileManager.default.temporaryDirectory.appending(path: UUID().uuidString))
+  }
+}

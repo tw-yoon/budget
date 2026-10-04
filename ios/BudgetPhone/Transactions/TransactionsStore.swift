@@ -58,7 +58,15 @@ final class TransactionsStore {
       error = .notConfigured
       return
     }
-    if pages.isEmpty { error = nil }
+    if pages.isEmpty {
+      error = nil
+      // The page the last launch saved for this query, until the server answers.
+      if let saved = client.savedTransactions(query) {
+        pages = [saved.transactions]
+        total = saved.total
+        totalPages = saved.totalPages
+      }
+    }
     isLoading = true
     loadMoreFailed = false
     isLoadingMore = false

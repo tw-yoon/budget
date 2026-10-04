@@ -226,3 +226,73 @@ extension StubbedNetworkTests {
     }
   }
 }
+
+/// What a launch shows before the server answers: the list saved last time.
+extension StubbedNetworkTests.SubscriptionsStoreTests {
+  func store(
+    cache: ResponseCache, token: String = "sample-token", gates: [Gate] = [],
+    unreachable: Bool = false
+  ) -> SubscriptionsStore {
+    let stub = self.stub
+    let c = APIClient(
+      baseURL: base,
+      session: StubURLProtocol.session(
+        { r in
+          if unreachable { throw URLError(.cannotConnectToHost) }
+          return try Self.answer(r, stub)
+        }, gates: gates),
+      token: token, cache: cache)
+    return SubscriptionsStore { c }
+  }
+
+  /// The list with s1 named "Sample Stream", saved for `token`.
+  func saveSubscriptions(in cache: ResponseCache, token: String = "sample-token") async {
+    await store(cache: cache, token: token).load()
+  }
+
+  @Test func savedSubscriptionsShowWhenTheServerIsUnreachable() async {
+    let cache = TestData.cache()
+    await saveSubscriptions(in: cache)
+    let s = store(cache: cache, unreachable: true)
+    await s.load()
+    #expect(s.data?.subscriptions.map(\.name) == ["Sample Stream", "Example Music"])
+    #expect(s.error == nil)
+    #expect(s.banner != nil)
+  }
+
+  @Test func savedSubscriptionsShowWhileLoadingThenTheServersAnswerReplacesThem() async {
+    let cache = TestData.cache()
+    await saveSubscriptions(in: cache)
+    stub.name = "Example Video"
+    let gate = Gate(Self.isGET)
+    let s = store(cache: cache, gates: [gate])
+    let load = Task { await s.load() }
+    await gate.arrival()
+    #expect(s.data?.subscriptions.first?.name == "Sample Stream")
+    #expect(s.isLoading)
+    gate.open()
+    await load.value
+    #expect(s.data?.subscriptions.first?.name == "Example Video")
+    #expect(s.error == nil && s.banner == nil)
+  }
+
+  @Test func withNothingSavedAFailureIsStillFullScreen() async {
+    let s = store(cache: TestData.cache(), unreachable: true)
+    await s.load()
+    #expect(s.data == nil)
+    guard case .unreachable = s.error else {
+      Issue.record("expected .unreachable, got \(String(describing: s.error))")
+      return
+    }
+    #expect(s.banner == nil)
+  }
+
+  @Test func subscriptionsSavedUnderAnotherTokenAreNotShown() async {
+    let cache = TestData.cache()
+    await saveSubscriptions(in: cache, token: "other-token")
+    let s = store(cache: cache, unreachable: true)
+    await s.load()
+    #expect(s.data == nil)
+    #expect(s.error != nil)
+  }
+}

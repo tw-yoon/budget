@@ -35,7 +35,10 @@ final class SubscriptionsStore {
       error = .notConfigured
       return
     }
-    if data == nil { error = nil }
+    if data == nil {
+      error = nil
+      data = client.savedSubscriptions()
+    }
     isLoading = true
     defer { if generation == loadGeneration { isLoading = false } }
     do throws(APIError) {

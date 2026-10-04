@@ -96,3 +96,87 @@ extension StubbedNetworkTests {
     }
   }
 }
+
+/// What a launch shows before the server answers: the cards saved last time,
+/// with their faces requested at once.
+extension StubbedNetworkTests.BenefitsStoreTests {
+  func store(
+    cache: ResponseCache, token: String = "sample-token", gates: [Gate] = [],
+    unreachable: Bool = false, art: CardArtCache? = nil
+  ) -> BenefitsStore {
+    let stub = self.stub
+    let session = StubURLProtocol.session(
+      { r in
+        if unreachable { throw URLError(.cannotConnectToHost) }
+        return try Self.answer(r, stub)
+      }, gates: gates)
+    let c = APIClient(baseURL: base, session: session, token: token, cache: cache)
+    let art = art ?? CardArtCache(
+      session: session, directory: FileManager.default.temporaryDirectory.appending(path: UUID().uuidString),
+      token: { nil })
+    return BenefitsStore(client: { c }, art: art)
+  }
+
+  /// One card, c1 ending 0001 with a face, saved for `token`.
+  func saveCards(in cache: ResponseCache, token: String = "sample-token") async throws {
+    let body = Data(
+      #"{"cards":[\#(TestData.cardJSON(id: "c1", artUrl: "/api/card-art/c1.png"))]}"#.utf8)
+    let c = APIClient(
+      baseURL: base, session: StubURLProtocol.session { _ in (200, body) }, token: token,
+      cache: cache)
+    _ = try await c.userCards()
+  }
+
+  @Test func savedCardsShowWhenTheServerIsUnreachableAndTheirFacesAreFetched() async throws {
+    let cache = TestData.cache()
+    try await saveCards(in: cache)
+    let art = CardArtCache(
+      session: StubURLProtocol.session { _ in throw URLError(.cannotConnectToHost) },
+      directory: FileManager.default.temporaryDirectory.appending(path: UUID().uuidString),
+      token: { nil })
+    let s = store(cache: cache, unreachable: true, art: art)
+    await s.load()
+    await art.settle()
+    #expect(s.cards?.map(\.last4) == ["0001"])
+    #expect(s.error == nil)
+    #expect(s.banner != nil)
+    #expect(StubURLProtocol.requests.contains { $0.url?.path() == "/api/card-art/c1.png" })
+  }
+
+  @Test func savedCardsShowWhileLoadingThenTheServersAnswerReplacesThem() async throws {
+    let cache = TestData.cache()
+    try await saveCards(in: cache)
+    stub.last4 = "2222"
+    // Not `any`: the saved card's face is fetched alongside.
+    let gate = Gate { $0.url?.path() == "/api/user-cards" }
+    let s = store(cache: cache, gates: [gate])
+    let load = Task { await s.load() }
+    await gate.arrival()
+    #expect(s.cards?.map(\.last4) == ["0001"])
+    #expect(s.isLoading)
+    gate.open()
+    await load.value
+    #expect(s.cards?.map(\.last4) == ["2222"])
+    #expect(s.error == nil && s.banner == nil)
+  }
+
+  @Test func withNothingSavedAFailureIsStillFullScreen() async {
+    let s = store(cache: TestData.cache(), unreachable: true)
+    await s.load()
+    #expect(s.cards == nil)
+    guard case .unreachable = s.error else {
+      Issue.record("expected .unreachable, got \(String(describing: s.error))")
+      return
+    }
+    #expect(s.banner == nil)
+  }
+
+  @Test func cardsSavedUnderAnotherTokenAreNotShown() async throws {
+    let cache = TestData.cache()
+    try await saveCards(in: cache, token: "other-token")
+    let s = store(cache: cache, unreachable: true)
+    await s.load()
+    #expect(s.cards == nil)
+    #expect(s.error != nil)
+  }
+}

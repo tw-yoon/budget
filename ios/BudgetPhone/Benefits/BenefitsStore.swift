@@ -47,7 +47,13 @@ final class BenefitsStore {
       error = .notConfigured
       return
     }
-    if cards == nil { error = nil }
+    if cards == nil {
+      error = nil
+      if let saved = client.savedUserCards()?.cards {
+        cards = saved
+        art.load(saved.compactMap { $0.artUrl.map(client.cardArtURL) })
+      }
+    }
     isLoading = true
     defer { if generation == loadGeneration { isLoading = false } }
     do throws(APIError) {

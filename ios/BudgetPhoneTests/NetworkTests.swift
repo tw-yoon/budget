@@ -310,3 +310,74 @@ extension StubbedNetworkTests {
     }
   }
 }
+
+/// What a launch shows before the server answers: the accounts saved last time.
+extension StubbedNetworkTests.NetworkTests {
+  func client(
+    cache: ResponseCache, token: String = "sample-token", gates: [Gate] = [],
+    _ handler: @escaping (URLRequest) throws -> (Int, Data)
+  ) -> APIClient {
+    APIClient(
+      baseURL: base, session: StubURLProtocol.session(handler, gates: gates), token: token,
+      cache: cache)
+  }
+
+  /// The accounts fixture, saved for `token` as an earlier launch would have.
+  func saveAccounts(in cache: ResponseCache, token: String = "sample-token") async throws {
+    let json = try TestData.accountsJSON()
+    _ = try await client(cache: cache, token: token) { _ in (200, json) }.accounts()
+  }
+
+  @Test func savedAccountsShowWhenTheServerIsUnreachable() async throws {
+    let cache = TestData.cache()
+    try await saveAccounts(in: cache)
+    let c = client(cache: cache) { _ in throw URLError(.cannotConnectToHost) }
+    let store = AccountsStore { c }
+    await store.load()
+    #expect(try store.data == TestData.accounts())
+    #expect(store.error == nil)
+    #expect(store.banner != nil, "with saved data showing, a failure is a banner")
+  }
+
+  @Test func savedAccountsShowWhileLoadingThenTheServersAnswerReplacesThem() async throws {
+    let cache = TestData.cache()
+    try await saveAccounts(in: cache)
+    var root = try #require(
+      JSONSerialization.jsonObject(with: TestData.accountsJSON()) as? [String: Any])
+    root["groups"] = []
+    let fresh = try JSONSerialization.data(withJSONObject: root)
+    let gate = Gate { _ in true }
+    let c = client(cache: cache, gates: [gate]) { _ in (200, fresh) }
+    let store = AccountsStore { c }
+    let load = Task { await store.load() }
+    await gate.arrival()
+    #expect(try store.data == TestData.accounts())
+    #expect(store.isLoading)
+    gate.open()
+    await load.value
+    #expect(store.data?.groups.isEmpty == true)
+    #expect(store.error == nil && store.banner == nil)
+  }
+
+  @Test func withNothingSavedAFailureIsStillFullScreen() async {
+    let c = client(cache: TestData.cache()) { _ in throw URLError(.cannotConnectToHost) }
+    let store = AccountsStore { c }
+    await store.load()
+    #expect(store.data == nil)
+    guard case .unreachable = store.error else {
+      Issue.record("expected .unreachable, got \(String(describing: store.error))")
+      return
+    }
+    #expect(store.banner == nil)
+  }
+
+  @Test func accountsSavedUnderAnotherTokenAreNotShown() async throws {
+    let cache = TestData.cache()
+    try await saveAccounts(in: cache, token: "other-token")
+    let c = client(cache: cache) { _ in throw URLError(.cannotConnectToHost) }
+    let store = AccountsStore { c }
+    await store.load()
+    #expect(store.data == nil)
+    #expect(store.error != nil)
+  }
+}

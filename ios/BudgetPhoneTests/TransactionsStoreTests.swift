@@ -326,3 +326,144 @@ extension StubbedNetworkTests {
     }
   }
 }
+
+/// What a launch shows before the server answers: the ledger's first page
+/// and the Pro-mode setting, saved last time.
+extension StubbedNetworkTests.TransactionsStoreTests {
+  func client(
+    cache: ResponseCache, token: String = "sample-token", gates: [Gate] = [],
+    _ handler: @escaping (URLRequest) throws -> (Int, Data)
+  ) -> APIClient {
+    APIClient(
+      baseURL: base, session: StubURLProtocol.session(handler, gates: gates), token: token,
+      cache: cache)
+  }
+
+  /// Page 1 holding `saved`, of 2 pages, saved for `token`.
+  func saveLedger(in cache: ResponseCache, token: String = "sample-token") async throws {
+    let page = try TestData.ledgerPage(["saved"], page: 1, totalPages: 2, total: 60)
+    _ = try await client(cache: cache, token: token) { _ in (200, page) }
+      .transactions(TransactionQuery(), page: 1)
+  }
+
+  // MARK: Saved ledger
+
+  @Test func theSavedLedgerShowsWhenTheServerIsUnreachable() async throws {
+    let cache = TestData.cache()
+    try await saveLedger(in: cache)
+    let c = client(cache: cache) { _ in throw URLError(.cannotConnectToHost) }
+    let store = TransactionsStore { c }
+    await store.reload()
+    #expect(store.rows.map(\.id) == ["saved"])
+    #expect(store.total == 60 && store.totalPages == 2)
+    #expect(store.error == nil)
+    #expect(store.banner != nil)
+  }
+
+  @Test func theSavedLedgerShowsWhileLoadingThenTheServersPageReplacesIt() async throws {
+    let cache = TestData.cache()
+    try await saveLedger(in: cache)
+    let fresh = try TestData.ledgerPage(["fresh"], page: 1, totalPages: 1)
+    let gate = Gate { _ in true }
+    let c = client(cache: cache, gates: [gate]) { _ in (200, fresh) }
+    let store = TransactionsStore { c }
+    let load = Task { await store.reload() }
+    await gate.arrival()
+    #expect(store.rows.map(\.id) == ["saved"])
+    #expect(store.isLoading)
+    gate.open()
+    await load.value
+    #expect(store.rows.map(\.id) == ["fresh"])
+    #expect(store.total == 1 && store.totalPages == 1)
+    #expect(store.error == nil && store.banner == nil)
+  }
+
+  @Test func withNoSavedLedgerAFailureIsStillFullScreen() async {
+    let c = client(cache: TestData.cache()) { _ in throw URLError(.cannotConnectToHost) }
+    let store = TransactionsStore { c }
+    await store.reload()
+    #expect(store.rows.isEmpty)
+    guard case .unreachable = store.error else {
+      Issue.record("expected .unreachable, got \(String(describing: store.error))")
+      return
+    }
+    #expect(store.banner == nil)
+  }
+
+  @Test func aLedgerSavedUnderAnotherTokenIsNotShown() async throws {
+    let cache = TestData.cache()
+    try await saveLedger(in: cache, token: "other-token")
+    let c = client(cache: cache) { _ in throw URLError(.cannotConnectToHost) }
+    let store = TransactionsStore { c }
+    await store.reload()
+    #expect(store.rows.isEmpty)
+    #expect(store.error != nil)
+  }
+
+  // MARK: Saved Pro mode
+
+  /// Saves each key's answer for `token`, as the reads of an earlier launch.
+  func saveMode(
+    in cache: ResponseCache, token: String = "sample-token", _ values: [String: String]
+  ) async throws {
+    let c = client(cache: cache, token: token) { r in
+      (200, Data(values[TestData.query(of: r, "key")!]!.utf8))
+    }
+    for key in [ProMode.key, ProMode.legacyKey] where values[key] != nil {
+      _ = try await c.uiState(key)
+    }
+  }
+
+  @Test func theSavedModeAppliesWhenTheServerIsUnreachable() async throws {
+    let cache = TestData.cache()
+    try await saveMode(in: cache, [ProMode.key: #"{"value":"pro"}"#])
+    let c = client(cache: cache) { _ in throw URLError(.cannotConnectToHost) }
+    let mode = ProMode { c }
+    await mode.load()
+    #expect(mode.isPro)
+    #expect(mode.hasLoaded)
+  }
+
+  @Test func theSavedModeFallsBackToTheSavedLegacyKey() async throws {
+    let cache = TestData.cache()
+    try await saveMode(
+      in: cache, [ProMode.key: #"{"value":null}"#, ProMode.legacyKey: #"{"value":"pro"}"#])
+    let c = client(cache: cache) { _ in throw URLError(.cannotConnectToHost) }
+    let mode = ProMode { c }
+    await mode.load()
+    #expect(mode.isPro)
+    #expect(mode.hasLoaded)
+  }
+
+  @Test func theSavedModeAppliesWhileLoadingThenTheServersAnswerReplacesIt() async throws {
+    let cache = TestData.cache()
+    try await saveMode(in: cache, [ProMode.key: #"{"value":"pro"}"#])
+    let gate = Gate { _ in true }
+    let c = client(cache: cache, gates: [gate]) { _ in (200, Data(#"{"value":"normal"}"#.utf8)) }
+    let mode = ProMode { c }
+    let load = Task { await mode.load() }
+    await gate.arrival()
+    #expect(mode.isPro && mode.hasLoaded)
+    gate.open()
+    await load.value
+    #expect(!mode.isPro)
+  }
+
+  @Test func withNoSavedModeAFailedReadStaysNormalAndUnloaded() async {
+    let c = client(cache: TestData.cache()) { _ in throw URLError(.cannotConnectToHost) }
+    let mode = ProMode { c }
+    await mode.load()
+    #expect(!mode.isPro)
+    #expect(!mode.hasLoaded)
+  }
+
+  @Test func aModeSavedUnderAnotherTokenIsNotApplied() async throws {
+    let cache = TestData.cache()
+    try await saveMode(in: cache, token: "other-token", [ProMode.key: #"{"value":"pro"}"#])
+    let c = client(cache: cache) { _ in throw URLError(.cannotConnectToHost) }
+    let mode = ProMode { c }
+    await mode.load()
+    #expect(!mode.isPro)
+    #expect(!mode.hasLoaded)
+  }
+}
