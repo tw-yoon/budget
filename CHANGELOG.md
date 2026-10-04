@@ -9,7 +9,7 @@ middle number; one carrying fixes and small changes moves the last.
 Still `0.x`: the database schema changes between releases (migrations run on
 update), so nothing here is a stability promise.
 
-## Unreleased
+## 0.10.0 — 2026-10-04
 
 - The setup guides (this README and `ios/README.md`) are rewritten as plain
   step-by-step instructions: where to download each app, what to paste into
