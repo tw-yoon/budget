@@ -26,17 +26,18 @@ else's servers, except Plaid, the service that talks to your banks for you.
 
 1. [What you need](#what-you-need)
 2. [How to use Terminal](#how-to-use-terminal)
-3. [Step 1: Install Node.js](#step-1-install-nodejs)
-4. [Step 2: Install Git](#step-2-install-git)
-5. [Step 3: Get your Plaid keys](#step-3-get-your-plaid-keys)
-6. [Step 4: Download Budget](#step-4-download-budget)
-7. [Step 5: Add your Plaid keys](#step-5-add-your-plaid-keys)
-8. [Step 6: Start Budget](#step-6-start-budget)
-9. [Step 7: Add a pretend bank](#step-7-add-a-pretend-bank)
-10. [Step 8: Open Budget on your phone or another computer](#step-8-open-budget-on-your-phone-or-another-computer-optional)
-11. [Step 9: The iPhone app](#step-9-the-iphone-app-optional)
-12. [Everyday use](#everyday-use)
-13. [Where your data is kept](#where-your-data-is-kept)
+3. [Quick install (one paste)](#quick-install-one-paste)
+4. [Step 1: Install Node.js](#step-1-install-nodejs)
+5. [Step 2: Install Git](#step-2-install-git)
+6. [Step 3: Get your Plaid keys](#step-3-get-your-plaid-keys)
+7. [Step 4: Download Budget](#step-4-download-budget)
+8. [Step 5: Add your Plaid keys](#step-5-add-your-plaid-keys)
+9. [Step 6: Start Budget](#step-6-start-budget)
+10. [Step 7: Add a pretend bank](#step-7-add-a-pretend-bank)
+11. [Step 8: Open Budget on your phone or another computer](#step-8-open-budget-on-your-phone-or-another-computer-optional)
+12. [Step 9: The iPhone app](#step-9-the-iphone-app-optional)
+13. [Everyday use](#everyday-use)
+14. [Where your data is kept](#where-your-data-is-kept)
 
 ## What you need
 
@@ -82,7 +83,57 @@ Paste **one grey box at a time**, in order. Leave Terminal open between steps.
 
 ---
 
+## Quick install (one paste)
+
+This does Steps 1, 2, 4, 5 and 6 below for you with one paste. Prefer to do it
+by hand? Steps 1 to 6 below do the same thing.
+
+1. Get your Plaid keys first. The installer asks for them. Do
+   [Step 3](#step-3-get-your-plaid-keys) now, and keep that page open.
+2. Open Terminal (see above) and paste:
+
+   ```bash
+   curl -fsSL https://raw.githubusercontent.com/tw-yoon/budget/main/scripts/install.sh | bash
+   ```
+
+3. Answer what it asks, as it goes:
+   - A window may ask to install the **command line developer tools**. Click
+     **Install** (not "Get Xcode"), then **Agree**, and wait. It can take 5 to
+     15 minutes; Terminal waits too.
+   - Your Mac may ask for its **password** to install Node.js. Nothing shows
+     while you type; that's normal. Press **Return** when done.
+   - It asks you to paste your **client_id**, then your **Sandbox secret**.
+     Paste each one and press **Return**. The secret stays hidden.
+4. It then starts Budget. The first time takes **3 to 5 minutes**.
+
+✅ **You should see** `Budget v… is ready at http://localhost:3000`, and your
+browser opens Budget. Go to [Step 7](#step-7-add-a-pretend-bank).
+
+You can paste the line again at any time. It skips what's already done.
+
+❌ **If you see** `The command line tools aren't installed yet`: the wait for
+the developer tools ran out. Finish that install (or paste
+`xcode-select --install` to open the window again), then paste the quick
+install line again.
+
+❌ **If you see** `Download the LTS installer from https://nodejs.org, open it,
+click through it, then paste this line again`: the installer couldn't set up
+Node.js. Do [Step 1](#step-1-install-nodejs) by hand, then paste the quick
+install line again.
+
+❌ **If you see** `There's already a folder at … that isn't Budget`: a folder
+named `budget` is already in your Documents folder. Rename or move it, then
+paste the quick install line again.
+
+❌ **If you see** `INVALID_API_KEYS` or `invalid client_id or secret` later,
+when you add the pretend bank: a Plaid key is wrong. See the first ❌ in
+[Step 7](#step-7-add-a-pretend-bank).
+
+---
+
 ## Step 1: Install Node.js
+
+Used the quick install? Skip to [Step 7](#step-7-add-a-pretend-bank).
 
 1. Go to [nodejs.org](https://nodejs.org) and click the big **Download** button
    (the **LTS** version).

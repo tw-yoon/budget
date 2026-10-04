@@ -17,6 +17,9 @@ update), so nothing here is a stability promise.
 - iPhone app: when it can't reach your Mac it says what to check (Tailscale,
   the Mac awake, Budget running), with a Retry button; with saved data
   showing, a short banner says so instead.
+- New one-paste installer for friends: it installs what Budget needs, downloads
+  it, asks for the Plaid keys and starts it. The README offers it first; the
+  step-by-step guide is still there.
 
 ## 0.10.0 — 2026-10-04
 
