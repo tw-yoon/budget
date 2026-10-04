@@ -47,18 +47,31 @@ check (below). `auto` is not documented for people to run.
 PHONE_DEVICE =
 ```
 
-Also added to `Local.example.xcconfig`. When empty, the script reads
-`xcrun devicectl list devices` and uses the one paired iPhone. None or more
-than one: it stops with a message naming the setting.
+Also added to `Local.example.xcconfig`. When empty, the script uses the one
+paired iPhone. None or more than one: it stops with a message naming the
+setting.
+
+The phone has two identifiers, and each tool needs a different one:
+
+| Identifier | Where it comes from | Used by |
+|---|---|---|
+| CoreDevice identifier | `identifier` | `devicectl … --device` |
+| Hardware UDID | `hardwareProperties.udid` | `xcodebuild -destination id=` |
+
+The script reads both from `xcrun devicectl list devices --json-output <file>`,
+parsed with `osascript -l JavaScript` (ships with macOS; no `jq` or Node, which
+launchd's minimal `PATH` may not find). `PHONE_DEVICE` matches a device's name,
+CoreDevice identifier or UDID, and the script takes both identifiers from that
+device's entry.
 
 ### `install`
 
 1. `xcodebuild build -project BudgetPhone.xcodeproj -scheme BudgetPhone
-   -configuration Debug -destination id=<phone> -derivedDataPath
+   -configuration Debug -destination id=<udid> -derivedDataPath
    build/DerivedData-phone -allowProvisioningUpdates -quiet`. The flag lets
    Xcode renew the free profile from the command line, using the Apple ID
    already added in Xcode → Settings → Accounts.
-2. `xcrun devicectl device install app --device <phone> <built .app>`. The
+2. `xcrun devicectl device install app --device <coredevice-id> <built .app>`. The
    bundle ID is unchanged, so the app keeps its data (server address, token).
 3. On success, write the current time to `build/phone/last-success`.
 
@@ -117,6 +130,7 @@ and succeed or fail on demand. Cases:
 
 - `install` success writes `last-success`; build failure does not install.
 - Device choice: setting wins; one paired iPhone used; zero or two stop with the message.
+- Identifiers: the stub device list gives different CoreDevice and UDID values; `xcodebuild` gets the UDID, `devicectl install` gets the CoreDevice identifier.
 - `auto` skips under 2 days; runs at 2+.
 - Alert: failure at 5+ days or missing notifies; failure under 5 days does not; success never does.
 - `schedule on` writes a plist with the right path and interval and bootstraps it; `schedule off` removes it; both repeatable.
