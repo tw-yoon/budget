@@ -17,15 +17,49 @@ enum APIError: Error, Equatable, Sendable {
   /// 401: the access token is missing, wrong, or was reset on the Mac.
   case unauthorized
 
+  /// Plain-language reason, safe to show as is.
   var message: String {
+    if isUnreachable { return Self.unreachableMessage }
     switch self {
-    case .notConfigured: "No server is set."
-    case .unreachable(let m): m
-    case .server(_, let m): m
-    case .decoding(let m): "Unexpected response from the server. \(m)"
-    case .cancelled: "Cancelled."
-    case .unauthorized: "The server rejected the access token. Paste the current one in Settings → Server."
+    case .notConfigured: return "No server is set."
+    case .unreachable: return Self.unreachableMessage
+    case .server(_, let m): return m
+    case .decoding(let m): return "Unexpected response from the server. \(m)"
+    case .cancelled: return "Cancelled."
+    case .unauthorized: return "The server rejected the access token. Paste the current one in Settings → Server."
     }
+  }
+
+  static let unreachableMessage =
+    "Can't reach your Mac. Check that Tailscale is on and the Mac is awake with Budget running."
+
+  /// The phone got no answer from Budget. 502-504 come from Tailscale's
+  /// proxy on the Mac when Budget isn't running; Budget never sends them.
+  var isUnreachable: Bool {
+    switch self {
+    case .unreachable: true
+    case .server(let status, _): [502, 503, 504].contains(status)
+    default: false
+    }
+  }
+
+  /// The system's or server's own text behind an unreachable failure, for
+  /// small print. Nil for every other kind.
+  var detail: String? {
+    switch self {
+    case .unreachable(let m): m
+    case .server(_, let m) where isUnreachable: m
+    default: nil
+    }
+  }
+
+  /// One line over data that is still showing after a failed load.
+  var loadBanner: String {
+    if isUnreachable { return "Showing saved data — can't reach your Mac." }
+    if self == .unauthorized {
+      return "Showing saved data — access token not accepted. Re-enter it in Settings → Server."
+    }
+    return message
   }
 }
 
