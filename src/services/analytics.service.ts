@@ -381,12 +381,17 @@ function dayKey(d: Date): string {
  * the same spend definition as the rest of analytics: outflows count positive,
  * reimbursements (classified inflows) net them down, plain income is ignored.
  */
+/** The effective category label of Plaid's RENT_AND_UTILITIES. */
+const RENT_AND_UTILITIES = "Rent and Utilities";
+
 export async function getDailySpending(months = 24): Promise<SpendingSeries> {
   const start = startOfWindow(new Date(), months);
   const txs = await fetchTxInputs(start);
   const round = (n: number) => Math.round(n * 100) / 100;
 
-  const map = new Map<string, number>();
+  // Per day: total spend, and the part of it in Rent and Utilities (the
+  // phone's graph can leave that out).
+  const map = new Map<string, { amount: number; rent: number }>();
   for (const t of txs) {
     if (t.date < start) continue;
     let v = 0;
@@ -394,11 +399,18 @@ export async function getDailySpending(months = 24): Promise<SpendingSeries> {
     else if (t.isOffset) v = t.amount; // reimbursement: negative, reduces spend
     else continue; // plain income inflow — not spending
     const key = dayKey(t.date);
-    map.set(key, (map.get(key) ?? 0) + v);
+    const entry = map.get(key) ?? { amount: 0, rent: 0 };
+    entry.amount += v;
+    if (t.category === RENT_AND_UTILITIES) entry.rent += v;
+    map.set(key, entry);
   }
 
   const days = [...map.entries()]
-    .map(([date, amount]) => ({ date, amount: round(amount) }))
+    .map(([date, e]) => ({
+      date,
+      amount: round(e.amount),
+      rentAndUtilities: round(e.rent),
+    }))
     .sort((a, b) => a.date.localeCompare(b.date));
   return { days };
 }

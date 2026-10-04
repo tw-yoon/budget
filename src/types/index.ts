@@ -141,6 +141,7 @@ export interface CashflowMonth {
 export interface DailySpend {
   date: string; // YYYY-MM-DD
   amount: number; // net spend that day (outflows minus reimbursements)
+  rentAndUtilities: number; // the part of `amount` in Rent and Utilities
 }
 
 export interface SpendingSeries {
