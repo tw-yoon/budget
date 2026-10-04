@@ -9,6 +9,12 @@ middle number; one carrying fixes and small changes moves the last.
 Still `0.x`: the database schema changes between releases (migrations run on
 update), so nothing here is a stability promise.
 
+## Unreleased
+
+- iPhone app: opens instantly with the data from last time, then refreshes in
+  the background. The saved data is cleared when you change the server or the
+  access token.
+
 ## 0.10.0 — 2026-10-04
 
 - The setup guides (this README and `ios/README.md`) are rewritten as plain

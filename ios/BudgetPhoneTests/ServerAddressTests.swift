@@ -24,4 +24,16 @@ struct ServerAddressTests {
     defaults.set("http://budget-mac.local:3000/", forKey: ServerAddress.storageKey)
     #expect(ServerAddress.saved(in: defaults)?.absoluteString == "http://budget-mac.local:3000")
   }
+
+  @Test func detectsAServerOrTokenChange() {
+    func changed(_ oldS: String, _ oldT: String?, _ newS: String, _ newT: String) -> Bool {
+      ServerForm.changed(oldServer: oldS, oldToken: oldT, newServer: newS, newToken: newT)
+    }
+    let host = "https://budget.example.ts.net"
+    #expect(!changed(host, "token-a", host + "/", " token-a "))
+    #expect(!changed("", nil, "", ""))
+    #expect(changed(host, "token-a", "https://other.example.ts.net", "token-a"))
+    #expect(changed(host, "token-a", host, "token-b"))
+    #expect(changed(host, nil, host, "token-a"))
+  }
 }

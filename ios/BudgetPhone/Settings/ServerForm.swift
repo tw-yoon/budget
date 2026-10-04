@@ -47,7 +47,22 @@ struct ServerForm: View {
     }
   }
 
+  /// True when the server address or token differs from what was saved, so
+  /// the saved data belongs to someone else's server. Compares the cleaned-up
+  /// forms, so stray spaces or a trailing slash don't count as a change.
+  static func changed(oldServer: String, oldToken: String?, newServer: String, newToken: String) -> Bool {
+    func clean(_ s: String) -> String { ServerAddress.normalize(s)?.absoluteString ?? "" }
+    return clean(oldServer) != clean(newServer)
+      || (AccessToken.normalize(oldToken ?? "") ?? "") != (AccessToken.normalize(newToken) ?? "")
+  }
+
   private func save() {
+    // An address that doesn't parse isn't saved, so it can't count as a change.
+    let newServer = ServerAddress.normalize(draft)?.absoluteString ?? server
+    // Reading never crosses owners; this also removes the old files from disk.
+    if Self.changed(oldServer: server, oldToken: AccessToken.saved(), newServer: newServer, newToken: tokenDraft) {
+      ResponseCache.shared.clear()
+    }
     if let url = ServerAddress.normalize(draft) {
       server = url.absoluteString
       draft = server
