@@ -51,7 +51,7 @@ final class P2PStore {
       banner = nil
     } catch {
       guard current == generation, error != .cancelled else { return }
-      if data == nil { self.error = error } else { banner = error.message }
+      if data == nil { self.error = error } else { banner = error.loadBanner }
     }
   }
 

@@ -67,7 +67,7 @@ final class BenefitsStore {
     } catch {
       guard generation == loadGeneration else { return }
       if error == .cancelled { return }
-      if cards == nil { self.error = error } else { banner = error.message }
+      if cards == nil { self.error = error } else { banner = error.loadBanner }
     }
   }
 

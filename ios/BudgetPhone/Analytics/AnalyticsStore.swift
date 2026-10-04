@@ -148,7 +148,7 @@ final class AnalyticsStore {
     } catch {
       guard generation == summaryGeneration else { return }
       if error == .cancelled { return }
-      if hasData { banner = error.message } else { self.error = error }
+      if hasData { banner = error.loadBanner } else { self.error = error }
     }
   }
 
@@ -194,6 +194,6 @@ final class AnalyticsStore {
       return
     }
     if failure == .cancelled { return }
-    if hasData { banner = failure.message } else { error = failure }
+    if hasData { banner = failure.loadBanner } else { error = failure }
   }
 }

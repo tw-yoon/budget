@@ -61,7 +61,7 @@ final class RulesStore {
     } catch {
       guard generation == loadGeneration else { return }
       if error == .cancelled { return }
-      if data == nil { self.error = error } else { banner = error.message }
+      if data == nil { self.error = error } else { banner = error.loadBanner }
     }
   }
 

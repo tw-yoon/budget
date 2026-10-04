@@ -123,38 +123,3 @@ private struct GroupHeader: View {
     }
   }
 }
-
-struct ErrorView: View {
-  let error: APIError
-  let server: String
-  let retry: () -> Void
-
-  var body: some View {
-    switch error {
-    case .notConfigured, .unreachable:
-      ContentUnavailableView {
-        Label("Can't Reach Budget", systemImage: "wifi.exclamationmark")
-      } description: {
-        Text("Make sure the Mac is awake, Budget is running, and this iPhone is on the same network.\n\n\(server)")
-      } actions: {
-        Button("Retry", action: retry).buttonStyle(.borderedProminent)
-      }
-    case .unauthorized:
-      ContentUnavailableView {
-        Label("Sign-in Required", systemImage: "lock")
-      } description: {
-        Text(error.message)
-      } actions: {
-        Button("Retry", action: retry).buttonStyle(.borderedProminent)
-      }
-    case .server, .decoding, .cancelled:
-      ContentUnavailableView {
-        Label("Something Went Wrong", systemImage: "exclamationmark.triangle")
-      } description: {
-        Text(error.message)
-      } actions: {
-        Button("Retry", action: retry).buttonStyle(.borderedProminent)
-      }
-    }
-  }
-}

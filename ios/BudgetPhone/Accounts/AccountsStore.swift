@@ -60,7 +60,7 @@ final class AccountsStore {
       if data == nil {
         self.error = error
       } else {
-        banner = error.message
+        banner = error.loadBanner
       }
     }
   }

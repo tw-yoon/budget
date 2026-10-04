@@ -14,6 +14,9 @@ update), so nothing here is a stability promise.
 - iPhone app: opens instantly with the data from last time, then refreshes in
   the background. The saved data is cleared when you change the server or the
   access token.
+- iPhone app: when it can't reach your Mac it says what to check (Tailscale,
+  the Mac awake, Budget running), with a Retry button; with saved data
+  showing, a short banner says so instead.
 
 ## 0.10.0 — 2026-10-04
 

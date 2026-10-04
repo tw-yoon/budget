@@ -81,7 +81,7 @@ final class TransactionsStore {
       banner = nil
     } catch {
       guard current == generation, error != .cancelled else { return }
-      if pages.isEmpty { self.error = error } else { banner = error.message }
+      if pages.isEmpty { self.error = error } else { banner = error.loadBanner }
     }
   }
 

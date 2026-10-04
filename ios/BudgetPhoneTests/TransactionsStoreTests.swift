@@ -360,6 +360,26 @@ extension StubbedNetworkTests.TransactionsStoreTests {
     #expect(store.banner != nil)
   }
 
+  @Test func aFailedReloadOverSavedRowsSaysWhyInPlainLanguage() async throws {
+    let cache = TestData.cache()
+    try await saveLedger(in: cache)
+    let down = TransactionsStore { [self] in client(cache: cache) { _ in throw URLError(.cannotConnectToHost) } }
+    await down.reload()
+    #expect(down.banner == "Showing saved data — can't reach your Mac.")
+    let denied = TransactionsStore { [self] in client(cache: cache) { _ in (401, Data("{}".utf8)) } }
+    await denied.reload()
+    #expect(denied.banner == "Showing saved data — access token not accepted. Re-enter it in Settings → Server.")
+    #expect(denied.rows.map(\.id) == ["saved"])
+  }
+
+  @Test func aBadGatewayWithNothingShowingIsCantReach() async {
+    let c = client(cache: TestData.cache()) { _ in (502, Data()) }
+    let store = TransactionsStore { c }
+    await store.reload()
+    #expect(store.error?.isUnreachable == true)
+    #expect(store.banner == nil)
+  }
+
   @Test func theSavedLedgerShowsWhileLoadingThenTheServersPageReplacesIt() async throws {
     let cache = TestData.cache()
     try await saveLedger(in: cache)

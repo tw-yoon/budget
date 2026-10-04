@@ -120,6 +120,33 @@ extension StubbedNetworkTests {
       #expect(store.banner != nil)
     }
 
+    @Test func aFailedReloadOverDataSaysWhyInPlainLanguage() async throws {
+      let json = try TestData.accountsJSON()
+      var status = 200
+      var unreachable = false
+      let c = client { _ in
+        if unreachable { throw URLError(.cannotConnectToHost) }
+        return (status, status == 200 ? json : Data("{}".utf8))
+      }
+      let store = AccountsStore { c }
+      await store.load()
+      unreachable = true
+      await store.load()
+      #expect(store.banner == "Showing saved data — can't reach your Mac.")
+      unreachable = false
+      status = 401
+      await store.load()
+      #expect(store.banner == "Showing saved data — access token not accepted. Re-enter it in Settings → Server.")
+      #expect(store.data != nil && store.error == nil)
+    }
+
+    @Test func aBadGatewayWithNothingShowingIsCantReach() async {
+      let c = client { _ in (502, Data()) }
+      let store = AccountsStore { c }
+      await store.load()
+      #expect(store.error?.isUnreachable == true)
+    }
+
     @Test func refreshNamesFailedBanksAndStillReloads() async throws {
       let json = try TestData.accountsJSON()
       let refresh = #"{"updated":[],"liabilities":[],"errors":[{"itemId":"i1","institution":"Example Bank","error":"ITEM_LOGIN_REQUIRED"}]}"#
