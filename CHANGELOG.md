@@ -9,7 +9,7 @@ middle number; one carrying fixes and small changes moves the last.
 Still `0.x`: the database schema changes between releases (migrations run on
 update), so nothing here is a stability promise.
 
-## Unreleased
+## 0.8.0 — 2026-10-03
 
 - Budget only accepts connections from the Mac it runs on and, with the access
   token, from your tailnet. Find the token under Settings → Remote Access;
