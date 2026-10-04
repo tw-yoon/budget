@@ -1,0 +1,144 @@
+import Foundation
+
+enum APIError: Error, Equatable, Sendable {
+  /// No server address saved yet.
+  case notConfigured
+  /// The request never got an HTTP answer: wrong address, Mac asleep, off
+  /// the home network.
+  case unreachable(String)
+  /// A non-2xx answer. `message` is the route's `{ error }` when it sent one.
+  case server(status: Int, message: String)
+  /// A 2xx answer whose body didn't match the models.
+  case decoding(String)
+  /// The request was cancelled (the view disappeared, or a newer request
+  /// superseded it) rather than actually failing. Never shown to the user:
+  /// callers are expected to treat it as a silent no-op.
+  case cancelled
+  /// 401: the access token is missing, wrong, or was reset on the Mac.
+  case unauthorized
+
+  var message: String {
+    switch self {
+    case .notConfigured: "No server is set."
+    case .unreachable(let m): m
+    case .server(_, let m): m
+    case .decoding(let m): "Unexpected response from the server. \(m)"
+    case .cancelled: "Cancelled."
+    case .unauthorized: "The server rejected the access token. Paste the current one in Settings → Server."
+    }
+  }
+}
+
+/// Calls against the web app's own API. The Accounts calls live here; each
+/// other screen adds its own in an `APIClient+<Screen>.swift` extension,
+/// all going through `send`, `encode` and `decode` below.
+struct APIClient: Sendable {
+  let baseURL: URL
+  var session: URLSession = .shared
+  var token: String? = nil
+
+  /// The saved server with the saved token; nil until a server is set.
+  static func saved() -> APIClient? {
+    ServerAddress.saved().map { APIClient(baseURL: $0, token: AccessToken.saved()) }
+  }
+
+  func accounts() async throws(APIError) -> AccountsResponse {
+    try decode(await send("GET", "api/accounts", timeout: 15))
+  }
+
+  /// Calls Plaid once per linked bank, hence the long timeout. A bank that
+  /// fails comes back in `errors`; the call itself still succeeds.
+  func refreshBalances() async throws(APIError) -> RefreshResult {
+    try decode(await send("POST", "api/plaid/refresh-balances", body: Data("{}".utf8), timeout: 60))
+  }
+
+  func updateAccount(id: String, patch: AccountPatch) async throws(APIError) {
+    _ = try await send("PATCH", "api/accounts/\(id)", body: encode(patch), timeout: 15)
+  }
+
+  private struct ErrorBody: Decodable { let error: String }
+
+  /// `CancellationError` doesn't always survive the trip through
+  /// `URLProtocolClient`'s Objective-C bridging with its native type intact
+  /// — it can come back as a plain `NSError` in `Swift.CancellationError`'s
+  /// domain instead. Check both forms, plus the `URLError` iOS itself uses
+  /// when it cancels the underlying task.
+  private static func isCancellation(_ error: Error) -> Bool {
+    if error is CancellationError { return true }
+    if let urlError = error as? URLError, urlError.code == .cancelled { return true }
+    let nsError = error as NSError
+    return nsError.domain == "Swift.CancellationError"
+  }
+
+  /// The request itself: any HTTP status comes back with its body, for the
+  /// few routes whose non-2xx bodies carry more than `{ error }` (a
+  /// category merge prompt, a delete refused in use).
+  func sendRaw(
+    _ method: String, _ path: String, query: [URLQueryItem] = [], body: Data? = nil,
+    timeout: TimeInterval
+  ) async throws(APIError) -> (status: Int, data: Data) {
+    var url = baseURL.appending(path: path)
+    if !query.isEmpty {
+      url.append(queryItems: query)
+      // URLComponents leaves "+" bare, and the server's URLSearchParams reads
+      // a bare "+" as a space ("Snacks + Treats" would arrive as "Snacks   Treats").
+      if var components = URLComponents(url: url, resolvingAgainstBaseURL: false) {
+        components.percentEncodedQuery = components.percentEncodedQuery?
+          .replacingOccurrences(of: "+", with: "%2B")
+        url = components.url ?? url
+      }
+    }
+    var request = URLRequest(url: url, timeoutInterval: timeout)
+    request.httpMethod = method
+    request.setValue("application/json", forHTTPHeaderField: "Accept")
+    if let token { request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
+    if let body {
+      request.httpBody = body
+      request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    }
+
+    let data: Data
+    let response: URLResponse
+    do {
+      (data, response) = try await session.data(for: request)
+    } catch {
+      if Self.isCancellation(error) { throw .cancelled }
+      throw .unreachable(error.localizedDescription)
+    }
+
+    guard let http = response as? HTTPURLResponse else {
+      throw .unreachable("No HTTP response.")
+    }
+    return (http.statusCode, data)
+  }
+
+  func send(
+    _ method: String, _ path: String, query: [URLQueryItem] = [], body: Data? = nil,
+    timeout: TimeInterval
+  ) async throws(APIError) -> Data {
+    let (status, data) = try await sendRaw(method, path, query: query, body: body, timeout: timeout)
+    guard (200..<300).contains(status) else { throw Self.serverError(status: status, data: data) }
+    return data
+  }
+
+  /// A non-2xx answer as `.server`, with the route's `{ error }` when it sent one.
+  static func serverError(status: Int, data: Data) -> APIError {
+    if status == 401 { return .unauthorized }
+    let message =
+      (try? JSONDecoder().decode(ErrorBody.self, from: data))?.error
+      ?? HTTPURLResponse.localizedString(forStatusCode: status)
+    return .server(status: status, message: message)
+  }
+
+  func decode<T: Decodable>(_ data: Data) throws(APIError) -> T {
+    do { return try JSONDecoder().decode(T.self, from: data) } catch {
+      throw .decoding(String(describing: error))
+    }
+  }
+
+  func encode<T: Encodable>(_ value: T) throws(APIError) -> Data {
+    do { return try JSONEncoder().encode(value) } catch {
+      throw .decoding(error.localizedDescription)
+    }
+  }
+}

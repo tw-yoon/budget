@@ -1,0 +1,69 @@
+{
+  "groups": [
+    {
+      "type": "DEPOSITORY",
+      "label": "Cash",
+      "subtotal": 4210.5,
+      "isLiability": false,
+      "accounts": [
+        {
+          "id": "acc-checking",
+          "name": "Everyday Checking",
+          "officialName": "Example Bank Everyday Checking",
+          "mask": "0001",
+          "type": "DEPOSITORY",
+          "subtype": "checking",
+          "currentBalance": 4210.5,
+          "availableBalance": 4100,
+          "balanceFetchedAt": "2026-09-26T15:00:00.000Z",
+          "institution": "Example Bank",
+          "isLiability": false,
+          "nextPaymentDueDate": null,
+          "lastStatementBalance": null,
+          "minimumPaymentAmount": null,
+          "paymentIsOverdue": null,
+          "displayName": null,
+          "manualDueDay": null,
+          "manualCreditLimit": null
+        }
+      ]
+    },
+    {
+      "type": "CREDIT",
+      "label": "Credit cards",
+      "subtotal": 812.34,
+      "isLiability": true,
+      "accounts": [
+        {
+          "id": "acc-card",
+          "name": "Sample Rewards Card",
+          "officialName": null,
+          "mask": "0002",
+          "type": "CREDIT",
+          "subtype": "credit card",
+          "currentBalance": 812.34,
+          "availableBalance": null,
+          "balanceFetchedAt": "2026-09-26T15:00:00.000Z",
+          "institution": "Sample Card Co",
+          "isLiability": true,
+          "nextPaymentDueDate": "2026-10-05T00:00:00.000Z",
+          "lastStatementBalance": 640,
+          "minimumPaymentAmount": 35,
+          "paymentIsOverdue": false,
+          "displayName": "Groceries card",
+          "manualDueDay": null,
+          "manualCreditLimit": 5000
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "totalAssets": 4210.5,
+    "totalLiabilities": 812.34,
+    "netWorth": 3398.16,
+    "accountCount": 2,
+    "lastRefreshed": "2026-09-26T15:00:00.000Z"
+  },
+  "banks": [{ "itemId": "item-1", "institution": "Example Bank", "accountCount": 1 }],
+  "debitCards": []
+}

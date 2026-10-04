@@ -1,0 +1,11 @@
+{
+  "subscriptions": [
+    { "id": "s1", "name": "Sample Stream", "amount": 15.49, "cadence": "MONTHLY", "cadenceLabel": "Monthly",
+      "monthlyCost": 15.49, "nextDate": "2026-10-05T00:00:00.000Z", "merchantName": null,
+      "accountName": "Sample Rewards Card", "source": "MANUAL", "isActive": true },
+    { "id": "s2", "name": "Example Music", "amount": 120, "cadence": "YEARLY", "cadenceLabel": "Yearly",
+      "monthlyCost": 10, "nextDate": null, "merchantName": "Example Music", "accountName": null,
+      "source": "AUTO", "isActive": false }
+  ],
+  "monthlyTotal": 15.49
+}

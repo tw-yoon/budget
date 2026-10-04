@@ -157,10 +157,13 @@ the monorepo as a remote of the public clone — copy file contents, not objects
 Use `git am -3 --keep-cr`: `-3` for the merges, `--keep-cr` because a Venmo
 test fixture deliberately uses CRLF line endings.
 
-*Unpublished paths.* Some of the monorepo's `budget-claude/` tree is private
-and never published. The list, and how it changes the replay (finding
-`LAST`, cutting the patches, verifying the tree), is kept with those paths in
-the monorepo, not here. Follow it on every release.
+*Unpublished paths.* **Superseded 2026-10-03: nothing is held back.** The
+iPhone app (`ios/` and the `*-ios-*` specs and plans) was kept out of releases
+from 2026-09-27 and published in 0.9.0 as one squashed commit, because its
+early history held real account details. That history is never replayed:
+`LAST` is always found by the tree comparison above, and for the first release
+after 0.9.0 it is the private commit that release was cut from, so
+`LAST..HEAD` holds none of the squashed commits.
 
 Scrub every commit, not only the tip — each private commit becomes a public
 one, so run the checks over each patch's added lines *and* its message,

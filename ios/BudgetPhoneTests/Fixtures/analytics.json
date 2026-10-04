@@ -1,0 +1,7 @@
+{
+  "summary": { "totalSpent": 1840.5, "totalIncome": 3200, "net": 1359.5, "txCount": 42 },
+  "byCategory": [{ "category": "Groceries", "amount": 400, "count": 9 }],
+  "byMonth": [{ "month": "2026-08", "label": "Aug", "spent": 900, "income": 1600 }],
+  "topMerchants": [{ "name": "Sample Mart", "amount": 120, "count": 3 }],
+  "rangeMonths": 6
+}

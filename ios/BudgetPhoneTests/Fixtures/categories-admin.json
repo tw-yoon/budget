@@ -1,0 +1,25 @@
+{
+  "categories": [
+    {
+      "id": "c1", "name": "Sample Groceries", "plaidPrimaries": ["FOOD_AND_DRINK"],
+      "transactionCount": 4, "ruleCount": 1, "resolvedTransactionCount": 9, "splitCount": 1,
+      "subcategories": [
+        { "name": "Snacks", "declared": true, "transactionCount": 2, "ruleCount": 0,
+          "plaidLabels": [], "plaidTransactionCount": 0, "renamed": false },
+        { "name": "Corner Store", "declared": false, "transactionCount": 0, "ruleCount": 0,
+          "plaidLabels": [{ "code": "FOOD_AND_DRINK_GROCERIES", "name": "Groceries" }],
+          "plaidTransactionCount": 5, "renamed": true },
+        { "name": "Coffee", "declared": false, "transactionCount": 0, "ruleCount": 0,
+          "plaidLabels": [{ "code": "FOOD_AND_DRINK_COFFEE", "name": "Coffee" }],
+          "plaidTransactionCount": 3, "renamed": false }
+      ]
+    },
+    {
+      "id": "c2", "name": "Transfer", "plaidPrimaries": ["TRANSFER_IN", "TRANSFER_OUT"],
+      "transactionCount": 0, "ruleCount": 0, "resolvedTransactionCount": 0, "splitCount": 0,
+      "subcategories": []
+    }
+  ],
+  "primaries": ["BANK_FEES", "FOOD_AND_DRINK", "TRANSFER_IN", "TRANSFER_OUT"],
+  "unmappedPrimaries": [{ "pfcPrimary": "BANK_FEES", "transactionCount": 2 }]
+}

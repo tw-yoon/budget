@@ -1,0 +1,4 @@
+# Local signing settings (see README.md) and build output.
+/Config/Local.xcconfig
+/build/
+xcuserdata/

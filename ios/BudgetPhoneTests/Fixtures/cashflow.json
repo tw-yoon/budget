@@ -1,0 +1,15 @@
+{
+  "months": [
+    {
+      "key": "2026-07", "label": "Jul 2026",
+      "income": [{ "source": "Paycheck", "amount": 3000 }, { "source": "Other income", "amount": 50 }],
+      "spend": [
+        { "category": "Groceries", "amount": 250, "subs": [{ "name": "Sample Mart", "amount": 100 }] },
+        { "category": "Dining", "amount": 80 }
+      ]
+    },
+    { "key": "2026-08", "label": "Aug 2026", "income": [], "spend": [{ "category": "Travel", "amount": 500 }] }
+  ],
+  "currentCash": 12000,
+  "cashAsOf": null
+}

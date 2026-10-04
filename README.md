@@ -198,6 +198,13 @@ even at home. Reach it through [Tailscale](https://tailscale.com) instead:
 Reset Token under Settings → Remote Access signs out every other device until
 it gets the new token. The Mac's own browser at `localhost` needs no token.
 
+## iPhone app
+
+`ios/` holds a native iPhone app for the same server. There is no App Store
+build: you build it with Xcode, on your own Apple ID. Setup, from the
+simulator to your own phone, is in [ios/README.md](ios/README.md). It reaches
+the Mac through Tailscale, as above, and needs the access token.
+
 ## Two ways to run
 
 | Command | When to use |

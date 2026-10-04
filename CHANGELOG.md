@@ -9,6 +9,13 @@ middle number; one carrying fixes and small changes moves the last.
 Still `0.x`: the database schema changes between releases (migrations run on
 update), so nothing here is a stability promise.
 
+## 0.9.0 — 2026-10-03
+
+- The iPhone app is published, in `ios/`. It covers Accounts, Activity (the
+  ledger, Venmo and Zelle), Analytics with Subscriptions, Benefits and
+  Settings, all through the same server. Build it with Xcode on your own Apple
+  ID; README → "iPhone app" says where to start.
+
 ## 0.8.0 — 2026-10-03
 
 - Budget only accepts connections from the Mac it runs on and, with the access

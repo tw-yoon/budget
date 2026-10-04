@@ -1,0 +1,11 @@
+{
+  "rules": [
+    { "id": "r1", "field": "EITHER", "matchType": "CONTAINS", "pattern": "Sample Mart",
+      "category": "Sample Groceries", "priority": 0, "enabled": true,
+      "createdAt": "2026-09-01T00:00:00.000Z",
+      "outcome": { "applied": 6, "pending": 0, "handSet": 3 } },
+    { "id": "r2", "field": "MERCHANT", "matchType": "STARTS_WITH", "pattern": "Example Transit",
+      "category": "Transportation > Transit", "priority": 1, "enabled": false,
+      "createdAt": "2026-09-02T00:00:00.000Z", "outcome": null }
+  ]
+}

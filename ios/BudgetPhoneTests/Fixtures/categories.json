@@ -1,0 +1,35 @@
+{
+  "categories": [
+    {
+      "id": "c1",
+      "name": "Groceries",
+      "plaidPrimaries": [
+        "FOOD_AND_DRINK"
+      ],
+      "transactionCount": 3,
+      "ruleCount": 0,
+      "resolvedTransactionCount": 3,
+      "subcategories": [
+        {
+          "name": "Organic",
+          "transactionCount": 1
+        }
+      ],
+      "splitCount": 1
+    },
+    {
+      "id": "c2",
+      "name": "Dining",
+      "plaidPrimaries": [],
+      "transactionCount": 0,
+      "ruleCount": 0,
+      "resolvedTransactionCount": 0,
+      "subcategories": [],
+      "splitCount": 0
+    }
+  ],
+  "primaries": [
+    "FOOD_AND_DRINK"
+  ],
+  "unmappedPrimaries": []
+}

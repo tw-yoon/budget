@@ -1,0 +1,39 @@
+{ "cards": [
+  { "id": "c1", "issuer": "AMEX", "name": "Gold", "last4": "0001", "membershipStartYear": 2024,
+    "membershipStartMonth": 2, "annualFee": 250, "pointValueCents": 1.5, "artUrl": "/api/card-art/c1.png",
+    "linked": true, "linkedAccountName": "Example Bank Gold", "displayName": "Example Bank Gold",
+    "benefits": [
+      { "id": "b1", "name": "Sample Dining Credit", "notes": null, "amount": 10, "period": "MONTHLY",
+        "matchCategories": [], "categoryLabels": [], "matchText": ["Sample Dining"],
+        "perkActiveFrom": null, "used": 12.5, "cappedUsed": 10, "pct": 1, "periodLabel": "March 2026",
+        "source": "auto", "autoMode": "credits",
+        "yearBreakdown": [
+          { "label": "February 2026", "short": "Feb", "key": "2026-02", "used": 10, "target": 10, "captured": true, "manual": false, "future": false },
+          { "label": "March 2026", "short": "Mar", "key": "2026-03", "used": 4, "target": 10, "captured": false, "manual": true, "future": false },
+          { "label": "April 2026", "short": "Apr", "key": "2026-04", "used": 0, "target": 10, "captured": false, "manual": false, "future": true }
+        ],
+        "ytdCaptured": 14, "yearTarget": 120 }
+    ],
+    "benefitCount": 1, "benefitsUsedCount": 1, "creditsYtd": 14, "creditsAnnualMax": 120,
+    "rewardRates": [
+      { "id": "r1", "category": "DINING", "categoryLabel": "Dining", "multiplier": 4, "unit": "X", "display": "4x", "notes": "Sample note" },
+      { "id": "r2", "category": "OTHER", "categoryLabel": "Everything else", "multiplier": 1, "unit": "X", "display": "1x", "notes": null }
+    ],
+    "earnings": { "unit": "X", "pointValueCents": 1.5, "totalSpend": 300, "totalEarned": 700,
+      "totalValue": 10.5, "incrementalValue": -2.25,
+      "byCategory": [
+        { "category": "DINING", "categoryLabel": "Dining", "spend": 100, "rate": "4x", "isBonus": true,
+          "earned": 400, "value": 6, "vsBest": 3, "bestAlternative": "Sample Rewards Card" },
+        { "category": "OTHER", "categoryLabel": "Everything else", "spend": 200, "rate": "1x", "isBonus": false,
+          "earned": 200, "value": 3, "vsBest": 0, "bestAlternative": null }
+      ] },
+    "earningsPeriodLabel": "Feb 2026 – Jan 2027" },
+  { "id": "c2", "issuer": "CHASE", "name": null, "last4": "0002", "membershipStartYear": 2023,
+    "membershipStartMonth": null, "annualFee": 0, "pointValueCents": 1, "artUrl": null,
+    "linked": false, "linkedAccountName": null, "displayName": null,
+    "benefits": [], "benefitCount": 0, "benefitsUsedCount": 0, "creditsYtd": 0, "creditsAnnualMax": 0,
+    "rewardRates": [
+      { "id": "r3", "category": "OTHER", "categoryLabel": "Everything else", "multiplier": 1.5, "unit": "PERCENT", "display": "1.5%", "notes": null }
+    ],
+    "earnings": null, "earningsPeriodLabel": "Jan 2026 – Dec 2026" }
+] }

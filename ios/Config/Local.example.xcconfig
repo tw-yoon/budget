@@ -1,0 +1,14 @@
+// Copy to Local.xcconfig (gitignored) and fill in your own values.
+//
+// DEVELOPMENT_TEAM is the ten-character Team ID for your Personal Team.
+// Find it under Xcode → Settings → Accounts (click the team), or in
+// Keychain Access under the "Apple Development" certificate's
+// Organizational Unit. Fill this in before opening the project, so Xcode
+// reads the team from here instead of writing it into the tracked
+// project.pbxproj when you pick it from Signing & Capabilities. Needed only
+// to run on a physical iPhone; the simulator builds without it.
+DEVELOPMENT_TEAM =
+
+// Bundle IDs must be unique per Apple ID. Change this if Xcode reports the
+// identifier is taken.
+BUNDLE_ID_PREFIX = local.budget

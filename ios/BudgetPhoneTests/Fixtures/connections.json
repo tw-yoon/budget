@@ -1,0 +1,33 @@
+{
+  "groups": [
+    { "type": "DEPOSITORY", "label": "Cash", "subtotal": 1500, "isLiability": false,
+      "accounts": [
+        { "id": "a1", "name": "Sample Checking", "officialName": null, "mask": "0001",
+          "type": "DEPOSITORY", "subtype": "checking", "currentBalance": 1500,
+          "availableBalance": 1450, "balanceFetchedAt": "2026-10-01T12:00:00.000Z",
+          "institution": "Example Bank", "isLiability": false, "nextPaymentDueDate": null,
+          "lastStatementBalance": null, "minimumPaymentAmount": null, "paymentIsOverdue": null,
+          "displayName": "Everyday", "manualDueDay": null, "manualCreditLimit": null },
+        { "id": "a2", "name": "Sample Savings", "officialName": null, "mask": "0003",
+          "type": "DEPOSITORY", "subtype": "savings", "currentBalance": 0,
+          "availableBalance": null, "balanceFetchedAt": "2026-10-01T12:00:00.000Z",
+          "institution": "Example Bank", "isLiability": false, "nextPaymentDueDate": null,
+          "lastStatementBalance": null, "minimumPaymentAmount": null, "paymentIsOverdue": null,
+          "displayName": null, "manualDueDay": null, "manualCreditLimit": null }
+      ] }
+  ],
+  "summary": { "totalAssets": 1500, "totalLiabilities": 0, "netWorth": 1500, "accountCount": 2,
+               "lastRefreshed": "2026-10-01T12:00:00.000Z" },
+  "banks": [
+    { "itemId": "item-sample-abc123", "institution": "Example Bank", "accountCount": 2,
+      "transactionCount": 41, "disconnectedAt": null },
+    { "itemId": "item-sample-zzz999", "institution": "Sample Credit Union", "accountCount": 1,
+      "transactionCount": 1, "disconnectedAt": "2026-09-30T12:00:00.000Z" }
+  ],
+  "debitCards": [
+    { "id": "d1", "name": "Sample Debit", "last4": "0002", "accountId": "a1",
+      "accountName": "Everyday", "available": 1450 },
+    { "id": "d2", "name": "Spare Debit", "last4": "0004", "accountId": "a1",
+      "accountName": "Everyday", "available": null }
+  ]
+}
