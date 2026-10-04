@@ -180,12 +180,23 @@ WSL — there's no native-Windows path.
 
 ## Using Budget from another device
 
-Budget listens on the Mac only, so devices on your Wi-Fi cannot reach it.
-Reach it through Tailscale (see `ios/README.md`). Anything that is not the
-Mac must send the access token: browsers ask for it once, and the token is
-under Settings → Remote Access. Reset Token there signs out every other
-device until it gets the new token. The Mac's own browser at `localhost`
-needs no token.
+Budget listens on the Mac only, so devices on your Wi-Fi cannot reach it,
+even at home. Reach it through [Tailscale](https://tailscale.com) instead:
+
+1. Install Tailscale on the Mac and on the other device, and sign in to the
+   same account on both.
+2. In the Tailscale admin console, enable MagicDNS and HTTPS certificates
+   (DNS page), and allow Serve when the CLI prints its link.
+3. On the Mac, run `tailscale serve --bg 3000` (or your `BUDGET_PORT`). It
+   prints `https://<mac-name>.<tailnet>.ts.net` and keeps running across
+   restarts. The CLI is at
+   `/Applications/Tailscale.app/Contents/MacOS/Tailscale`.
+4. On the other device, open that address (no port).
+5. It asks for the access token once. On the Mac, open Budget → Settings →
+   Remote Access, copy the token, and paste it in.
+
+Reset Token under Settings → Remote Access signs out every other device until
+it gets the new token. The Mac's own browser at `localhost` needs no token.
 
 ## Two ways to run
 

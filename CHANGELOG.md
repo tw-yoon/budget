@@ -13,9 +13,10 @@ update), so nothing here is a stability promise.
 
 - Budget only accepts connections from the Mac it runs on and, with the access
   token, from your tailnet. Find the token under Settings → Remote Access;
-  other browsers ask for it once, and the iPhone app has a field for it under
-  Settings → Server. Devices on your Wi-Fi can no longer reach Budget directly, and web pages
-  on other sites can no longer make changes through your browser.
+  other browsers ask for it once. Devices on your Wi-Fi can no longer reach
+  Budget directly, and web pages on other sites can no longer make changes
+  through your browser. README → "Using Budget from another device" has the
+  Tailscale setup.
 - Disconnecting a bank keeps its history. Its accounts stay on Accounts,
   greyed and marked "Disconnected · as of <date>", but count toward no total;
   its transactions stay everywhere they were. Under Settings → Connections a
