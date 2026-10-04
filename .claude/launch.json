@@ -4,7 +4,7 @@
     {
       "name": "budget-claude",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["next", "dev"],
+      "runtimeArgs": ["next", "dev", "-H", "127.0.0.1"],
       "env": { "NEXT_DIST_DIR": ".next-preview" },
       "port": 3000,
       "autoPort": true
