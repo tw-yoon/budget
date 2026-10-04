@@ -67,8 +67,9 @@ Mac.
       Management.
    5. In the app's Settings → Server, enter the `.ts.net` address and the
       access token.
-4. With a free Apple ID the app stops opening every 7 days. Connect the phone
-   and press Run again; nothing on it is lost.
+4. With a free Apple ID the app stops opening every 7 days. Run
+   `bash ios/scripts/phone.sh schedule on` once and the Mac reinstalls it over
+   Wi-Fi on its own ([details](ios/README.md#reinstall-automatically)).
 
 ## Before you start
 

@@ -84,8 +84,43 @@ xcodebuild test -project BudgetPhone.xcodeproj -scheme BudgetPhone -destination 
 6. In the app, enter the Mac's `https://…ts.net` address and its access
    token. Set both up as described in "Reaching the Mac" below.
 
-**Every 7 days** a free signature expires and the app stops opening. Connect
-the phone and press Run again; nothing on the phone is lost.
+### Reinstall automatically
+
+A free Apple ID signs the app for 7 days; after that it stops opening until
+it's installed again. Nothing on the phone is lost either way. The Mac can do
+it on its own whenever the phone is on the same Wi-Fi:
+
+1. Once, with the cable: Xcode → Window → Devices and Simulators, select the
+   iPhone and tick **Connect via network**.
+2. Check it works without Xcode:
+
+   ```bash
+   bash scripts/phone.sh install
+   ```
+
+3. Turn on the schedule:
+
+   ```bash
+   bash scripts/phone.sh schedule on
+   ```
+
+Every 3 hours the Mac checks, and if the app was installed 2 or more days ago
+it builds and installs it again. That needs the Mac awake and logged in and
+the iPhone on the same Wi-Fi. If it keeps failing and the app is close to
+expiring, the Mac shows a notification. Each run is logged in
+`build/phone/log`.
+
+- More than one paired iPhone: set `PHONE_DEVICE` in `Config/Local.xcconfig`
+  to the phone's name.
+- Moved this folder: run `schedule on` again.
+- To stop: `bash scripts/phone.sh schedule off`.
+
+The schedule is one small file in `~/Library/LaunchAgents`, the only thing
+this app keeps outside its folder; `schedule off` deletes it. It builds
+whatever code is checked out and never pulls from GitHub.
+
+Without the schedule, run `bash scripts/phone.sh install` (or connect the
+phone and press Run in Xcode) at least once a week.
 
 ## Reaching the Mac
 
