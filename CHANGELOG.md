@@ -9,6 +9,11 @@ middle number; one carrying fixes and small changes moves the last.
 Still `0.x`: the database schema changes between releases (migrations run on
 update), so nothing here is a stability promise.
 
+## 0.9.1 — 2026-10-03
+
+- The iPhone app shows the release's version (it said 0.1.0), and from now on
+  it moves with every release.
+
 ## 0.9.0 — 2026-10-03
 
 - The iPhone app is published, in `ios/`. It covers Accounts, Activity (the
