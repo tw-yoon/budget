@@ -220,6 +220,45 @@ echo $((NOW - 6 * DAY)) >"$CASE/state/last-success"
 phone auto
 assert_lacks "$CALLS" "osascript" "success never notifies"
 
+echo "phone.sh schedule"
+
+new_case
+PLIST="$CASE/agents/local.budget.phone-reinstall.plist"
+phone schedule on
+assert_eq "$RC" 0 "schedule on succeeds"
+if plutil -lint "$PLIST" >/dev/null 2>&1; then pass "writes a valid plist"; else fail "writes a valid plist" "$PLIST"; fi
+assert_eq "$(plutil -extract Label raw "$PLIST" 2>/dev/null)" "local.budget.phone-reinstall" "default label"
+assert_eq "$(plutil -extract ProgramArguments.0 raw "$PLIST" 2>/dev/null)" "/bin/bash" "runs bash"
+assert_eq "$(plutil -extract ProgramArguments.1 raw "$PLIST" 2>/dev/null)" "$PHONE" "runs this phone.sh"
+assert_eq "$(plutil -extract ProgramArguments.2 raw "$PLIST" 2>/dev/null)" "auto" "runs auto"
+assert_eq "$(plutil -extract StartInterval raw "$PLIST" 2>/dev/null)" "10800" "every 3 hours"
+assert_eq "$(plutil -extract RunAtLoad raw "$PLIST" 2>/dev/null)" "true" "runs at load"
+assert_eq "$(plutil -extract StandardOutPath raw "$PLIST" 2>/dev/null)" "$CASE/state/log" "output to the log"
+assert_eq "$(plutil -extract StandardErrorPath raw "$PLIST" 2>/dev/null)" "$CASE/state/log" "errors to the log"
+assert_has "$CALLS" "launchctl bootstrap gui/$(id -u) $PLIST" "loads it"
+
+phone schedule on
+assert_eq "$RC" 0 "schedule on again succeeds"
+assert_eq "$(ls "$CASE/agents" | wc -l | tr -d ' ')" "1" "schedule on again leaves one file"
+
+phone schedule off
+assert_eq "$RC" 0 "schedule off succeeds"
+assert_no_file "$PLIST" "schedule off deletes the plist"
+assert_has "$CALLS" "launchctl bootout gui/$(id -u)/local.budget.phone-reinstall" "unloads it"
+
+phone schedule off
+assert_eq "$RC" 0 "schedule off again succeeds"
+
+new_case
+echo "BUNDLE_ID_PREFIX = com.example" >"$CASE/Local.xcconfig"
+phone schedule on
+assert_eq "$(plutil -extract Label raw "$CASE/agents/com.example.phone-reinstall.plist" 2>/dev/null)" \
+  "com.example.phone-reinstall" "label follows BUNDLE_ID_PREFIX"
+
+new_case
+phone schedule
+assert_eq "$RC" 2 "schedule without on/off prints usage"
+
 # Summary
 echo
 echo "$PASS passed, $FAIL failed"

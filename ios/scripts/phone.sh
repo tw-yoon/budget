@@ -151,6 +151,52 @@ notify_failed() {
   "$OSASCRIPT" -e "display notification \"Unlock your iPhone on home Wi-Fi with the Mac awake. It stops opening $when.\" with title \"Budget: couldn't update the iPhone app\"" >>"$LOG" 2>&1
 }
 
+# The LaunchAgent's name, unique per Apple ID the same way the bundle ID is.
+agent_label() {
+  local prefix
+  prefix=$(xcconfig_value BUNDLE_ID_PREFIX)
+  echo "${prefix:-local.budget}.phone-reinstall"
+}
+
+# The one file this app keeps outside its folder. It holds this checkout's
+# path, so it is written here rather than committed; moving the folder means
+# running this again. Safe to repeat.
+schedule_on() {
+  local label plist
+  label=$(agent_label)
+  plist="$LAUNCH_AGENTS_DIR/$label.plist"
+  mkdir -p "$LAUNCH_AGENTS_DIR"
+  cat >"$plist" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>$label</string>
+  <key>ProgramArguments</key>
+  <array><string>/bin/bash</string><string>$SELF</string><string>auto</string></array>
+  <key>StartInterval</key><integer>10800</integer>
+  <key>RunAtLoad</key><true/>
+  <key>StandardOutPath</key><string>$LOG</string>
+  <key>StandardErrorPath</key><string>$LOG</string>
+</dict>
+</plist>
+EOF
+  "$LAUNCHCTL" bootout "gui/$(id -u)/$label" >/dev/null 2>&1
+  if ! "$LAUNCHCTL" bootstrap "gui/$(id -u)" "$plist" >>"$LOG" 2>&1; then
+    say "launchctl couldn't load $plist. Details: $LOG"
+    return 1
+  fi
+  say "Scheduled. Every 3 hours the Mac reinstalls the app if it's 2 or more days old."
+}
+
+schedule_off() {
+  local label
+  label=$(agent_label)
+  "$LAUNCHCTL" bootout "gui/$(id -u)/$label" >/dev/null 2>&1
+  rm -f "$LAUNCH_AGENTS_DIR/$label.plist"
+  say "Schedule removed."
+}
+
 usage() {
   echo "usage: bash scripts/phone.sh install | schedule on | schedule off" >&2
   return 2
@@ -159,5 +205,7 @@ usage() {
 case "${1:-} ${2:-}" in
   "install ") cmd_install ;;
   "auto ") cmd_auto ;;
+  "schedule on") schedule_on ;;
+  "schedule off") schedule_off ;;
   *) usage ;;
 esac
