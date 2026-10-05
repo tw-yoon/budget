@@ -9,7 +9,7 @@ middle number; one carrying fixes and small changes moves the last.
 Still `0.x`: the database schema changes between releases (migrations run on
 update), so nothing here is a stability promise.
 
-## Unreleased
+## 0.11.0 — 2026-10-04
 
 - iPhone app: opens instantly with the data from last time, then refreshes in
   the background. The saved data is cleared when you change the server or the
