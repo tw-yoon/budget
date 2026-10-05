@@ -89,7 +89,8 @@ This does Steps 1, 2, 4, 5 and 6 below for you with one paste. Prefer to do it
 by hand? Steps 1 to 6 below do the same thing.
 
 1. Get your Plaid keys first. The installer asks for them. Do
-   [Step 3](#step-3-get-your-plaid-keys) now, and keep that page open.
+   [Step 3](#step-3-get-your-plaid-keys) now, then come back here. Keep the
+   Plaid page open.
 2. Open Terminal (see above) and paste:
 
    ```bash
@@ -102,6 +103,8 @@ by hand? Steps 1 to 6 below do the same thing.
      15 minutes; Terminal waits too.
    - Your Mac may ask for its **password** to install Node.js. Nothing shows
      while you type; that's normal. Press **Return** when done.
+   - A window may ask to let **Terminal** access your **Documents** folder.
+     Click **Allow**.
    - It asks you to paste your **client_id**, then your **Sandbox secret**.
      Paste each one and press **Return**. The secret stays hidden.
 4. It then starts Budget. The first time takes **3 to 5 minutes**.
@@ -119,6 +122,12 @@ install line again.
 ❌ **If you see** `Download the LTS installer from https://nodejs.org, open it,
 click through it, then paste this line again`: the installer couldn't set up
 Node.js. Do [Step 1](#step-1-install-nodejs) by hand, then paste the quick
+install line again.
+
+❌ **If you see** `Terminal isn't allowed to save files in …`: you clicked
+**Don't Allow** when the Mac asked about your Documents folder. Open
+**System Settings**, go to **Privacy & Security**, then **Files and Folders**,
+and turn on **Documents Folder** under **Terminal**. Then paste the quick
 install line again.
 
 ❌ **If you see** `There's already a folder at … that isn't Budget`: a folder

@@ -30,6 +30,8 @@ TEST_SECRET="testsandboxsecret0123456789abc"
 # A single bare origin is enough for every case: the installer only ever
 # clones from it. Seeded from tracked files only, which is exactly what a
 # friend receives (same seeding as test-launcher.sh's make_fixture).
+# The stub git hands everything to this one, so cloning is real.
+REAL_GIT=$(command -v git)
 ORIGIN="$SUITE_TMP/origin.git"
 git init -q --bare "$ORIGIN"
 mkdir -p "$SUITE_TMP/seed"
@@ -59,6 +61,8 @@ PKG_SHA=$(shasum -a 256 "$DIST/node-v24.0.0.pkg" | awk '{print $1}')
 #   state/node-version absent = node not installed
 #   state/curl-fail    present = every download fails
 #   state/os           what uname prints (default Darwin)
+#   state/git-fails    N = the next N `git --version` calls fail (tools
+#                      registered but git not in place yet)
 #   state/*.log        what each stub was asked to do
 make_mac() {
   local mac; mac=$(mktemp -d "$SUITE_TMP/mac.XXXXXX")
@@ -74,6 +78,16 @@ case "\$1" in
              exit 0 ;;
 esac
 exit 1
+EOF
+
+  cat > "$mac/bin/git" <<EOF
+#!/bin/bash
+if [ "\$1" = --version ]; then
+  echo version >> "$s/git.log"
+  n=\$(cat "$s/git-fails" 2>/dev/null || echo 0)
+  if [ "\$n" -gt 0 ]; then echo \$((n - 1)) > "$s/git-fails"; exit 1; fi
+fi
+exec "$REAL_GIT" "\$@"
 EOF
 
   cat > "$mac/bin/node" <<EOF
@@ -144,7 +158,7 @@ run_install() {
       BUDGET_POLL_SECS=1 \
       BUDGET_INSTALL_SKIP_LAUNCH=1 \
       "$@" \
-      bash -c 'if [ "${VIA_PIPE:-}" = 1 ]; then bash < "$1"; else bash "$1"; fi' _ "$INSTALL" 2>&1 )
+      bash -c 'if [ "${VIA_PIPE:-}" = 1 ]; then cat "$1" | bash; else bash "$1"; fi' _ "$INSTALL" 2>&1 )
   echo $? > "$mac/state/rc"
 }
 
@@ -226,11 +240,18 @@ mac=$(make_mac); touch "$mac/state/clt"; echo v18.19.0 > "$mac/state/node-versio
 out=$(run_install "$mac" "$(answers "$TEST_ID" "$TEST_SECRET")")
 [ "$(rc_of "$mac")" = 0 ] && [ -s "$mac/state/installer.log" ] \
   && pass "Node.js 18 is replaced" || fail "Node.js 18 is replaced" "rc=$(rc_of "$mac"); output: $out"
-mac=$(make_mac); touch "$mac/state/clt"; echo v20.11.1 > "$mac/state/node-version"
+# Budget's Next.js needs 20.9 or newer.
+mac=$(make_mac); touch "$mac/state/clt"; echo v20.8.1 > "$mac/state/node-version"
 out=$(run_install "$mac" "$(answers "$TEST_ID" "$TEST_SECRET")")
-[ "$(rc_of "$mac")" = 0 ] && pass "Node.js 20 install exits 0" || fail "Node.js 20 install exits 0" "rc=$(rc_of "$mac"); output: $out"
-[ ! -s "$mac/state/curl.log" ] && [ ! -s "$mac/state/installer.log" ] \
-  && pass "Node.js 20 is kept, nothing downloaded" || fail "Node.js 20 is kept, nothing downloaded" "$(cat "$mac/state/curl.log")"
+[ "$(rc_of "$mac")" = 0 ] && [ -s "$mac/state/installer.log" ] \
+  && pass "Node.js 20.8 is replaced" || fail "Node.js 20.8 is replaced" "rc=$(rc_of "$mac"); output: $out"
+for v in v20.9.0 v22.1.0; do
+  mac=$(make_mac); touch "$mac/state/clt"; echo "$v" > "$mac/state/node-version"
+  out=$(run_install "$mac" "$(answers "$TEST_ID" "$TEST_SECRET")")
+  [ "$(rc_of "$mac")" = 0 ] && pass "Node.js $v install exits 0" || fail "Node.js $v install exits 0" "rc=$(rc_of "$mac"); output: $out"
+  [ ! -s "$mac/state/curl.log" ] && [ ! -s "$mac/state/installer.log" ] \
+    && pass "Node.js $v is kept, nothing downloaded" || fail "Node.js $v is kept, nothing downloaded" "$(cat "$mac/state/curl.log")"
+done
 
 echo "installer: Node.js download problems"
 mac=$(make_mac); touch "$mac/state/clt"
@@ -254,6 +275,29 @@ out=$(run_install "$mac" "$(answers "$TEST_ID" "$TEST_SECRET")" BUDGET_CLT_WAIT_
 [ "$(rc_of "$mac")" != 0 ] && pass "gives up waiting with a non-zero exit" || fail "gives up waiting with a non-zero exit" "rc=0"
 assert_has "$out" "paste this line again" "says to finish the install and paste the line again"
 [ ! -e "$mac/home/Documents/budget" ] && pass "nothing cloned without the tools" || fail "nothing cloned without the tools" "clone exists"
+
+echo "installer: tools registered before git works"
+mac=$(make_mac); touch "$mac/state/clt-on-install"; echo 1 > "$mac/state/git-fails"
+echo v24.0.0 > "$mac/state/node-version"
+out=$(run_install "$mac" "$(answers "$TEST_ID" "$TEST_SECRET")" BUDGET_CLT_WAIT_SECS=3)
+[ "$(rc_of "$mac")" = 0 ] && pass "keeps waiting until git works" || fail "keeps waiting until git works" "rc=$(rc_of "$mac"); output: $out"
+[ "$(grep -c version "$mac/state/git.log")" -ge 2 ] && pass "checks git again after the tools appear" \
+  || fail "checks git again after the tools appear" "git --version calls: $(grep -c version "$mac/state/git.log")"
+mac=$(make_mac); touch "$mac/state/clt-on-install"; echo 99 > "$mac/state/git-fails"
+out=$(run_install "$mac" "$(answers "$TEST_ID" "$TEST_SECRET")" BUDGET_CLT_WAIT_SECS=1)
+[ "$(rc_of "$mac")" != 0 ] && pass "gives up when git never works" || fail "gives up when git never works" "rc=0"
+assert_has "$out" "The command line tools aren't installed yet" "says the tools aren't ready"
+[ ! -e "$mac/home/Documents/budget" ] && pass "nothing cloned while git is missing" || fail "nothing cloned while git is missing" "clone exists"
+
+echo "installer: Terminal not allowed in Documents"
+mac=$(make_mac); touch "$mac/state/clt"; echo v24.0.0 > "$mac/state/node-version"
+mkdir -p "$mac/home/Documents"; chmod 555 "$mac/home/Documents"
+out=$(run_install "$mac" "$(answers "$TEST_ID" "$TEST_SECRET")")
+chmod 755 "$mac/home/Documents"
+[ "$(rc_of "$mac")" != 0 ] && pass "stops when Documents can't be written" || fail "stops when Documents can't be written" "rc=0"
+assert_has "$out" "Privacy & Security" "says where to allow Terminal"
+assert_lacks "$out" "internet connection" "doesn't blame the internet"
+[ -z "$(ls -A "$mac/home/Documents")" ] && pass "leaves Documents as it was" || fail "leaves Documents as it was" "$(ls -A "$mac/home/Documents")"
 
 echo "installer: a different folder is in the way"
 mac=$(make_mac); touch "$mac/state/clt"; echo v24.0.0 > "$mac/state/node-version"

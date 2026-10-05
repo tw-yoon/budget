@@ -31,19 +31,17 @@ stop() {
   exit 1
 }
 
-node_major() {
-  local v
+# Budget's Next.js needs Node.js 20.9 or newer: any 21+, or 20 from .9 up.
+node_ok() {
+  local v major minor
   v=$(node --version 2>/dev/null) || return 1
   v=${v#v}
-  v=${v%%.*}
-  case "$v" in ''|*[!0-9]*) return 1 ;; esac
-  echo "$v"
-}
-
-node_ok() {
-  local major
-  major=$(node_major) || return 1
-  [ "$major" -ge 20 ]
+  major=${v%%.*}
+  minor=${v#*.}
+  minor=${minor%%.*}
+  case "$major" in ''|*[!0-9]*) return 1 ;; esac
+  case "$minor" in ''|*[!0-9]*) return 1 ;; esac
+  [ "$major" -gt 20 ] || { [ "$major" -eq 20 ] && [ "$minor" -ge 9 ]; }
 }
 
 check_mac() {
@@ -63,28 +61,34 @@ open_keyboard() {
 # The command line tools bring git. `xcode-select --install` only opens
 # Apple's install window and returns at once, so poll for the result. Its own
 # exit status is ignored: it fails when an install is already in progress,
-# which is just as good a reason to wait.
+# which is just as good a reason to wait. `xcode-select -p` can start
+# succeeding before git is actually in place, so the wait is for both.
+tools_ready() {
+  xcode-select -p >/dev/null 2>&1 && git --version >/dev/null 2>&1
+}
+
 ensure_tools() {
   if xcode-select -p >/dev/null 2>&1; then
+    # Installed earlier, so there is no install in progress to wait for.
+    git --version >/dev/null 2>&1 || stop "Git isn't working even though the command line tools are installed. Restart your Mac, then paste this line again."
     echo "✅ Command line tools are installed."
-  else
-    xcode-select --install >/dev/null 2>&1
-    echo
-    echo "A window will ask to install the command line developer tools. Click Install"
-    echo "(not Get Xcode), then Agree. This can take 5 to 15 minutes; this window waits for it."
-    local waited=0 step="$BUDGET_POLL_SECS"
-    # A zero poll interval would never add up to the deadline.
-    [ "$step" -ge 1 ] 2>/dev/null || step=1
-    until xcode-select -p >/dev/null 2>&1; do
-      if [ "$waited" -ge "$BUDGET_CLT_WAIT_SECS" ]; then
-        stop "The command line tools aren't installed yet. Finish that install (or run 'xcode-select --install' to open the window again), then paste this line again."
-      fi
-      sleep "$BUDGET_POLL_SECS"
-      waited=$((waited + step))
-    done
-    echo "✅ Command line tools are installed."
+    return 0
   fi
-  git --version >/dev/null 2>&1 || stop "Git isn't working even though the command line tools are installed. Restart your Mac, then paste this line again."
+  xcode-select --install >/dev/null 2>&1
+  echo
+  echo "A window will ask to install the command line developer tools. Click Install"
+  echo "(not Get Xcode), then Agree. This can take 5 to 15 minutes; this window waits for it."
+  local waited=0 step="$BUDGET_POLL_SECS"
+  # A zero poll interval would never add up to the deadline.
+  [ "$step" -ge 1 ] 2>/dev/null || step=1
+  until tools_ready; do
+    if [ "$waited" -ge "$BUDGET_CLT_WAIT_SECS" ]; then
+      stop "The command line tools aren't installed yet. Finish that install (or run 'xcode-select --install' to open the window again), then paste this line again."
+    fi
+    sleep "$step"
+    waited=$((waited + step))
+  done
+  echo "✅ Command line tools are installed."
 }
 
 cleanup_download() {
@@ -151,7 +155,17 @@ ensure_clone() {
   fi
   echo
   echo "Downloading Budget into $BUDGET_DIR…"
-  mkdir -p "$(dirname "$BUDGET_DIR")" || stop "Couldn't create $(dirname "$BUDGET_DIR"). Paste this line again."
+  local parent probe
+  parent=$(dirname "$BUDGET_DIR")
+  mkdir -p "$parent" || stop "Couldn't create $parent. Paste this line again."
+  # macOS asks whether Terminal may use the Documents folder. After a
+  # "Don't Allow" the clone fails like a network error would, so check for
+  # write access first and say what actually needs fixing.
+  probe="$parent/.budget-install-check.$$"
+  if ! { : > "$probe"; } 2>/dev/null; then
+    stop "Terminal isn't allowed to save files in $parent. Open System Settings, go to Privacy & Security, then Files and Folders, and turn on Documents Folder under Terminal. Then paste this line again."
+  fi
+  rm -f "$probe"
   GIT_TERMINAL_PROMPT=0 git clone -q "$BUDGET_REPO" "$BUDGET_DIR" </dev/null \
     || stop "Couldn't download Budget. Check your internet connection, then paste this line again."
   EXISTING=false
