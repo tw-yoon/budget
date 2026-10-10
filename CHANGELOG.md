@@ -11,6 +11,11 @@ update), so nothing here is a stability promise.
 
 ## Unreleased
 
+## 0.12.1 — 2026-10-09
+
+- iPhone app: the connection card opens exactly over the dot on Accounts; on
+  a real phone it sat a little low and to the left.
+
 ## 0.12.0 — 2026-10-09
 
 - iPhone app: haptics when a save works or fails and on segment switches; Analytics

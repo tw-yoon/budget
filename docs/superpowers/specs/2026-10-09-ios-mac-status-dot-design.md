@@ -13,7 +13,10 @@ left, the line on one line, a short grey line under it, and, when the Mac
 can't be reached, a "Check that" section (Tailscale is on / Your Mac is
 awake / Budget is running on it) with numbered icons in the dot's column,
 so every line's text starts at the same place. One width for every state
-(scaled with the text size). A tap anywhere closes it.
+(scaled with the text size). A tap anywhere closes it. Its top-right
+corner sits on the dot's glass circle, measured from the dot's frame on
+screen: fixed spacing (0.12.0) matched the simulator but sat a little low
+and left on a real phone.
 
 Accounts draws the card itself. Tried first and dropped:
 - a popover: on a real phone it landed below and left of the dot, and its

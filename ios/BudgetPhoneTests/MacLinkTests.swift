@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 import Testing
 @testable import BudgetPhone
@@ -250,5 +251,30 @@ extension StubbedNetworkTests {
       await s.load()
       #expect(s.updatedAt == noon)
     }
+  }
+}
+
+/// Where the card goes: its top-right corner on the dot's glass circle.
+struct MacLinkCardPlacementTests {
+  @Test func theCornerSitsOnTheCirclesCorner() {
+    // A dot centred at (364, 84) on a 402-point-wide screen: the circle
+    // spans 342...386 across and 62...106 down.
+    let dot = CGRect(x: 359, y: 79, width: 10, height: 10)
+    let p = MacLinkCard.placement(dot: dot, screenWidth: 402)
+    #expect(p.top == 62)
+    #expect(p.trailing == 16)
+  }
+
+  @Test func itFollowsTheDotWhereverItIs() {
+    let dot = CGRect(x: 355, y: 90, width: 10, height: 10)
+    let p = MacLinkCard.placement(dot: dot, screenWidth: 393)
+    #expect(p.top == 73)
+    #expect(p.trailing == 11)
+  }
+
+  @Test func unmeasuredFallsBackUnderTheStatusBar() {
+    let p = MacLinkCard.placement(dot: .zero, screenWidth: 402)
+    #expect(p.top == 62)
+    #expect(p.trailing == 16)
   }
 }

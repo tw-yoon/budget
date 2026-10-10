@@ -13,6 +13,7 @@ struct AccountsView: View {
   @State private var hidden = HiddenAccounts()
   @State private var showHidden = false
   @State private var showLink = false
+  @State private var dotFrame = CGRect.zero
   /// Bumped by Settings when a bank is disconnected.
   let changes: DataChanges
 
@@ -25,26 +26,32 @@ struct AccountsView: View {
         }
         .toolbar {
           ToolbarItem(placement: .topBarTrailing) {
-            MacLinkDot(link: link.link, updated: store.updatedAt, isShowing: $showLink)
+            MacLinkDot(
+              link: link.link, updated: store.updatedAt, isShowing: $showLink, frame: $dotFrame)
           }
         }
     }
-    // The dot's card, at the top right where the dot is; a tap anywhere
-    // closes it.
-    .overlay(alignment: .topTrailing) {
+    // The dot's card, its top-right corner on the dot's circle; a tap
+    // anywhere closes it. Laid out over the whole screen, so the dot's
+    // measured (global) frame is in the same coordinates.
+    .overlay {
       if showLink {
-        ZStack(alignment: .topTrailing) {
-          Color.clear
-            .contentShape(.rect)
-            .ignoresSafeArea()
-            .onTapGesture { withAnimation(.snappy) { showLink = false } }
-            .accessibilityHidden(true)
-          MacLinkCard(link: link.link, updated: store.updatedAt)
-            .padding(.horizontal, 16)
-            .padding(.top, 4)
-            .transition(.scale(scale: 0.5, anchor: .topTrailing).combined(with: .opacity))
-            .accessibilityAction(.escape) { withAnimation(.snappy) { showLink = false } }
+        GeometryReader { screen in
+          let place = MacLinkCard.placement(dot: dotFrame, screenWidth: screen.size.width)
+          ZStack(alignment: .topTrailing) {
+            Color.clear
+              .contentShape(.rect)
+              .onTapGesture { withAnimation(.snappy) { showLink = false } }
+              .accessibilityHidden(true)
+            MacLinkCard(link: link.link, updated: store.updatedAt)
+              .padding(.leading, 16)
+              .padding(.trailing, place.trailing)
+              .padding(.top, place.top)
+              .transition(.scale(scale: 0.5, anchor: .topTrailing).combined(with: .opacity))
+              .accessibilityAction(.escape) { withAnimation(.snappy) { showLink = false } }
+          }
         }
+        .ignoresSafeArea()
       }
     }
     .task { await store.load() }

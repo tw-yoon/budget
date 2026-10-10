@@ -10,6 +10,8 @@ struct MacLinkDot: View {
   let link: MacLink
   let updated: Date?
   @Binding var isShowing: Bool
+  /// Where the dot is on screen, for the card to open over it.
+  @Binding var frame: CGRect
   @Environment(\.accessibilityDifferentiateWithoutColor) private var withoutColor
 
   var body: some View {
@@ -20,6 +22,7 @@ struct MacLinkDot: View {
       MacLinkSymbol(link: link, withoutColor: withoutColor)
         .font(withoutColor ? .body : .caption)
         .contentTransition(.symbolEffect(.replace))
+        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame = $0 }
     }
     .accessibilityLabel("Mac connection")
     .accessibilityValue(
@@ -41,6 +44,18 @@ struct MacLinkCard: View {
   @ScaledMetric(relativeTo: .body) private var iconWidth = 22
   /// Text width: the same in every state, growing with the text size.
   @ScaledMetric(relativeTo: .body) private var textWidth = 250
+
+  /// Half the glass circle the bar draws around the dot.
+  static let circleRadius: CGFloat = 22
+
+  /// The card's distance from the screen's top and right edges, putting its
+  /// top-right corner on the dot's circle. Measured, not fixed: the bar's
+  /// button sits a little differently on a real phone than in the simulator.
+  static func placement(dot: CGRect, screenWidth: CGFloat) -> (top: CGFloat, trailing: CGFloat) {
+    // Not measured yet: where the circle sits on a 6.3-inch iPhone.
+    guard dot != .zero else { return (62, 16) }
+    return (dot.midY - circleRadius, screenWidth - (dot.midX + circleRadius))
+  }
 
   var body: some View {
     // Keeps "2 minutes ago" true while the card stays open.

@@ -1,6 +1,6 @@
 {
   "name": "budget-claude",
-  "version": "0.12.0",
+  "version": "0.12.1",
   "private": true,
   "scripts": {
     "dev": "next dev -H 127.0.0.1",
