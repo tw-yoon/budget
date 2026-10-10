@@ -11,6 +11,12 @@ update), so nothing here is a stability promise.
 
 ## Unreleased
 
+## 0.12.2 — 2026-10-10
+
+- iPhone app: the connection card now sits and curves exactly like the
+  system menu a toolbar button opens: top on the dot's circle, 8 points past
+  it on the right, with the menu's 32-point corners.
+
 ## 0.12.1 — 2026-10-09
 
 - iPhone app: the connection card opens exactly over the dot on Accounts; on

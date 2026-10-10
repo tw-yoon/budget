@@ -31,7 +31,7 @@ struct AccountsView: View {
           }
         }
     }
-    // The dot's card, its top-right corner on the dot's circle; a tap
+    // The dot's card, placed and curved like the system menu; a tap
     // anywhere closes it. Laid out over the whole screen, so the dot's
     // measured (global) frame is in the same coordinates.
     .overlay {

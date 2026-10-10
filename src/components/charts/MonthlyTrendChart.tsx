@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from "recharts";
-import { useCashflow } from "./useCashflow";
+import { useCashflow } from "./useSeries";
 import { useMonthWindow } from "./useMonthWindow";
 import { WindowNav } from "./WindowNav";
 import { formatCurrency, formatCompactCurrency } from "@/lib/format";

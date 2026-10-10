@@ -28,13 +28,9 @@ struct SubscriptionDTO: Decodable, Equatable, Identifiable, Sendable {
     return parts.joined(separator: " · ")
   }
 
-  /// "Oct 5, 2026". Read in UTC so the stored calendar date shows as is; the
-  /// web formats it in local time and shows the day before west of UTC.
+  /// "Oct 5, 2026", the stored calendar date as is (see Formatters.zone).
   static func nextDateText(_ iso: String) -> String? {
-    guard let date = Formatters.parseISO(iso) else { return nil }
-    var utc = Calendar(identifier: .gregorian)
-    utc.timeZone = .gmt
-    return Formatters.date(date, calendar: utc)
+    Formatters.parseISO(iso).map { Formatters.date($0) }
   }
 }
 

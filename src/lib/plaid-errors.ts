@@ -57,3 +57,15 @@ export function summarizeFailures(
   if (parts.length === 1) return parts[0];
   return `${parts.length} banks failed: ${parts.join("; ")}`;
 }
+
+/**
+ * Plaid's error_code (e.g. ITEM_LOGIN_REQUIRED) from a failed API call,
+ * instead of a generic "AxiosError: Request failed with status code 400".
+ */
+export function plaidErrorCode(err: unknown): string {
+  if (err && typeof err === "object" && "response" in err) {
+    const data = (err as { response?: { data?: { error_code?: string } } }).response?.data;
+    if (data?.error_code) return data.error_code;
+  }
+  return err instanceof Error ? err.message : String(err);
+}

@@ -9,9 +9,9 @@ import { getAccessToken } from "@/lib/token-store";
 import { prisma } from "@/lib/prisma";
 import { getEnabledRulesOrdered, categorizeRow } from "@/services/rules.service";
 import { upsertAccounts } from "@/services/accounts.service";
-import { nextLabel } from "@/lib/next-label";
+import { nextLabel, withLabelLock } from "@/lib/next-label";
 import type { Transaction as PlaidTransaction } from "plaid";
-import type { CategoryRule } from "@prisma/client";
+import type { CategoryRule, Prisma } from "@prisma/client";
 
 /**
  * Bouncer + categorization keyed off Plaid's personal_finance_category (PFC).
@@ -24,25 +24,32 @@ import type { CategoryRule } from "@prisma/client";
  */
 const TRANSFER_PRIMARIES = new Set(["TRANSFER_IN", "TRANSFER_OUT"]);
 
-function classify(tx: PlaidTransaction): {
-  primary: string;
-  detailed: string | null;
-  isTransfer: boolean;
-  isFee: boolean;
-} {
+/** The fields Plaid owns, refreshed whenever it sends the row again. */
+function plaidFields(tx: PlaidTransaction) {
   const pfc = tx.personal_finance_category;
   const primary = pfc?.primary ?? "UNCATEGORIZED";
   const detailed = pfc?.detailed ?? null;
-
-  const isTransfer =
-    TRANSFER_PRIMARIES.has(primary) ||
-    detailed === "LOAN_PAYMENTS_CREDIT_CARD_PAYMENT";
-  const isFee = primary === "BANK_FEES";
-
-  return { primary, detailed, isTransfer, isFee };
+  return {
+    amount: tx.amount,
+    date: new Date(tx.date),
+    name: tx.name,
+    merchantName: tx.merchant_name ?? null,
+    pfcPrimary: primary,
+    pfcDetailed: detailed,
+    pending: tx.pending,
+    isTransfer:
+      TRANSFER_PRIMARIES.has(primary) || detailed === "LOAN_PAYMENTS_CREDIT_CARD_PAYMENT",
+    isFee: primary === "BANK_FEES",
+  };
 }
 
-export async function syncTransactions(
+export function syncTransactions(
+  itemId: string
+): Promise<{ added: number; modified: number; removed: number }> {
+  return withLabelLock(() => syncItem(itemId));
+}
+
+async function syncItem(
   itemId: string
 ): Promise<{ added: number; modified: number; removed: number }> {
   const item = await prisma.plaidItem.findUniqueOrThrow({ where: { itemId } });
@@ -59,6 +66,10 @@ export async function syncTransactions(
   // account list first is what keeps that from happening.
   const accountsRes = await plaidClient.accountsGet({ access_token: accessToken });
   await upsertAccounts(itemId, accountsRes.data.accounts);
+  const accountIds = new Map(
+    (await prisma.account.findMany({ select: { id: true, plaidAccountId: true } }))
+      .map((a) => [a.plaidAccountId, a.id])
+  );
 
   // User auto-categorization rules, evaluated against each incoming row.
   const rules: CategoryRule[] = await getEnabledRulesOrdered();
@@ -68,6 +79,8 @@ export async function syncTransactions(
   let modified = 0;
   let removed = 0;
   let hasMore = true;
+  // The lock is held, so labels can be counted up locally from the max.
+  let nextFree = await nextLabel();
 
   while (hasMore) {
     const res = await plaidClient.transactionsSync({
@@ -79,73 +92,53 @@ export async function syncTransactions(
     const { added: addedTxs, modified: modifiedTxs, removed: removedTxs, next_cursor, has_more } =
       res.data;
 
+    // Each page is written in one transaction rather than a commit per row.
+    const ops: Prisma.PrismaPromise<unknown>[] = [];
+    const known = new Set(
+      (await prisma.transaction.findMany({
+        where: { externalId: { in: addedTxs.map((tx) => tx.transaction_id) } },
+        select: { externalId: true },
+      })).map((t) => t.externalId)
+    );
+
     // ── Added ─────────────────────────────────────────────────────────────────
     for (const tx of addedTxs) {
-      const account = await prisma.account.findUnique({
-        where: { plaidAccountId: tx.account_id },
-      });
-      if (!account) continue; // safety net: accounts are refreshed above
+      const accountId = accountIds.get(tx.account_id);
+      if (!accountId) continue; // safety net: accounts are refreshed above
 
-      const c = classify(tx);
+      const fields = plaidFields(tx);
       const ruleCat = categorizeRow(rules, {
         name: tx.name,
         merchantName: tx.merchant_name ?? null,
       });
-      // Computed before the upsert so it is available to the `create` branch.
-      // If the row already exists we take the update branch and this value goes
-      // unused — no number is burned, since the maximum is unchanged.
-      const label = await nextLabel();
-      await prisma.transaction.upsert({
+      // Only a row that is really new takes a number, so none is burned.
+      let label = 0;
+      if (!known.has(tx.transaction_id)) {
+        label = nextFree++;
+        known.add(tx.transaction_id);
+      }
+      ops.push(prisma.transaction.upsert({
         where: { externalId: tx.transaction_id },
         create: {
+          ...fields,
           externalId: tx.transaction_id,
-          accountId: account.id,
-          amount: tx.amount,
-          date: new Date(tx.date),
-          name: tx.name,
-          merchantName: tx.merchant_name ?? null,
-          pfcPrimary: c.primary,
-          pfcDetailed: c.detailed,
+          accountId,
           logoUrl: tx.logo_url ?? null,
-          pending: tx.pending,
-          isTransfer: c.isTransfer,
-          isFee: c.isFee,
           userCategory: ruleCat ?? undefined,
           userCategorySource: ruleCat ? "RULE" : undefined,
           label,
         },
-        update: {
-          amount: tx.amount,
-          date: new Date(tx.date),
-          name: tx.name,
-          merchantName: tx.merchant_name ?? null,
-          pfcPrimary: c.primary,
-          pfcDetailed: c.detailed,
-          pending: tx.pending,
-          isTransfer: c.isTransfer,
-          isFee: c.isFee,
-        },
-      });
+        update: fields,
+      }));
       added++;
     }
 
     // ── Modified ──────────────────────────────────────────────────────────────
     for (const tx of modifiedTxs) {
-      const c = classify(tx);
-      await prisma.transaction.updateMany({
+      ops.push(prisma.transaction.updateMany({
         where: { externalId: tx.transaction_id },
-        data: {
-          amount: tx.amount,
-          date: new Date(tx.date),
-          name: tx.name,
-          merchantName: tx.merchant_name ?? null,
-          pfcPrimary: c.primary,
-          pfcDetailed: c.detailed,
-          pending: tx.pending,
-          isTransfer: c.isTransfer,
-          isFee: c.isFee,
-        },
-      });
+        data: plaidFields(tx),
+      }));
 
       // Re-run rules on the (possibly changed) merchant/name, but only touch
       // rows the user hasn't manually or Venmo-categorized.
@@ -154,25 +147,24 @@ export async function syncTransactions(
         merchantName: tx.merchant_name ?? null,
       });
       if (ruleCat) {
-        await prisma.transaction.updateMany({
+        ops.push(prisma.transaction.updateMany({
           where: {
             externalId: tx.transaction_id,
             linkedToId: null,
             OR: [{ userCategorySource: null }, { userCategorySource: "RULE" }],
           },
           data: { userCategory: ruleCat, userCategorySource: "RULE" },
-        });
+        }));
       }
       modified++;
     }
 
     // ── Removed ───────────────────────────────────────────────────────────────
-    for (const tx of removedTxs) {
-      await prisma.transaction.deleteMany({
-        where: { externalId: tx.transaction_id },
-      });
-      removed++;
-    }
+    ops.push(prisma.transaction.deleteMany({
+      where: { externalId: { in: removedTxs.map((tx) => tx.transaction_id) } },
+    }));
+    removed += removedTxs.length;
+    await prisma.$transaction(ops);
 
     cursor = next_cursor;
     hasMore = has_more;

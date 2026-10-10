@@ -21,7 +21,8 @@ import {
   suggestCategory,
   type VenmoRow,
 } from "@/lib/venmo";
-import { nextLabel } from "@/lib/next-label";
+import { nextLabel, withLabelLock } from "@/lib/next-label";
+import type { Prisma } from "@prisma/client";
 
 const APPROX = 0.005; // dollar tolerance when matching amounts
 
@@ -48,7 +49,11 @@ interface ImportResult {
   accountHolder: string;
 }
 
-export async function importVenmoStatements(): Promise<ImportResult> {
+export function importVenmoStatements(): Promise<ImportResult> {
+  return withLabelLock(importStatements);
+}
+
+async function importStatements(): Promise<ImportResult> {
   const files = findStatementFiles();
   if (files.length === 0) {
     return { imported: 0, reconciledCashouts: 0, unmatchedCashouts: 0, accountHolder: "" };
@@ -107,19 +112,30 @@ export async function importVenmoStatements(): Promise<ImportResult> {
   }
 
   // ── Upsert payment rows (preserve any user category already set) ───────────
+  // One transaction for the whole import, and labels counted up locally from
+  // one read: the label lock is held, and only a really new row takes one.
   let imported = 0;
+  let nextFree = await nextLabel();
+  const known = new Set(
+    (await prisma.transaction.findMany({
+      where: { externalId: { in: payments.map((p) => `venmo:${p.venmoId}`) } },
+      select: { externalId: true },
+    })).map((t) => t.externalId)
+  );
+  const ops: Prisma.PrismaPromise<unknown>[] = [];
   for (const p of payments) {
     const externalId = `venmo:${p.venmoId}`;
     // Plaid sign convention: positive = outflow. Sent => +, received => -.
     const amount = p.direction === "out" ? p.amount : -p.amount;
     const name = p.note || `Venmo ${p.direction === "out" ? "payment" : "received"}`;
     const fundsCashoutId = allocation.get(p.venmoId) ?? null;
-    // Computed before the upsert so it is available to the `create` branch.
-    // If the row already exists we take the update branch and this value goes
-    // unused — no number is burned, since the maximum is unchanged.
-    const label = await nextLabel();
+    let label = 0;
+    if (!known.has(externalId)) {
+      label = nextFree++;
+      known.add(externalId);
+    }
 
-    await prisma.transaction.upsert({
+    ops.push(prisma.transaction.upsert({
       where: { externalId },
       create: {
         externalId,
@@ -148,9 +164,10 @@ export async function importVenmoStatements(): Promise<ImportResult> {
         counterparty: p.counterparty || null,
         fundsCashoutId,
       },
-    });
+    }));
     imported++;
   }
+  await prisma.$transaction(ops);
 
   return {
     imported,

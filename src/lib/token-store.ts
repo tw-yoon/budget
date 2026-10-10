@@ -87,7 +87,3 @@ export function deleteAccessToken(itemId: string): void {
   delete store[itemId];
   writeStore(store);
 }
-
-export function listItemIds(): string[] {
-  return Object.keys(readStore());
-}

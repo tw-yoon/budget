@@ -43,4 +43,13 @@ struct CompactRowsTests {
     #expect(CompactRows.shortDate("2026-09-29T12:00:00.000Z", calendar: calendar) == "Sep 29")
     #expect(CompactRows.shortDate("not a date", calendar: calendar) == "")
   }
+
+  @Test func bankDateKeepsItsDayWestOfUTC() {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = TimeZone(identifier: "America/Los_Angeles")!
+    #expect(CompactRows.shortDate("2026-10-01T00:00:00.000Z", calendar: calendar) == "Oct 1")
+    #expect(CompactRows.shortDate("2026-10-01T03:00:00.000Z", calendar: calendar) == "Sep 30")
+    let day = Formatters.parseISO("2026-10-01T00:00:00.000Z")!
+    #expect(Formatters.date(day, calendar: calendar) == "Oct 1, 2026")
+  }
 }

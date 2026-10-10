@@ -10,13 +10,22 @@ enum Formatters {
     amount.formatted(.currency(code: "USD").locale(enUS))
   }
 
+  /// The zone to read a date in — isDateOnly in ../src/lib/format.ts. A bank
+  /// date is a bare calendar day stored as UTC midnight; read locally it would
+  /// show the day before west of UTC. Real instants keep the calendar's zone.
+  static func zone(for date: Date, calendar: Calendar) -> TimeZone {
+    date.timeIntervalSince1970.truncatingRemainder(dividingBy: 86_400) == 0 ? .gmt : calendar.timeZone
+  }
+
+  /// A Gregorian en_US style in the zone `date` should be read in. FormatStyle
+  /// rather than a DateFormatter per call: these run once per list row.
+  static func dateStyle(_ date: Date, calendar: Calendar) -> Date.FormatStyle {
+    Date.FormatStyle(locale: enUS, calendar: Calendar(identifier: .gregorian), timeZone: zone(for: date, calendar: calendar))
+  }
+
   /// "Sep 26, 2026" — formatDate, in the calendar's time zone.
   static func date(_ date: Date, calendar: Calendar = .current) -> String {
-    let f = DateFormatter()
-    f.locale = enUS
-    f.timeZone = calendar.timeZone
-    f.dateFormat = "MMM d, yyyy"
-    return f.string(from: date)
+    date.formatted(dateStyle(date, calendar: calendar).month(.abbreviated).day().year())
   }
 
   /// "just now", "4m ago", "3h ago", "2d ago" — formatRelativeTime.
@@ -56,18 +65,17 @@ enum Formatters {
   /// "2026-10-05T00:00:00.000Z", the same without fractional seconds, or a
   /// bare "2026-10-05", which JavaScript reads as UTC midnight.
   static func parseISO(_ s: String) -> Date? {
-    for options: ISO8601DateFormatter.Options in [
-      [.withInternetDateTime, .withFractionalSeconds],
-      [.withInternetDateTime],
-      [.withFullDate],
-    ] {
-      let f = ISO8601DateFormatter()
-      f.formatOptions = options
-      f.timeZone = .gmt
-      if let d = f.date(from: s) { return d }
+    for style in isoStyles {
+      if let d = try? style.parse(s) { return d }
     }
     return nil
   }
+
+  private static let isoStyles: [Date.ISO8601FormatStyle] = [
+    .iso8601.year().month().day().time(includingFractionalSeconds: true).timeZone(separator: .omitted),
+    .iso8601,
+    Date.ISO8601FormatStyle().year().month().day(),
+  ]
 
   /// "$1.2K" — formatCompactCurrency: compact notation, at most one
   /// decimal, halves rounded away from zero as Intl does.

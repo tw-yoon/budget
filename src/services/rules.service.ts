@@ -117,27 +117,29 @@ export async function applyRulesToExisting(): Promise<{ updated: number; kept: n
     },
   });
 
-  let updated = 0;
+  // Group the changes by their new category so each group is one write, all
+  // in one transaction: thousands of rows on a first apply, not thousands of
+  // separate commits. null clears a rule category no rule matches anymore.
+  const changes = new Map<string | null, string[]>();
   for (const row of rows) {
     const match = categorizeRow(rules, row);
-
-    if (match) {
-      if (row.userCategory !== match || row.userCategorySource !== "RULE") {
-        await prisma.transaction.update({
-          where: { id: row.id },
-          data: { userCategory: match, userCategorySource: "RULE" },
-        });
-        updated++;
-      }
-    } else if (row.userCategorySource === "RULE") {
-      // Previously rule-categorized but no rule matches anymore — clear it.
-      await prisma.transaction.update({
-        where: { id: row.id },
-        data: { userCategory: null, userCategorySource: null },
-      });
-      updated++;
-    }
+    const changed = match
+      ? row.userCategory !== match || row.userCategorySource !== "RULE"
+      : row.userCategorySource === "RULE";
+    if (!changed) continue;
+    const ids = changes.get(match) ?? [];
+    ids.push(row.id);
+    changes.set(match, ids);
   }
+  await prisma.$transaction(
+    [...changes].map(([category, ids]) =>
+      prisma.transaction.updateMany({
+        where: { id: { in: ids } },
+        data: { userCategory: category, userCategorySource: category ? "RULE" : null },
+      })
+    )
+  );
+  const updated = [...changes.values()].reduce((n, ids) => n + ids.length, 0);
 
   const kept = (await unlinkedRows()).filter(
     (row) => isHandSet(row.userCategorySource) && categorizeRow(rules, row) !== null

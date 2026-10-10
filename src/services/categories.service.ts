@@ -430,6 +430,15 @@ export async function loadPlaidCategoryMap(): Promise<Map<string, string>> {
   return new Map(rows.map((r) => [r.pfcPrimary, r.category.name]));
 }
 
+/**
+ * Names a Plaid primary the way every view does: the category it is mapped to,
+ * else Plaid's own wording. Loads the mapping once, for a whole response.
+ */
+export async function loadPlaidNamer(): Promise<(primary: string) => string> {
+  const map = await loadPlaidCategoryMap();
+  return (primary) => map.get(primary) ?? humanizePfc(primary);
+}
+
 /** Plaid detailed label → the name the user gave it. Unnamed labels read as humanizePfcDetailed. */
 export async function loadPlaidDetailedNames(): Promise<Map<string, string>> {
   const rows = await prisma.plaidDetailedName.findMany();

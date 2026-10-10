@@ -1,13 +1,13 @@
 {
   "name": "budget-claude",
-  "version": "0.12.1",
+  "version": "0.12.2",
   "private": true,
   "scripts": {
     "dev": "next dev -H 127.0.0.1",
     "build": "next build",
     "start": "next start -H 127.0.0.1",
     "lint": "eslint --max-warnings 0",
-    "test": "bash scripts/test-scrub.sh && bash scripts/test-launcher.sh && bash scripts/test-install.sh && bash scripts/test-phone-reinstall.sh && bash scripts/test-release.sh && node --import ./scripts/resolve-alias.mjs --test scripts/test-links.mjs scripts/test-plaid-errors.mjs scripts/test-categories.mjs scripts/test-subcategories.mjs scripts/test-rules.mjs scripts/test-pro-mode.mjs scripts/test-splits.mjs scripts/test-rewards.mjs scripts/test-venmo.mjs scripts/test-zelle.mjs scripts/test-subscriptions.mjs scripts/test-ui-state.mjs scripts/test-version.mjs scripts/test-theme.mjs scripts/test-card-crop.mjs scripts/test-plaid-items.mjs scripts/test-account-totals.mjs scripts/test-reconnect-merge.mjs scripts/test-access.mjs scripts/test-server-timing.mjs scripts/test-updater.mjs && npm run lint"
+    "test": "bash scripts/test-scrub.sh && bash scripts/test-launcher.sh && bash scripts/test-install.sh && bash scripts/test-phone-reinstall.sh && bash scripts/test-release.sh && node --import ./scripts/resolve-alias.mjs --test scripts/test-links.mjs scripts/test-plaid-errors.mjs scripts/test-categories.mjs scripts/test-subcategories.mjs scripts/test-rules.mjs scripts/test-pro-mode.mjs scripts/test-splits.mjs scripts/test-rewards.mjs scripts/test-venmo.mjs scripts/test-zelle.mjs scripts/test-subscriptions.mjs scripts/test-ui-state.mjs scripts/test-version.mjs scripts/test-theme.mjs scripts/test-card-crop.mjs scripts/test-plaid-items.mjs scripts/test-account-totals.mjs scripts/test-reconnect-merge.mjs scripts/test-access.mjs scripts/test-server-timing.mjs scripts/test-updater.mjs scripts/test-income.mjs scripts/test-label-lock.mjs scripts/test-calendar-dates.mjs && npm run lint"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",

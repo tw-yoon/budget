@@ -9,6 +9,7 @@ import { plaidClient } from "@/lib/plaid";
 import { getAccessToken } from "@/lib/token-store";
 import { prisma } from "@/lib/prisma";
 import { estimateNext, mapFrequency } from "@/lib/subscriptions";
+import { plaidErrorCode } from "@/lib/plaid-errors";
 
 const EXCLUDE_PRIMARY = new Set([
   "LOAN_PAYMENTS",
@@ -82,12 +83,4 @@ export async function detectSubscriptions(): Promise<{
   }
 
   return { found, errors };
-}
-
-function plaidErrorCode(err: unknown): string {
-  if (err && typeof err === "object" && "response" in err) {
-    const data = (err as { response?: { data?: { error_code?: string } } }).response?.data;
-    if (data?.error_code) return data.error_code;
-  }
-  return err instanceof Error ? err.message : String(err);
 }

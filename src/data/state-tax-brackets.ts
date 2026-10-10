@@ -415,9 +415,6 @@ const STATE_YEARS = Object.keys(STATES_BY_YEAR)
   .map(Number)
   .sort((a, b) => a - b);
 
-// The most recent tax year we have state brackets coded for.
-export const LATEST_STATE_TAX_YEAR = STATE_YEARS[STATE_YEARS.length - 1];
-
 // Resolve the best dataset for a requested year: exact match, else the most
 // recent prior year available, else the earliest we have.
 export function statesForYear(year: number): {

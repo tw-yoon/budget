@@ -1,8 +1,7 @@
 import { withServerTiming } from "@/lib/server-timing";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { listCategoryNames } from "@/services/categories.service";
-import { humanizePfc } from "@/lib/format";
+import { listCategoryNames, loadPlaidNamer } from "@/services/categories.service";
 import { resolveLinkedCategory } from "@/lib/links";
 
 // GET /api/venmo — list imported Venmo transactions (for the categorizer page).
@@ -28,9 +27,10 @@ async function handleGET() {
       },
     });
 
+    const plaidName = await loadPlaidNamer();
     const transactions = rows.map((t) => {
       const linkedToCategory = t.linkedTo
-        ? t.linkedTo.userCategory ?? humanizePfc(t.linkedTo.pfcPrimary)
+        ? t.linkedTo.userCategory ?? plaidName(t.linkedTo.pfcPrimary)
         : null;
       const { raw } = resolveLinkedCategory({
         amount: t.amount,

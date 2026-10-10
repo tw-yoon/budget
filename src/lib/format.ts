@@ -67,11 +67,38 @@ export function humanizePfcDetailed(detailed: string, primary: string): string {
   return humanizePfc(rest);
 }
 
+// Plaid sends a transaction's date as a bare calendar day, stored as UTC
+// midnight. Read in local time it would land on the previous day anywhere west
+// of UTC, so a value at exactly UTC midnight is read in UTC. Real instants
+// (Venmo times, sync times) keep the local zone.
+export function isDateOnly(d: Date): boolean {
+  return d.getTime() % 86_400_000 === 0;
+}
+
+/** Year, month (1–12) and day a date stands for; see isDateOnly. */
+export function calendarDay(d: Date): { y: number; m: number; day: number } {
+  return isDateOnly(d)
+    ? { y: d.getUTCFullYear(), m: d.getUTCMonth() + 1, day: d.getUTCDate() }
+    : { y: d.getFullYear(), m: d.getMonth() + 1, day: d.getDate() };
+}
+
+/**
+ * The same day at local midnight, so it falls inside windows built from local
+ * dates (new Date(y, m, 1)) the way its calendar day says it should.
+ */
+export function localDay(d: Date): Date {
+  if (!isDateOnly(d)) return d;
+  const { y, m, day } = calendarDay(d);
+  return new Date(y, m - 1, day);
+}
+
 export function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-US", {
+  const d = new Date(iso);
+  return d.toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
+    timeZone: isDateOnly(d) ? "UTC" : undefined,
   });
 }
 

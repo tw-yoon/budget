@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { describePlaidError, summarizeFailures } from "../src/lib/plaid-errors.ts";
+import { describePlaidError, plaidErrorCode, summarizeFailures } from "../src/lib/plaid-errors.ts";
 
 test("a login-required item names the bank and says what to do", () => {
   const s = describePlaidError("ITEM_LOGIN_REQUIRED", "Marcus by Goldman Sachs");
@@ -49,4 +49,10 @@ test("several failures are counted and separated", () => {
   assert.match(s, /Marcus by Goldman Sachs/);
   assert.match(s, /Chase/);
   assert.match(s, /;/);
+});
+
+test("plaidErrorCode prefers Plaid's code, then the message", () => {
+  assert.equal(plaidErrorCode({ response: { data: { error_code: "ITEM_LOGIN_REQUIRED" } } }), "ITEM_LOGIN_REQUIRED");
+  assert.equal(plaidErrorCode(new Error("socket hang up")), "socket hang up");
+  assert.equal(plaidErrorCode("boom"), "boom");
 });

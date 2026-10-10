@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ComposedChart, Area, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ResponsiveContainer,
 } from "recharts";
-import { useSpending } from "./useSpending";
+import { useSpending } from "./useSeries";
 import { WindowNav } from "./WindowNav";
 import { formatCurrency, formatCompactCurrency } from "@/lib/format";
 import { INCOME_COLOR, DRAW_COLOR } from "@/lib/colors";

@@ -1,3 +1,5 @@
+import type { Prisma } from "@prisma/client";
+
 // Lightweight subcategory convention: a userCategory string may be
 // "Parent > Sub" (e.g. "Entertainment > Movies"). Analytics roll up to the
 // parent; the sub is display/detail only. No separator = plain category.
@@ -11,11 +13,6 @@ export function splitCategory(cat: string): { parent: string; sub: string | null
     parent: cat.slice(0, idx).trim(),
     sub: cat.slice(idx + SUB_SEPARATOR.length).trim() || null,
   };
-}
-
-/** The parent (roll-up) category of a possibly-subcategorized value. */
-export function parentCategory(cat: string): string {
-  return splitCategory(cat).parent;
 }
 
 /** Build a stored userCategory from a parent and optional subcategory. */
@@ -69,3 +66,19 @@ export const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
 ];
+
+/**
+ * Rows not tagged "Transfer", including subcategorized "Transfer > ..."
+ * overrides. Null-safe: an untagged row stays. Spending views drop the rest.
+ */
+export const NOT_TAGGED_TRANSFER: Prisma.TransactionWhereInput = {
+  OR: [
+    { userCategory: null },
+    {
+      AND: [
+        { userCategory: { not: "Transfer" } },
+        { NOT: { userCategory: { startsWith: "Transfer > " } } },
+      ],
+    },
+  ],
+};

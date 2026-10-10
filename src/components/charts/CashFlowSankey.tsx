@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { useCashflow } from "./useCashflow";
+import { useCashflow } from "./useSeries";
 import { useMonthWindow } from "./useMonthWindow";
 import { WindowNav } from "./WindowNav";
 import type { CashflowMonth } from "@/types";

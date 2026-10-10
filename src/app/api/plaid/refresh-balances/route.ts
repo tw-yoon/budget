@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { pickConnectedItems } from "@/lib/plaid-items";
 import { syncLiabilities } from "@/services/liabilities.service";
 import { upsertAccounts } from "@/services/accounts.service";
+import { plaidErrorCode } from "@/lib/plaid-errors";
 
 // POST /api/plaid/refresh-balances — body: { item_id } or omit for all
 export async function POST(req: NextRequest) {
@@ -73,12 +74,4 @@ export async function POST(req: NextRequest) {
     console.error("[refresh-balances]", err);
     return NextResponse.json({ error: "Balance refresh failed" }, { status: 500 });
   }
-}
-
-function plaidErrorCode(err: unknown): string {
-  if (err && typeof err === "object" && "response" in err) {
-    const data = (err as { response?: { data?: { error_code?: string } } }).response?.data;
-    if (data?.error_code) return data.error_code;
-  }
-  return err instanceof Error ? err.message : String(err);
 }

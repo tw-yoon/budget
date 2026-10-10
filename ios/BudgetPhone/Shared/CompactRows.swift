@@ -68,11 +68,7 @@ enum CompactRows {
   /// "Sep 29" — the compact row's date. Empty when the date doesn't parse.
   nonisolated static func shortDate(_ iso: String, calendar: Calendar = .current) -> String {
     guard let date = Formatters.parseISO(iso) else { return "" }
-    let f = DateFormatter()
-    f.locale = Locale(identifier: "en_US")
-    f.timeZone = calendar.timeZone
-    f.dateFormat = "MMM d"
-    return f.string(from: date)
+    return date.formatted(Formatters.dateStyle(date, calendar: calendar).month(.abbreviated).day())
   }
 }
 

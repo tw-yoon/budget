@@ -12,6 +12,7 @@
 import { plaidClient } from "@/lib/plaid";
 import { getAccessToken } from "@/lib/token-store";
 import { prisma } from "@/lib/prisma";
+import { plaidErrorCode } from "@/lib/plaid-errors";
 
 // Plaid gives dates as "YYYY-MM-DD"; pin to noon UTC so local formatting
 // never lands on the previous day.
@@ -52,12 +53,4 @@ export async function syncLiabilities(
   } catch (err) {
     return { ok: false, updated: 0, error: plaidErrorCode(err) };
   }
-}
-
-function plaidErrorCode(err: unknown): string {
-  if (err && typeof err === "object" && "response" in err) {
-    const data = (err as { response?: { data?: { error_code?: string } } }).response?.data;
-    if (data?.error_code) return data.error_code;
-  }
-  return err instanceof Error ? err.message : String(err);
 }

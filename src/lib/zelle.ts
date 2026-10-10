@@ -9,20 +9,6 @@
  * We don't import anything; we just parse + categorize the rows already present.
  */
 
-// Categories a Zelle row can be tagged with. "Uncategorized" maps to null
-// (stays ignored, like an untouched transfer); "Transfer" is an explicit ignore.
-export const ZELLE_CATEGORIES = [
-  "Uncategorized",
-  "Dining",
-  "Groceries",
-  "Travel",
-  "Entertainment",
-  "Housing",
-  "Shopping",
-  "Reimbursement",
-  "Transfer",
-] as const;
-
 // Matches real Zelle payment descriptions from the banks above ("…Pmt To …",
 // "Zelle payment to …") but not incidental mentions like a memo that happens
 // to say "zelle".

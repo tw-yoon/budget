@@ -1,11 +1,11 @@
 import { withServerTiming } from "@/lib/server-timing";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { humanizePfc, humanizePfcDetailed } from "@/lib/format";
-import { splitCategory } from "@/lib/categories";
+import { humanizePfcDetailed } from "@/lib/format";
+import { NOT_TAGGED_TRANSFER, splitCategory } from "@/lib/categories";
 import { getCashoutBreakdowns } from "@/services/venmo.service";
 import {
-  loadPlaidCategoryMap,
+  loadPlaidNamer,
   loadPlaidDetailedNames,
 } from "@/services/categories.service";
 import { netAmount, resolveLinkedCategory } from "@/lib/links";
@@ -46,19 +46,7 @@ async function handleGET(req: NextRequest) {
     if (accountId) and.push({ accountId });
     if (hideInternal) {
       and.push({ isFee: false });
-      // Don't show anything explicitly tagged "Transfer" (null-safe: keep
-      // nulls), including subcategorized "Transfer > ..." overrides.
-      and.push({
-        OR: [
-          { userCategory: null },
-          {
-            AND: [
-              { userCategory: { not: "Transfer" } },
-              { NOT: { userCategory: { startsWith: "Transfer > " } } },
-            ],
-          },
-        ],
-      });
+      and.push(NOT_TAGGED_TRANSFER);
       and.push({
         OR: [
           { isTransfer: false },
@@ -171,11 +159,10 @@ async function handleGET(req: NextRequest) {
         : Promise.resolve([]),
     ]);
 
-    const [plaidMap, detailedNames] = await Promise.all([
-      loadPlaidCategoryMap(),
+    const [plaidName, detailedNames] = await Promise.all([
+      loadPlaidNamer(),
       loadPlaidDetailedNames(),
     ]);
-    const plaidName = (primary: string) => plaidMap.get(primary) ?? humanizePfc(primary);
     // Plaid's detailed label, under the name given it in Settings if any.
     const plaidSub = (detailed: string | null, primary: string) =>
       detailed

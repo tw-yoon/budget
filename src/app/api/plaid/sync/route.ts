@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { syncTransactions } from "@/services/sync.service";
 import { prisma } from "@/lib/prisma";
 import { pickConnectedItems } from "@/lib/plaid-items";
+import { plaidErrorCode } from "@/lib/plaid-errors";
 
 // Plaid error codes that mean "this item has no Transactions product" rather
 // than a real failure — e.g. an investments-only connection (Robinhood, a
@@ -76,14 +77,4 @@ export async function POST(req: NextRequest) {
     console.error("[sync]", err);
     return NextResponse.json({ error: "Sync failed" }, { status: 500 });
   }
-}
-
-// Surface Plaid's error_code (e.g. ITEM_LOGIN_REQUIRED) instead of a generic
-// "AxiosError: Request failed with status code 400".
-function plaidErrorCode(err: unknown): string {
-  if (err && typeof err === "object" && "response" in err) {
-    const data = (err as { response?: { data?: { error_code?: string } } }).response?.data;
-    if (data?.error_code) return data.error_code;
-  }
-  return err instanceof Error ? err.message : String(err);
 }

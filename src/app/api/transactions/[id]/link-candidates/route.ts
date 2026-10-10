@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { humanizePfc } from "@/lib/format";
+import { loadPlaidNamer } from "@/services/categories.service";
 import { rankCandidates } from "@/lib/links";
 
 // GET /api/transactions/:id/link-candidates — the purchases this money-in row
@@ -55,6 +55,7 @@ export async function GET(
       },
     });
 
+    const plaidName = await loadPlaidNamer();
     const candidates = rankCandidates(refund, rows).map((c) => {
       const row = rows.find((r) => r.id === c.id)!;
       return {
@@ -63,7 +64,7 @@ export async function GET(
         date: row.date.toISOString(),
         name: row.merchantName ?? row.name,
         amount: row.amount,
-        category: row.userCategory ?? humanizePfc(row.pfcPrimary),
+        category: row.userCategory ?? plaidName(row.pfcPrimary),
       };
     });
 

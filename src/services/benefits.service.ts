@@ -9,8 +9,9 @@
  *   - "none":   nothing to track against (no manual value, no link/category)
  */
 
+import { queryStart } from "@/lib/analytics";
 import { prisma } from "@/lib/prisma";
-import { humanizePfc } from "@/lib/format";
+import { humanizePfc, localDay } from "@/lib/format";
 import { REWARD_CATEGORY_LABELS, formatRate } from "@/lib/rewards";
 import { computeEarnings } from "@/lib/earnings";
 import type {
@@ -209,7 +210,7 @@ export async function getUserCardsWithProgress(
         isTransfer: false,
         isFee: false,
         pending: false,
-        date: { gte: yearStart },
+        date: { gte: queryStart(yearStart) },
       },
       select: {
         accountId: true,
@@ -227,7 +228,7 @@ export async function getUserCardsWithProgress(
       const arr = txByAccount.get(t.accountId) ?? [];
       arr.push({
         amount: t.amount,
-        date: t.date,
+        date: localDay(t.date),
         pfcPrimary: t.pfcPrimary,
         pfcDetailed: t.pfcDetailed,
         userCategory: t.userCategory,
