@@ -11,6 +11,12 @@ update), so nothing here is a stability promise.
 
 ## Unreleased
 
+## 0.12.3 — 2026-10-10
+
+- iPhone app: the connection card lines up with the dot and the boxes below
+  on the right instead of sticking out past them, and its corner follows the
+  dot's curve.
+
 ## 0.12.2 — 2026-10-10
 
 - iPhone app: the connection card now sits and curves exactly like the

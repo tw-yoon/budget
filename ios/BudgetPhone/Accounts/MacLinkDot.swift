@@ -47,20 +47,20 @@ struct MacLinkCard: View {
 
   /// Half the glass circle the bar draws around the dot.
   static let circleRadius: CGFloat = 22
-  /// How far the card reaches past the circle's right side, and its corner
-  /// radius: both measured from the system menu a toolbar button opens, so
-  /// the card sits and curves where that menu does.
-  static let overhang: CGFloat = 8
-  static let cornerRadius: CGFloat = 32
+  /// The circle's own curve, so the card's corner covers the circle exactly
+  /// instead of letting it peek out round the corner.
+  static let cornerRadius: CGFloat = circleRadius
 
-  /// The card's distance from the screen's top and right edges: its top on
-  /// the circle's top, its right side `overhang` past the circle's. Measured,
+  /// The card's distance from the screen's top and right edges: its
+  /// top-right corner on the circle's, so its right edge lines up with the
+  /// circle and the boxes below. (0.12.2 reached 8 points further right, as
+  /// the system menu does; on the phone that stuck out past both.) Measured,
   /// not fixed: the bar's button sits a little differently on a real phone
   /// than in the simulator.
   static func placement(dot: CGRect, screenWidth: CGFloat) -> (top: CGFloat, trailing: CGFloat) {
     // Not measured yet: where the circle sits on a 6.3-inch iPhone.
-    guard dot != .zero else { return (62, 16 - overhang) }
-    return (dot.midY - circleRadius, screenWidth - (dot.midX + circleRadius) - overhang)
+    guard dot != .zero else { return (62, 16) }
+    return (dot.midY - circleRadius, screenWidth - (dot.midX + circleRadius))
   }
 
   var body: some View {
