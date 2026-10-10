@@ -26,6 +26,16 @@ mkdir -p "$STUBS"
 cat >"$STUBS/xcodebuild" <<'EOF'
 #!/bin/bash
 echo "xcodebuild $*" >>"$STUB_CALLS"
+case "${1:-}" in
+  -license) exit "${STUB_LICENSE_RC:-0}" ;;
+  -checkFirstLaunchStatus) exit "${STUB_FIRSTLAUNCH_RC:-0}" ;;
+  -showsdks) echo "${STUB_SDKS-iOS SDKs: -sdk iphoneos26.0}"; exit 0 ;;
+  -downloadPlatform) exit 0 ;;
+esac
+# The first STUB_BUILD_FAILS builds fail with STUB_BUILD_OUT.
+n=$(( $(cat "$STUB_CALLS.builds" 2>/dev/null || echo 0) + 1 ))
+echo "$n" >"$STUB_CALLS.builds"
+if [ "$n" -le "${STUB_BUILD_FAILS:-0}" ]; then echo "${STUB_BUILD_OUT:-}"; exit 65; fi
 [ -z "${STUB_BUILD_OUT:-}" ] || echo "$STUB_BUILD_OUT"
 [ "${STUB_BUILD_RC:-0}" = 0 ] || exit "$STUB_BUILD_RC"
 while [ $# -gt 0 ]; do [ "$1" = -derivedDataPath ] && dd="$2"; shift; done
@@ -42,13 +52,27 @@ EOF
 cat >"$STUBS/devicectl" <<'EOF'
 #!/bin/bash
 echo "devicectl $*" >>"$STUB_CALLS"
+# The nth device list comes from $STUB_DEVICES.n if that file exists.
 if [ "${1:-} ${2:-}" = "list devices" ]; then
+  n=$(( $(cat "$STUB_CALLS.lists" 2>/dev/null || echo 0) + 1 ))
+  echo "$n" >"$STUB_CALLS.lists"
+  src="$STUB_DEVICES"; [ -f "$STUB_DEVICES.$n" ] && src="$STUB_DEVICES.$n"
   while [ $# -gt 0 ]; do
-    [ "$1" = --json-output ] && cp "$STUB_DEVICES" "$2"
+    [ "$1" = --json-output ] && cp "$src" "$2"
     shift
   done
   exit 0
 fi
+# The first STUB_LAUNCH_FAILS launches fail with STUB_LAUNCH_OUT. Records
+# what the launched app would get in its environment.
+if [ "${1:-} ${2:-} ${3:-}" = "device process launch" ]; then
+  echo "server=${DEVICECTL_CHILD_BUDGET_SETUP_SERVER:-} token=${DEVICECTL_CHILD_BUDGET_SETUP_TOKEN:-}" >>"$STUB_CALLS.env"
+  n=$(( $(cat "$STUB_CALLS.launches" 2>/dev/null || echo 0) + 1 ))
+  echo "$n" >"$STUB_CALLS.launches"
+  if [ "$n" -le "${STUB_LAUNCH_FAILS:-0}" ]; then echo "${STUB_LAUNCH_OUT:-}"; exit 1; fi
+  exit 0
+fi
+if [ "${1:-} ${2:-}" = "manage pair" ]; then exit 0; fi
 exit "${STUB_INSTALL_RC:-0}"
 EOF
 cat >"$STUBS/osascript" <<'EOF'
@@ -59,6 +83,52 @@ cat >"$STUBS/launchctl" <<'EOF'
 #!/bin/bash
 echo "launchctl $*" >>"$STUB_CALLS"
 EOF
+cat >"$STUBS/xcode-select" <<'EOF'
+#!/bin/bash
+echo "xcode-select $*" >>"$STUB_CALLS"
+echo "${STUB_SELECT_PATH:-$XCODE_APP/Contents/Developer}"
+EOF
+cat >"$STUBS/sudo" <<'EOF'
+#!/bin/bash
+echo "sudo $*" >>"$STUB_CALLS"
+exit "${STUB_SUDO_RC:-0}"
+EOF
+# `open` the App Store page "installs" Xcode when STUB_OPEN_INSTALLS is set.
+cat >"$STUBS/open" <<'EOF'
+#!/bin/bash
+echo "open $*" >>"$STUB_CALLS"
+case "$*" in macappstore:*) [ -z "${STUB_OPEN_INSTALLS:-}" ] || { mkdir -p "$XCODE_APP/Contents/Developer/usr/bin"; touch "$XCODE_APP/Contents/Developer/usr/bin/xcodebuild"; } ;; esac
+EOF
+# The nth `defaults export` comes from $STUB_TEAMS.n if that file exists.
+cat >"$STUBS/defaults" <<'EOF'
+#!/bin/bash
+echo "defaults $*" >>"$STUB_CALLS"
+n=$(( $(cat "$STUB_CALLS.teams" 2>/dev/null || echo 0) + 1 ))
+echo "$n" >"$STUB_CALLS.teams"
+src="$STUB_TEAMS"; [ -f "$STUB_TEAMS.$n" ] && src="$STUB_TEAMS.$n"
+cat "$src"
+EOF
+cat >"$STUBS/tailscale" <<'EOF'
+#!/bin/bash
+echo "tailscale $*" >>"$STUB_CALLS"
+case "$*" in
+  "status --json")
+    printf '{"BackendState":"%s","Self":{"DNSName":"test-mac.example.ts.net."}}' "${STUB_TS_STATE:-Running}" ;;
+  "serve status --json")
+    if [ -n "${STUB_TS_NO_SERVE:-}" ]; then echo '{}'
+    else echo '{"Web":{"test-mac.example.ts.net:443":{"Handlers":{"/":{"Proxy":"http://127.0.0.1:3000"}}}}}'; fi ;;
+esac
+EOF
+# A request for the token writes the token file when STUB_CURL_WRITES_TOKEN
+# is set (the server creates it on first read).
+cat >"$STUBS/curl" <<'EOF'
+#!/bin/bash
+echo "curl $*" >>"$STUB_CALLS"
+case "$*" in
+  *"/api/access/token"*) [ -z "${STUB_CURL_WRITES_TOKEN:-}" ] || echo "$STUB_CURL_WRITES_TOKEN" >"$TOKEN_FILE" ;;
+esac
+exit "${STUB_CURL_RC:-0}"
+EOF
 chmod +x "$STUBS"/*
 export XCODEBUILD="$STUBS/xcodebuild" DEVICECTL="$STUBS/devicectl" \
        OSASCRIPT="$STUBS/osascript" LAUNCHCTL="$STUBS/launchctl"
@@ -68,14 +138,17 @@ NOW=1000000000
 export PHONE_NOW=$NOW
 
 # One device entry shaped like `devicectl list devices --json-output`.
+# Args: name, CoreDevice id, UDID, [deviceType], [pairingState],
+# [transportType], [developerModeStatus].
 phone_json() {
-  printf '{"identifier":"%s","deviceProperties":{"name":"%s"},"hardwareProperties":{"platform":"iOS","deviceType":"%s","udid":"%s"},"connectionProperties":{"pairingState":"%s"}}' \
-    "$2" "$1" "${4:-iPhone}" "$3" "${5:-paired}"
+  printf '{"identifier":"%s","deviceProperties":{"name":"%s","developerModeStatus":"%s"},"hardwareProperties":{"platform":"iOS","deviceType":"%s","udid":"%s"},"connectionProperties":{"pairingState":"%s","transportType":"%s"}}' \
+    "$2" "$1" "${7:-enabled}" "${4:-iPhone}" "$3" "${5:-paired}" "${6:-localNetwork}"
 }
-# Replaces this case's device list with the given entries.
+# Replaces this case's device list with the given entries. DEVICES_FILE
+# picks another file, e.g. "$CASE/devices.json.1" for the first list only.
 devices() {
   local IFS=,
-  printf '{"result":{"devices":[%s]}}' "$*" >"$CASE/devices.json"
+  printf '{"result":{"devices":[%s]}}' "$*" >"${DEVICES_FILE:-$CASE/devices.json}"
 }
 # A fresh state dir, LaunchAgents dir and empty Local.xcconfig, with one
 # paired iPhone. Tests change any of it before calling `phone`.
@@ -90,7 +163,7 @@ new_case() {
          LOCAL_XCCONFIG="$CASE/Local.xcconfig" SHARED_XCCONFIG="$CASE/Shared.xcconfig" STUB_CALLS="$CASE/calls" \
          STUB_DEVICES="$CASE/devices.json" \
          PHONE_DERIVED_DATA="$CASE/dd" PHONE_PROFILES_DIR="$CASE/profiles"
-  unset STUB_BUILD_RC STUB_BUILD_OUT STUB_INSTALL_RC STUB_SIGNED STUB_NO_PROFILE
+  unset STUB_BUILD_RC STUB_BUILD_OUT STUB_INSTALL_RC STUB_SIGNED STUB_NO_PROFILE STUB_BUILD_FAILS STUB_LAUNCH_FAILS STUB_LAUNCH_OUT
 }
 # A saved Xcode profile for the given app ID, as a bare plist.
 saved_profile() {
@@ -100,6 +173,40 @@ saved_profile() {
 phone() {
   OUT=$(bash "$PHONE" "$@" 2>&1); RC=$?
   CALLS=$(cat "$CASE/calls")
+}
+
+# Xcode's saved teams, as `defaults export com.apple.dt.Xcode -` prints them.
+# Each arg is "TEAMID|Name|Team type|1 for free". No args: signed out.
+teams_plist() {
+  printf '<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict><key>IDEProvisioningTeamByIdentifier</key><dict><key>ACCOUNT-1</key><array>'
+  local t id name type free
+  for t in "$@"; do
+    IFS='|' read -r id name type free <<<"$t"
+    printf '<dict><key>teamID</key><string>%s</string><key>teamName</key><string>%s</string><key>teamType</key><string>%s</string><key>isFreeProvisioningTeam</key><%s/></dict>' \
+      "$id" "$name" "$type" "$([ "$free" = 1 ] && echo true || echo false)"
+  done
+  printf '</array></dict></dict></plist>'
+}
+# The friend's answers, one per line (an empty line is pressing Return).
+answers() { printf '%s\n' "$@" >"$CASE/answers"; }
+# A case where every setup step is already done: Xcode installed and set
+# up, signed in with one team that is already in Local.xcconfig, one paired
+# phone on Wi-Fi with Developer Mode on, Tailscale serving Budget, a token.
+new_setup_case() {
+  new_case
+  mkdir -p "$CASE/Xcode.app/Contents/Developer/usr/bin"
+  touch "$CASE/Xcode.app/Contents/Developer/usr/bin/xcodebuild"
+  echo "DEVELOPMENT_TEAM = A1B2C3D4E5" >"$CASE/Local.xcconfig"
+  teams_plist "A1B2C3D4E5|Test Person|Personal Team|1" >"$CASE/teams.plist"
+  echo "tok-123" >"$CASE/access-token"
+  : >"$CASE/answers"
+  export XCODE_APP="$CASE/Xcode.app" XCODE_SELECT="$STUBS/xcode-select" SUDO="$STUBS/sudo" \
+         OPEN="$STUBS/open" DEFAULTS="$STUBS/defaults" TAILSCALE="$STUBS/tailscale" CURL="$STUBS/curl" \
+         STUB_TEAMS="$CASE/teams.plist" TOKEN_FILE="$CASE/access-token" SETUP_INPUT="$CASE/answers" \
+         EXAMPLE_XCCONFIG="$ROOT/ios/Config/Local.example.xcconfig" \
+         PHONE_POLL_SECONDS=0 PHONE_POLL_TRIES=2
+  unset STUB_LICENSE_RC STUB_FIRSTLAUNCH_RC STUB_SDKS STUB_SELECT_PATH STUB_SUDO_RC STUB_OPEN_INSTALLS \
+        STUB_TS_STATE STUB_TS_NO_SERVE STUB_CURL_WRITES_TOKEN STUB_CURL_RC DEVICES_FILE
 }
 
 echo "phone.sh install"
@@ -225,6 +332,7 @@ devices
 phone install
 assert_fails "no phones fails"
 assert_has "$OUT" "No paired iPhone" "no phones says so"
+assert_has "$OUT" "Plug it in with a cable and run: bash scripts/phone.sh setup" "no phones says how to pair"
 
 new_case
 devices "$(phone_json "Old Phone" CORE-3 UDID-3 iPhone unpaired)" \
@@ -345,6 +453,217 @@ assert_eq "$(plutil -extract Label raw "$CASE/agents/com.example.phone-reinstall
 new_case
 phone schedule
 assert_eq "$RC" 2 "schedule without on/off prints usage"
+
+echo "phone.sh setup: Budget, Tailscale, Xcode"
+
+new_setup_case
+phone setup
+assert_has "$OUT" "Step 1 of 7: Xcode" "prints numbered steps"
+assert_has "$OUT" "✓ Xcode is ready." "a ready Xcode is a tick"
+assert_lacks "$CALLS" "sudo " "nothing to fix needs no password"
+assert_lacks "$CALLS" "open " "opens nothing"
+
+new_setup_case
+export STUB_CURL_RC=7
+phone setup
+assert_fails "stops when Budget isn't running"
+assert_has "$OUT" "Start Budget first" "says to start Budget"
+assert_lacks "$OUT" "Step 1 of 7" "before any step"
+
+new_setup_case
+export STUB_TS_STATE=Stopped
+phone setup
+assert_fails "stops when Tailscale is off"
+assert_has "$OUT" "Tailscale isn't on" "says to turn Tailscale on"
+
+new_setup_case
+export STUB_TS_NO_SERVE=1
+phone setup
+assert_fails "stops when Tailscale doesn't give Budget an address"
+assert_has "$OUT" "Step 8" "points to the main guide's Step 8"
+
+new_setup_case
+rm -rf "$CASE/Xcode.app"
+export STUB_OPEN_INSTALLS=1
+answers ""
+phone setup
+assert_has "$CALLS" "open macappstore://apps.apple.com/app/id497799835" "opens Xcode's App Store page"
+assert_has "$OUT" "Click Get, then Install" "says what to click"
+assert_has "$OUT" "✓ Xcode is ready." "continues once Xcode is there"
+
+new_setup_case
+rm -rf "$CASE/Xcode.app/Contents"
+answers ""
+phone setup
+assert_has "$OUT" "Click Get, then Install" "a half-installed Xcode.app counts as not installed"
+assert_eq "$RC" 3 "and waits until the real tools are there"
+
+new_setup_case
+rm -rf "$CASE/Xcode.app"
+phone setup
+assert_eq "$RC" 3 "running out of answers stops setup"
+assert_has "$OUT" "Stopped." "says it stopped"
+
+new_setup_case
+export STUB_SELECT_PATH=/Library/Developer/CommandLineTools STUB_LICENSE_RC=1
+phone setup
+assert_has "$OUT" "password is needed once" "warns before asking for the password"
+assert_eq "$(grep -c '^sudo ' "$CASE/calls")" 1 "one sudo call"
+assert_has "$CALLS" "xcode-select -s '$CASE/Xcode.app'" "points the tools at Xcode"
+assert_has "$CALLS" "xcodebuild -license accept" "accepts the license"
+assert_lacks "$CALLS" "runFirstLaunch" "skips what isn't needed"
+
+new_setup_case
+export STUB_SUDO_RC=1 STUB_FIRSTLAUNCH_RC=1
+phone setup
+assert_fails "a failed sudo stops setup"
+assert_has "$OUT" "Xcode isn't finished setting up" "says so"
+
+new_setup_case
+export STUB_SDKS="macOS SDKs: -sdk macosx26.0"
+phone setup
+assert_has "$CALLS" "xcodebuild -downloadPlatform iOS" "downloads the iPhone parts"
+
+echo "phone.sh setup: Apple ID and Team ID"
+
+new_setup_case
+phone setup
+assert_has "$OUT" "✓ Xcode is signed in to your Apple ID." "signed in is a tick"
+assert_has "$OUT" "✓ Team ID A1B2C3D4E5 is set." "an existing team is kept"
+
+new_setup_case
+teams_plist >"$CASE/teams.plist.1"
+answers ""
+phone setup
+assert_has "$CALLS" "open -a $CASE/Xcode.app" "opens Xcode"
+assert_has "$OUT" "click Xcode in the menu bar" "says where to click"
+assert_has "$OUT" "✓ Xcode is signed in to your Apple ID." "continues once signed in"
+
+new_setup_case
+rm -f "$CASE/Local.xcconfig"
+phone setup
+assert_has "$(cat "$CASE/Local.xcconfig")" "DEVELOPMENT_TEAM = A1B2C3D4E5" "writes the only team"
+assert_has "$(cat "$CASE/Local.xcconfig")" "BUNDLE_ID_PREFIX = local.budget" "starts from the example file"
+assert_eq "$(grep -c '^DEVELOPMENT_TEAM' "$CASE/Local.xcconfig")" 1 "one DEVELOPMENT_TEAM line"
+
+new_setup_case
+echo "DEVELOPMENT_TEAM =" >"$CASE/Local.xcconfig"
+teams_plist "Z9Z9Z9Z9Z9|Example Org|Company|0" "A1B2C3D4E5|Test Person|Personal Team|1" >"$CASE/teams.plist"
+answers "5" "1"
+phone setup
+assert_has "$OUT" "1) Test Person (Personal Team)  A1B2C3D4E5" "lists the personal team first"
+assert_has "$OUT" "2) Example Org (Company)  Z9Z9Z9Z9Z9" "lists the other team"
+assert_eq "$(sed -n 's/^DEVELOPMENT_TEAM = //p' "$CASE/Local.xcconfig")" "A1B2C3D4E5" "writes the picked team after a bad answer"
+
+echo "phone.sh setup: iPhone and install"
+
+new_setup_case
+phone setup
+assert_has "$OUT" "✓ Found Test Phone." "a ready phone is a tick"
+assert_has "$OUT" "Installed." "installs"
+
+new_setup_case
+DEVICES_FILE="$CASE/devices.json.1" devices
+DEVICES_FILE="$CASE/devices.json.2" devices "$(phone_json "Test Phone" CORE-1 UDID-1 iPhone unpaired)"
+DEVICES_FILE="$CASE/devices.json.3" devices "$(phone_json "Test Phone" CORE-1 UDID-1 iPhone paired wired disabled)"
+answers "" "" ""
+phone setup
+assert_has "$OUT" "Plug your iPhone into this Mac" "no phone: plug it in"
+assert_has "$OUT" "tap Trust" "unpaired: tap Trust"
+assert_has "$OUT" "Privacy & Security → scroll to the bottom → Developer Mode" "Developer Mode off: where to turn it on"
+assert_has "$OUT" "✓ Found Test Phone." "continues once ready"
+assert_has "$CALLS" "devicectl manage pair --device CORE-1" "unpaired: asks the phone to pair"
+assert_has "$CALLS" "open -a $CASE/Xcode.app" "Developer Mode off: opens Xcode"
+assert_has "$OUT" "Keep Xcode open while you do this." "and says to keep it open"
+
+new_setup_case
+devices "$(phone_json "Old Phone" CORE-0 UDID-0)" "$(phone_json "Ann & Bo's iPhone" CORE-1 UDID-1)"
+answers "2"
+phone setup
+assert_has "$OUT" "1) Old Phone" "lists every paired phone"
+assert_has "$(cat "$CASE/Local.xcconfig")" "PHONE_DEVICE = Ann & Bo's iPhone" "writes the picked name exactly"
+assert_has "$OUT" "✓ Found Ann & Bo's iPhone." "then uses it"
+assert_has "$CALLS" "-destination id=UDID-1 " "builds for the picked phone"
+
+new_setup_case
+devices "$(phone_json "Test Phone" CORE-1 UDID-1)" "$(phone_json "Test Phone" CORE-2 UDID-2)"
+answers "2"
+phone setup
+assert_eq "$(sed -n 's/^PHONE_DEVICE = //p' "$CASE/Local.xcconfig")" "CORE-2" "same-name phones: writes the identifier"
+assert_has "$OUT" "✓ Found Test Phone." "and setup goes on"
+assert_has "$CALLS" "-destination id=UDID-2 " "builds for the picked one"
+
+new_setup_case
+export STUB_BUILD_FAILS=1 STUB_BUILD_OUT="error: Failed Registering Bundle Identifier: The app identifier cannot be registered to your development team"
+phone setup
+assert_eq "$(grep -c '^xcodebuild build' "$CASE/calls")" 2 "builds again after the bundle ID is taken"
+prefix=$(sed -n 's/^BUNDLE_ID_PREFIX = //p' "$CASE/Local.xcconfig")
+case "$prefix" in local.budget.??????) pass "picks a prefix of its own";; *) fail "picks a prefix of its own" "got [$prefix]";; esac
+assert_has "$OUT" "Installed." "then installs"
+
+new_setup_case
+export STUB_BUILD_FAILS=1 STUB_BUILD_OUT="error: No Accounts: Add a new account in Accounts settings."
+answers ""
+phone setup
+assert_has "$OUT" "click Xcode in the menu bar" "signed out at build time: the sign-in steps"
+assert_has "$CALLS" "open -a $CASE/Xcode.app" "signed out at build time: opens Xcode"
+assert_has "$OUT" "Installed." "then installs"
+
+new_setup_case
+export STUB_BUILD_FAILS=1 STUB_BUILD_OUT="error: iOS 26.0 is not installed. To use with Xcode, first download and install the platform"
+phone setup
+assert_has "$CALLS" "xcodebuild -downloadPlatform iOS" "missing iOS platform: downloads it"
+assert_eq "$(grep -c '^xcodebuild build' "$CASE/calls")" 2 "and builds again"
+assert_has "$OUT" "Installed." "then installs"
+
+new_setup_case
+export STUB_BUILD_RC=65 STUB_BUILD_OUT="error: something else"
+phone setup
+assert_fails "an unknown build failure stops setup"
+assert_has "$OUT" "Build failed" "with the install's message"
+
+echo "phone.sh setup: connect, Wi-Fi, schedule"
+
+new_setup_case
+phone setup
+assert_eq "$RC" 0 "a fully set-up Mac and phone finish cleanly"
+assert_has "$(cat "$CASE/calls.env")" "server=https://test-mac.example.ts.net token=tok-123" "the app gets the address and token"
+assert_has "$CALLS" "device process launch --terminate-existing --device CORE-1 local.budget.BudgetPhone" "opens the app on the phone"
+assert_lacks "$CALLS" "tok-123" "the token is never an argument"
+assert_lacks "$(cat "$CASE/state/log")" "tok-123" "nor in the log"
+assert_lacks "$OUT" "tok-123" "nor on screen"
+assert_has "$OUT" "✓ The Mac sees your iPhone over Wi-Fi." "Wi-Fi is a tick"
+[ -f "$CASE/agents/local.budget.phone-reinstall.plist" ] && pass "turns the schedule on" || fail "turns the schedule on" "no plist"
+assert_has "$OUT" "All set. Budget is on your iPhone and opens until $(date -r $((NOW + 7 * DAY)) '+%A, %B %-d')." "ends with the last day"
+assert_lacks "$CALLS" "sudo " "a re-run asks for no password"
+assert_lacks "$CALLS" "open " "a re-run opens nothing"
+
+new_setup_case
+rm -f "$CASE/access-token"
+export STUB_CURL_WRITES_TOKEN=tok-456
+phone setup
+assert_has "$CALLS" "curl -fsS -o /dev/null --max-time 10 http://127.0.0.1:3000/api/access/token" "asks Budget to make the token"
+assert_has "$(cat "$CASE/calls.env")" "token=tok-456" "then hands it over"
+
+new_setup_case
+export STUB_LAUNCH_FAILS=1 STUB_LAUNCH_OUT="Unable to launch local.budget.BudgetPhone because it has an invalid code signature, inadequate entitlements or its profile has not been explicitly trusted by the user."
+answers ""
+phone setup
+assert_has "$OUT" "VPN & Device Management" "untrusted: where to trust it"
+assert_eq "$(grep -c 'device process launch' "$CASE/calls")" 2 "launches again after Return"
+assert_eq "$RC" 0 "then finishes"
+
+# Device-list call order in an otherwise done case: 1 is Step 4, 2 is the
+# install's resolve_phone, 3 is Connect's, 4-5 are Step 7's polls
+# (PHONE_POLL_TRIES=2), 6 is the poll after Return.
+new_setup_case
+devices "$(phone_json "Test Phone" CORE-1 UDID-1 iPhone paired wired)"
+DEVICES_FILE="$CASE/devices.json.6" devices "$(phone_json "Test Phone" CORE-1 UDID-1)"
+answers ""
+phone setup
+assert_has "$OUT" "Unplug the cable." "asks to unplug"
+assert_has "$OUT" "can't see the iPhone over Wi-Fi yet" "says when it isn't seen over Wi-Fi"
+assert_has "$OUT" "✓ The Mac sees your iPhone over Wi-Fi." "continues once it is"
 
 # Summary
 echo

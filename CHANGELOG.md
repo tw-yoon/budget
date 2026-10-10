@@ -11,6 +11,13 @@ update), so nothing here is a stability promise.
 
 ## Unreleased
 
+## 0.12.4 — 2026-10-10
+
+- iPhone app: `bash scripts/phone.sh setup` puts the app on a new iPhone step
+  by step. It finds your Team ID, fills in your Mac's address and access
+  token, and turns on automatic reinstalls; when it needs you it says
+  exactly where to click and waits.
+
 ## 0.12.3 — 2026-10-10
 
 - iPhone app: the connection card lines up with the dot and the boxes below

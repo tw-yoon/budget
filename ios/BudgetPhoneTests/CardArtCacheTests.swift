@@ -29,6 +29,19 @@ extension StubbedNetworkTests {
       return CardArtCache(session: session, directory: directory, token: { nil })
     }
 
+    @Test func aForgottenFaceIsFetchedAgain() async throws {
+      let c = cache()
+      c.load(url)
+      await c.settle()
+      #expect(c.image(url) != nil)
+      c.forget(url)
+      #expect(c.image(url) == nil)
+      c.load(url)
+      await c.settle()
+      #expect(c.image(url) != nil)
+      #expect(StubURLProtocol.requests.count == 2)
+    }
+
     @Test func sendsTheToken() async throws {
       let session = StubURLProtocol.session { _ in (200, Self.png) }
       let c = CardArtCache(session: session, directory: directory, token: { "sample-token" })

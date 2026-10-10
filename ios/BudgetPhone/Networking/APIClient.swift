@@ -185,15 +185,17 @@ struct APIClient: Sendable {
   /// category merge prompt, a delete refused in use).
   func sendRaw(
     _ method: String, _ path: String, query: [URLQueryItem] = [], body: Data? = nil,
-    timeout: TimeInterval
+    contentType: String = "application/json", timeout: TimeInterval
   ) async throws(APIError) -> (status: Int, data: Data) {
-    let (status, data, _) = try await exchange(method, path, query: query, body: body, timeout: timeout)
+    let (status, data, _) = try await exchange(
+      method, path, query: query, body: body, contentType: contentType, timeout: timeout)
     return (status, data)
   }
 
   /// `sendRaw`, keeping the response for its headers.
   private func exchange(
-    _ method: String, _ path: String, query: [URLQueryItem], body: Data?, timeout: TimeInterval
+    _ method: String, _ path: String, query: [URLQueryItem], body: Data?,
+    contentType: String = "application/json", timeout: TimeInterval
   ) async throws(APIError) -> (status: Int, data: Data, response: HTTPURLResponse) {
     let url = url(path, query: query)
     var request = URLRequest(url: url, timeoutInterval: timeout)
@@ -202,7 +204,7 @@ struct APIClient: Sendable {
     if let token { request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
     if let body {
       request.httpBody = body
-      request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+      request.setValue(contentType, forHTTPHeaderField: "Content-Type")
     }
 
     let data: Data
@@ -222,9 +224,10 @@ struct APIClient: Sendable {
 
   func send(
     _ method: String, _ path: String, query: [URLQueryItem] = [], body: Data? = nil,
-    timeout: TimeInterval
+    contentType: String = "application/json", timeout: TimeInterval
   ) async throws(APIError) -> Data {
-    let (status, data) = try await sendRaw(method, path, query: query, body: body, timeout: timeout)
+    let (status, data) = try await sendRaw(
+      method, path, query: query, body: body, contentType: contentType, timeout: timeout)
     guard (200..<300).contains(status) else { throw Self.serverError(status: status, data: data) }
     return data
   }

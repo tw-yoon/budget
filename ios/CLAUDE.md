@@ -20,7 +20,7 @@ xcodebuild test -project BudgetPhone.xcodeproj -scheme BudgetPhone -destination 
 - Also run `bash ../scripts/test-scrub.sh` before committing. It scans this
   folder too.
 - `scripts/phone.sh` installs on the owner's real phone and adds a
-  LaunchAgent. Agents never run `install`, `auto` or `schedule on` for real;
+  LaunchAgent. Agents never run `setup`, `install`, `auto` or `schedule on` for real;
   its test is `bash ../scripts/test-phone-reinstall.sh` (stubs only).
 
 ## Project file

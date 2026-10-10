@@ -1,8 +1,10 @@
+import PhotosUI
 import SwiftUI
 
 /// One card (UserCardItem in ../src/components/benefits/UserCardItem.tsx):
 /// its details, credits against the fee, earning rates, points earned and
-/// statement credits. Edit changes the start month, fee and point value.
+/// statement credits. Edit changes the start month, fee and point value;
+/// tapping the face sets its image from a Wallet screenshot.
 struct CardDetailView: View {
   let id: String
   let store: BenefitsStore
@@ -11,16 +13,21 @@ struct CardDetailView: View {
   @State private var sheet: Sheet?
   @State private var confirmingRemove = false
   @State private var saveError: String?
+  @State private var choosingScreenshot = false
+  @State private var screenshot: PhotosPickerItem?
+  @State private var confirmingRemoveArt = false
 
   enum Sheet: Identifiable {
     case edit
     case rate(RewardRateDTO?)
     case credit
+    case art(CardCrop.Cut)
     var id: String {
       switch self {
       case .edit: "edit"
       case .rate(let r): "rate-\(r?.id ?? "")"
       case .credit: "credit"
+      case .art: "art"
       }
     }
   }
@@ -41,6 +48,7 @@ struct CardDetailView: View {
         case .edit: CardEditSheet(card: card, store: store)
         case .rate(let rate): RateSheet(card: card, rate: rate, store: store)
         case .credit: AddCreditSheet(card: card, store: store)
+        case .art(let cut): CardArtSheet(card: card, cut: cut, store: store)
         }
       }
     }
@@ -57,10 +65,19 @@ struct CardDetailView: View {
   private func list(_ card: UserCardDTO) -> some View {
     List {
       Section {
-        CardArtView(card: card, artURL: card.artUrl.flatMap(store.artURL), width: 240)
-          .frame(maxWidth: .infinity)
-          .listRowBackground(Color.clear)
-          .listRowInsets(EdgeInsets())
+        Menu {
+          Button("Choose Screenshot", systemImage: "photo") { choosingScreenshot = true }
+          if card.artUrl != nil {
+            Button("Remove Image", systemImage: "trash", role: .destructive) { confirmingRemoveArt = true }
+          }
+        } label: {
+          CardArtView(card: card, artURL: card.artUrl.flatMap(store.artURL), width: 240)
+        }
+        .disabled(store.isSaving)
+        .accessibilityHint("Sets the card's image")
+        .frame(maxWidth: .infinity)
+        .listRowBackground(Color.clear)
+        .listRowInsets(EdgeInsets())
       }
       details(card)
       fee(card)
@@ -83,6 +100,16 @@ struct CardDetailView: View {
       }
     }
     .refreshable { await store.load() }
+    .photosPicker(isPresented: $choosingScreenshot, selection: $screenshot, matching: .images)
+    .onChange(of: screenshot) { _, item in
+      guard let item else { return }
+      screenshot = nil
+      Task { await cut(item) }
+    }
+    .alert("Remove this card's image?", isPresented: $confirmingRemoveArt) {
+      Button("Remove", role: .destructive) { write(.deleteArt(id: card.id)) }
+      Button("Cancel", role: .cancel) {}
+    }
     .alert(CardRules.removeCardPrompt(card), isPresented: $confirmingRemove) {
       Button("Remove", role: .destructive) { write(.deleteCard(id: card.id), thenDismiss: true) }
       Button("Cancel", role: .cancel) {}
@@ -157,6 +184,17 @@ struct CardDetailView: View {
     } footer: {
       if card.benefits.isEmpty { Text("No credits yet — add one below.") }
     }
+  }
+
+  /// The picked screenshot, cut to the card and shown before it's saved.
+  private func cut(_ item: PhotosPickerItem) async {
+    guard let data = try? await item.loadTransferable(type: Data.self),
+      let cut = await CardCrop.cut(data)
+    else {
+      saveError = "That image could not be read."
+      return
+    }
+    sheet = .art(cut)
   }
 
   private func write(_ write: CardWrite, thenDismiss: Bool = false) {

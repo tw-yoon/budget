@@ -84,6 +84,22 @@ extension StubbedNetworkTests {
       #expect(writes().last?.value(forHTTPHeaderField: "Content-Type") == "application/json")
     }
 
+    @Test func artIsTheRawPNGAndRemovingItHasNoBody() async throws {
+      let s = await store()
+      let png = Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 1, 2, 3])
+      try await s.perform(.putArt(id: "c1", png: png))
+      let put = try #require(writes().last)
+      #expect(put.httpMethod == "PUT" && put.url?.path() == "/api/user-cards/c1/art")
+      #expect(put.value(forHTTPHeaderField: "Content-Type") == "image/png")
+      #expect(StubURLProtocol.body(of: put) == png)
+
+      try await s.perform(.deleteArt(id: "c1"))
+      let delete = try #require(writes().last)
+      #expect(delete.httpMethod == "DELETE" && delete.url?.path() == "/api/user-cards/c1/art")
+      #expect(StubURLProtocol.body(of: delete) == nil)
+      #expect(gets() == 3)
+    }
+
     @Test func anEmptyCardPatchSendsNothing() async throws {
       let s = await store()
       try await s.perform(.updateCard(id: "c1", UserCardPatch()))

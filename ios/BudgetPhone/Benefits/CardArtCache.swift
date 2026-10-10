@@ -60,6 +60,16 @@ final class CardArtCache {
     inFlight[url] = Task { await fetch(url) }
   }
 
+  /// Drops a face whose bytes changed on the server, here and on disk, so
+  /// the next `load` fetches it afresh.
+  func forget(_ url: URL) {
+    inFlight[url]?.cancel()
+    inFlight[url] = nil
+    fresh.remove(url)
+    images[url] = nil
+    if let file = file(url) { try? FileManager.default.removeItem(at: file) }
+  }
+
   /// Waits for every fetch under way. For tests.
   func settle() async {
     while let task = inFlight.values.first { await task.value }

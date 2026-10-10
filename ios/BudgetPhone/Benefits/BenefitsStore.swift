@@ -12,6 +12,8 @@ enum CardWrite: Equatable, Sendable {
   case addBenefit(NewBenefit)
   case updateBenefit(id: String, BenefitPatch)
   case deleteBenefit(id: String)
+  case putArt(id: String, png: Data)
+  case deleteArt(id: String)
 }
 
 /// The cards Benefits shows (useUserCards in
@@ -102,8 +104,20 @@ final class BenefitsStore {
     case .addBenefit(let benefit): try await client.addBenefit(benefit)
     case .updateBenefit(let id, let patch): try await client.updateBenefit(id: id, patch: patch)
     case .deleteBenefit(let id): try await client.deleteBenefit(id: id)
+    case .putArt(let id, let png):
+      try await client.putCardArt(id: id, png: png)
+      forgetArt(id, client)
+    case .deleteArt(let id):
+      try await client.deleteCardArt(id: id)
+      forgetArt(id, client)
     }
     await load()
+  }
+
+  /// A new face keeps its card's URL (the server names the file after the
+  /// card), so the cached copy has to go or the old face stays.
+  private func forgetArt(_ id: String, _ client: APIClient) {
+    if let path = card(id: id)?.artUrl { art.forget(client.cardArtURL(path)) }
   }
 
   /// The list's swipe Remove: the row goes at once, then the delete. A

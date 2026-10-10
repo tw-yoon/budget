@@ -143,7 +143,7 @@ Name (placeholder "Benefit name (e.g. Airline Fee Credit)"), Amount ($, > 0), Pe
 
 ## Out of scope
 
-- Card art upload, crop and removal (`CardArtPicker`): cropping is awkward on a phone and the web does it well. Display uses `CardArtCache`.
+- ~~Card art upload, crop and removal~~ — added 2026-10-10: tapping the card face in the detail picks a Wallet screenshot, which `CardCrop` (a port of `../src/lib/card-crop.ts`) cuts with the same preset, then a preview sheet saves it.
 - Flights (its own spec).
 - Editing a card's issuer, name or last 4 (the web cannot either).
 - Showing preset or credit `notes` beyond what the web shows (rate notes only).

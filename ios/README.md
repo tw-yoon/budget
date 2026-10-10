@@ -7,17 +7,14 @@ be on, with Budget running.
 It isn't in the App Store. You put it on your phone yourself with **Xcode**,
 Apple's free app for building iPhone apps, using your own Apple ID.
 
+
 ## Contents
 
 1. [What you need](#what-you-need)
-2. [Step 1: Install Xcode](#step-1-install-xcode)
-3. [Step 2: Add your Apple ID to Xcode](#step-2-add-your-apple-id-to-xcode)
-4. [Step 3: Tell the project who you are](#step-3-tell-the-project-who-you-are)
-5. [Step 4: Get the iPhone ready](#step-4-get-the-iphone-ready)
-6. [Step 5: Put the app on your iPhone](#step-5-put-the-app-on-your-iphone)
-7. [Step 6: Connect the app to your Mac](#step-6-connect-the-app-to-your-mac)
-8. [Step 7: Keep it working past 7 days](#step-7-keep-it-working-past-7-days)
-9. [If something goes wrong](#if-something-goes-wrong)
+2. [Set it up](#set-it-up)
+3. [Keeping it working](#keeping-it-working)
+4. [If something goes wrong](#if-something-goes-wrong)
+5. [Doing it by hand](#doing-it-by-hand)
 
 ## What you need
 
@@ -35,12 +32,122 @@ Commands below go in **Terminal**. If you haven't used it, see
 
 > **The 7-day catch.** With a free Apple ID, the app stops opening 7 days
 > after it was put on your phone. Nothing is lost: putting it on again wakes
-> it up. [Step 7](#step-7-keep-it-working-past-7-days) makes your Mac do this
+> it up. [Setup](#set-it-up) makes your Mac do this
 > for you automatically.
 
 ---
 
-## Step 1: Install Xcode
+## Set it up
+
+Paste these two lines into Terminal, one at a time:
+
+```bash
+cd ~/Documents/budget/ios
+```
+
+```bash
+bash scripts/phone.sh setup
+```
+
+It goes through seven steps. When a step is already done it shows a ✓ and
+moves on. When it needs you, it says exactly what to do, then waits: do it,
+come back to Terminal and press **Return**. You can stop at any time with
+**Control-C** and paste the second line again later; it picks up where it
+stopped.
+
+What it will ask you to do:
+
+1. **Xcode.** If it isn't installed, the App Store opens on it: click
+   **Get**, then **Install**. It's a very big download (often an hour). Your
+   Mac's password may be needed once afterwards; nothing shows while you
+   type.
+2. **Apple ID.** If Xcode isn't signed in, Xcode opens and setup tells you
+   where to click to sign in with your Apple ID.
+3. **Team ID.** Nothing to do: setup finds it. If your Apple ID has more
+   than one team, it asks which one, by number.
+4. **iPhone.** Plug it in with a cable and unlock it. Tap **Trust** if the
+   phone asks. Then turn on **Developer Mode** (setup says where); the phone
+   restarts.
+5. **Putting the app on.** Takes a few minutes the first time. Nothing to do.
+6. **Connecting.** The first time, the phone says the developer isn't
+   trusted. Setup tells you where to tap **Trust**. Then Budget opens on the
+   phone with your Mac's address and access token already filled in.
+7. **Wi-Fi.** Unplug the cable, keep the phone unlocked on the same Wi-Fi as
+   the Mac. Setup checks the Mac can still see it, and turns on automatic
+   reinstalls.
+
+✅ **You should see**, at the end:
+
+```
+All set. Budget is on your iPhone and opens until Saturday, October 17.
+```
+
+(Your date will be 7 days from today.)
+
+❌ **If setup stops with** `Budget isn't running` or `Tailscale isn't …`:
+do what it says (it names the step of the [main guide](../README.md)), then
+paste the second line again.
+
+## Keeping it working
+
+Every 3 hours your Mac checks, and once the app has fewer than 5 of its 7
+days left, it puts a freshly signed copy on the phone. On the phone,
+**Settings → About** shows when it was installed and when it stops opening.
+For this to work:
+
+- the Mac has to be **awake and logged in**, and
+- the iPhone has to be on the **same Wi-Fi** as the Mac.
+
+If it keeps failing and the app is close to its 7 days, the Mac shows a
+notification. Then paste `bash scripts/phone.sh install` (in
+`~/Documents/budget/ios`).
+
+| To… | Paste into Terminal (after `cd ~/Documents/budget/ios`) |
+| --- | --- |
+| Set up from the start, or check everything | `bash scripts/phone.sh setup` |
+| Put the app on the phone right now | `bash scripts/phone.sh install` |
+| Turn automatic reinstalls off | `bash scripts/phone.sh schedule off` |
+| Turn them back on (also after moving the `budget` folder) | `bash scripts/phone.sh schedule on` |
+| See what happened on each try | `open -e build/phone/log` |
+
+- The schedule is one small file in `~/Library/LaunchAgents`, the only thing
+  Budget keeps outside its folder. `schedule off` deletes it. It installs the
+  code that's in your `budget` folder and never downloads anything itself.
+
+## If something goes wrong
+
+| What you see | What to do |
+| --- | --- |
+| The app won't open at all | The 7 days ran out. Paste `cd ~/Documents/budget/ios && bash scripts/phone.sh install`, or plug in and press ▶ in Xcode. Nothing is lost. |
+| "Untrusted Developer" | iPhone **Settings → General → VPN & Device Management** → your Apple ID → **Trust** (setup's step 6). |
+| No Developer Mode in Settings | Plug the phone in, unlock it, open Xcode, wait a minute, look again (setup's step 4). |
+| The app can't reach the server | Tailscale on in the phone's Tailscale app? Mac on with Budget running? Address starts with `https://` and ends in `.ts.net`? |
+| The app asks for the access token again | Someone pressed **Reset Token** on the Mac. Copy the new one from Budget → **Settings → Remote Access**. |
+
+
+## Try it on the Mac first (optional)
+
+Xcode can show a pretend iPhone on your Mac, called the **Simulator**. It's a
+quick way to look around, and it needs no Team ID, cable or Tailscale.
+
+1. Paste into Terminal:
+
+   ```bash
+   cd ~/Documents/budget/ios && open BudgetPhone.xcodeproj
+   ```
+
+2. At the top of Xcode, click the device name next to **BudgetPhone** and
+   choose any iPhone under **iOS Simulators**. Press **▶**.
+3. When the app asks for the server, enter `http://localhost:3000`.
+
+✅ **You should see** a pretend iPhone on your screen showing your accounts.
+
+## Doing it by hand
+
+Setup does all of this for you. These are the same steps by hand, in case
+you'd rather, or setup can't finish.
+
+### Step 1: Install Xcode
 
 1. Open [Xcode in the Mac App Store](https://apps.apple.com/app/xcode/id497799835)
    and click **Get**, then **Install**. It's a very big download: it can take
@@ -54,7 +161,7 @@ Commands below go in **Terminal**. If you haven't used it, see
 ❌ **If the App Store says** your macOS is too old for this Xcode: update
 your Mac first in **System Settings → General → Software Update**.
 
-## Step 2: Add your Apple ID to Xcode
+### Step 2: Add your Apple ID to Xcode
 
 1. With Xcode open, click **Xcode** in the menu bar at the very top of the
    screen, then **Settings…**
@@ -77,7 +184,7 @@ called **"Your Name (Personal Team)"**.
    4. Your Team ID is next to **Organizational Unit**.
 5. **Quit Xcode (⌘ Q).** Step 3 must happen while the project is closed.
 
-## Step 3: Tell the project who you are
+### Step 3: Tell the project who you are
 
 This puts your Team ID in a small settings file that only you have.
 
@@ -118,7 +225,7 @@ This puts your Team ID in a small settings file that only you have.
 > "Signing & Capabilities"), Xcode writes your Team ID into a project file
 > that's shared publicly. This way it stays in your own file.
 
-## Step 4: Get the iPhone ready
+### Step 4: Get the iPhone ready
 
 1. Plug the iPhone into the Mac with the cable.
 2. Unlock the iPhone. If it asks **"Trust This Computer?"**, tap **Trust** and
@@ -140,7 +247,7 @@ This puts your Team ID in a small settings file that only you have.
 ❌ **If there's no Developer Mode** in Privacy & Security: keep the phone
 plugged in and unlocked with Xcode open for a minute, then look again.
 
-## Step 5: Put the app on your iPhone
+### Step 5: Put the app on your iPhone
 
 1. At the top of the Xcode window, next to **BudgetPhone**, click the device
    name (it may say "iPhone 17 Pro" or "Any iOS Device") and choose **your
@@ -172,7 +279,7 @@ saved), then open the project again.
 ❌ **If Xcode says** the iPhone "is busy" or "is not available": unplug and
 replug the cable, unlock the phone, and wait a minute.
 
-## Step 6: Connect the app to your Mac
+### Step 6: Connect the app to your Mac
 
 1. On the iPhone, open the **Tailscale** app and make sure it's switched
    **on** (Connected).
@@ -194,14 +301,14 @@ You can change these later in the app under **Settings → Server**.
 > **Keep Tailscale on** on the phone. The app always reaches your Mac through
 > Tailscale, even at home on the same Wi-Fi.
 
-## Step 7: Keep it working past 7 days
+### Step 7: Keep it working past 7 days
 
 Your Mac can put the app on your phone again by itself every few days, over
 Wi-Fi, without a cable.
 
-1. **Once, with the cable plugged in:** in Xcode, click **Window** in the menu
-   bar, then **Devices and Simulators**. Click your iPhone on the left and
-   tick **Connect via network**. Then quit Xcode and unplug the cable.
+1. **Once, with the cable plugged in**, put the app on with ▶ in Xcode
+   (Step 5). That pairs the phone. Then unplug the cable: current Xcode
+   reaches a paired phone over Wi-Fi by itself.
 2. **Check the Mac can do it on its own.** Unlock the iPhone and keep it on
    the same Wi-Fi as the Mac. Paste into Terminal:
 
@@ -224,11 +331,11 @@ Wi-Fi, without a cable.
 
    ❌ **If you see** `Install failed. Is the iPhone unlocked and on the same
    Wi-Fi as the Mac?`: unlock the phone, check it's on the same Wi-Fi as the
-   Mac, and check **Connect via network** is ticked (sub-step 1). Then paste
-   the `install` line again.
+   Mac, and check you did sub-step 1 once with the cable. Then paste the
+   `install` line again.
 
-   ❌ **If you see** `No paired iPhone`: do sub-step 1 again with the cable
-   plugged in.
+   ❌ **If you see** `No paired iPhone`: plug the phone in, unlock it, and press
+   ▶ in Xcode once.
 
    ❌ **If you see** `Build failed`: paste `open -e build/phone/log` and look
    near the bottom. Usually it's the same signing problem as in Step 5; fix
@@ -248,55 +355,7 @@ Wi-Fi, without a cable.
    ✅ **You should see** `Scheduled. Every 3 hours the Mac reinstalls the app
    once fewer than 5 days of its 7 are left.`
 
-That's it. Every 3 hours your Mac checks, and once the app has fewer than 5
-of its 7 days left, it puts a freshly signed copy on the phone. On the phone,
-**Settings → About** shows when it was installed and when it stops opening. For this to work:
-
-- the Mac has to be **awake and logged in**, and
-- the iPhone has to be on the **same Wi-Fi** as the Mac.
-
-If it keeps failing and the app is close to its 7 days, the Mac shows a
-notification. Then paste `bash scripts/phone.sh install` again (in
-`~/Documents/budget/ios`), or plug the phone in and press **▶** in Xcode.
-
-| To… | Paste into Terminal (after `cd ~/Documents/budget/ios`) |
-| --- | --- |
-| Put the app on the phone right now | `bash scripts/phone.sh install` |
-| Turn the schedule off | `bash scripts/phone.sh schedule off` |
-| Turn it back on (also after moving the `budget` folder) | `bash scripts/phone.sh schedule on` |
-| See what happened on each try | `open -e build/phone/log` |
-
 - Without the schedule, put the app on again yourself at least once a week.
-- The schedule is one small file in `~/Library/LaunchAgents`, the only thing
-  Budget keeps outside its folder. `schedule off` deletes it. It installs the
-  code that's in your `budget` folder and never downloads anything itself.
-
-## If something goes wrong
-
-| What you see | What to do |
-| --- | --- |
-| The app won't open at all | The 7 days ran out. Paste `cd ~/Documents/budget/ios && bash scripts/phone.sh install`, or plug in and press ▶ in Xcode. Nothing is lost. |
-| "Untrusted Developer" | iPhone **Settings → General → VPN & Device Management** → your Apple ID → **Trust** (Step 5). |
-| No Developer Mode in Settings | Plug the phone in, unlock it, open Xcode, wait a minute, look again (Step 4). |
-| The app can't reach the server | Tailscale on in the phone's Tailscale app? Mac on with Budget running? Address starts with `https://` and ends in `.ts.net`? |
-| The app asks for the access token again | Someone pressed **Reset Token** on the Mac. Copy the new one from Budget → **Settings → Remote Access**. |
-
-## Try it on the Mac first (optional)
-
-Xcode can show a pretend iPhone on your Mac, called the **Simulator**. It's a
-quick way to look around, and it needs no Team ID, cable or Tailscale.
-
-1. Paste into Terminal:
-
-   ```bash
-   cd ~/Documents/budget/ios && open BudgetPhone.xcodeproj
-   ```
-
-2. At the top of Xcode, click the device name next to **BudgetPhone** and
-   choose any iPhone under **iOS Simulators**. Press **▶**.
-3. When the app asks for the server, enter `http://localhost:3000`.
-
-✅ **You should see** a pretend iPhone on your screen showing your accounts.
 
 ---
 

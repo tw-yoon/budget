@@ -1,8 +1,7 @@
 import Foundation
 
 // Benefits (../src/app/api/user-cards/**, ../src/app/api/rewards/**,
-// ../src/app/api/benefits/**, ../src/app/api/card-art/**). Card art upload
-// (PUT /api/user-cards/:id/art) stays on the web.
+// ../src/app/api/benefits/**, ../src/app/api/card-art/**).
 
 extension APIClient {
   /// GET /api/user-cards — the cards Benefits shows, in the user's order.
@@ -31,6 +30,16 @@ extension APIClient {
   /// DELETE /api/user-cards/:id — the card and its credits and rates.
   func deleteUserCard(id: String) async throws(APIError) {
     _ = try await send("DELETE", "api/user-cards/\(id)", timeout: 15)
+  }
+
+  /// PUT /api/user-cards/:id/art — the raw PNG, already cut (CardCrop).
+  func putCardArt(id: String, png: Data) async throws(APIError) {
+    _ = try await send("PUT", "api/user-cards/\(id)/art", body: png, contentType: "image/png", timeout: 30)
+  }
+
+  /// DELETE /api/user-cards/:id/art — back to the placeholder face.
+  func deleteCardArt(id: String) async throws(APIError) {
+    _ = try await send("DELETE", "api/user-cards/\(id)/art", timeout: 15)
   }
 
   /// POST /api/user-cards/reorder — `{ ids }`, every card in its new order.

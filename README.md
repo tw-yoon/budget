@@ -419,7 +419,14 @@ The iPhone app isn't in the App Store. You put it on your phone yourself with
 Xcode, using your own free Apple ID. Do Step 8 first, since the app reaches
 your Mac through Tailscale.
 
-**Follow the steps in [ios/README.md](ios/README.md).**
+Install Xcode from the [Mac App Store](https://apps.apple.com/app/xcode/id497799835)
+(a big download), then paste into Terminal:
+
+```bash
+cd ~/Documents/budget/ios && bash scripts/phone.sh setup
+```
+
+and follow what it says. The details are in [ios/README.md](ios/README.md).
 
 ---
 
