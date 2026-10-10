@@ -79,6 +79,84 @@ extension StubbedNetworkTests {
       #expect(StubURLProtocol.requests.count == 2, "applying the same query again does nothing")
     }
 
+    // MARK: Recent searches
+
+    func gated(_ gate: Gate, _ handler: @escaping (URLRequest) throws -> (Int, Data)) -> APIClient {
+      APIClient(baseURL: base, session: StubURLProtocol.session(handler, gates: [gate]))
+    }
+
+    @Test func goingBackToARecentQueryShowsItAtOnceThenTheServersPage() async throws {
+      // The third request (back to no search) is held.
+      let gate = Gate { _ in StubURLProtocol.requests.count == 3 }
+      let c = gated(gate) { r in
+        if TestData.query(of: r, "search") != nil {
+          return (200, try TestData.ledgerPage(["s"], page: 1, totalPages: 1))
+        }
+        let ids = StubURLProtocol.requests.count >= 3 ? ["a2"] : ["a"]
+        return (200, try TestData.ledgerPage(ids, page: 1, totalPages: 1))
+      }
+      let store = TransactionsStore { c }
+      await store.reload()
+      let all = store.query
+      var q = all
+      q.search = "sample"
+      await store.apply(q)
+      #expect(store.rows.map(\.id) == ["s"])
+      let back = Task { await store.apply(all) }
+      await gate.arrival()
+      #expect(store.rows.map(\.id) == ["a"])
+      #expect(store.isLoading)
+      gate.open()
+      await back.value
+      #expect(store.rows.map(\.id) == ["a2"])
+    }
+
+    @Test func aWriteForgetsTheKeptQueries() async throws {
+      // Requests: GET all, GET search, PATCH, GET search (the write's page), GET all (held).
+      let gate = Gate { _ in StubURLProtocol.requests.count == 5 }
+      let c = gated(gate) { r in
+        if r.httpMethod == "PATCH" { return (200, Data(#"{"ok":true,"userCategory":"Dining"}"#.utf8)) }
+        let ids = TestData.query(of: r, "search") != nil ? ["s"] : ["a"]
+        return (200, try TestData.ledgerPage(ids, page: 1, totalPages: 1))
+      }
+      let store = TransactionsStore { c }
+      await store.reload()
+      let all = store.query
+      var q = all
+      q.search = "sample"
+      await store.apply(q)
+      try await store.setCategory("s", .set("Dining", subcategory: nil))
+      let back = Task { await store.apply(all) }
+      await gate.arrival()
+      #expect(store.rows.map(\.id) == ["s"], "the kept page for no search was dropped")
+      gate.open()
+      await back.value
+      #expect(store.rows.map(\.id) == ["a"])
+    }
+
+    @Test func onlyTheLastTenQueriesAreKept() async throws {
+      // Request 13 is the first query again (after it and eleven more), held.
+      let gate = Gate { _ in StubURLProtocol.requests.count == 13 }
+      let c = gated(gate) { r in
+        let ids = [TestData.query(of: r, "search") ?? "all"]
+        return (200, try TestData.ledgerPage(ids, page: 1, totalPages: 1))
+      }
+      let store = TransactionsStore { c }
+      await store.reload()
+      let all = store.query
+      for i in 1...11 {
+        var q = all
+        q.search = "s\(i)"
+        await store.apply(q)
+      }
+      let back = Task { await store.apply(all) }
+      await gate.arrival()
+      #expect(store.rows.map(\.id) == ["s11"], "no search fell out of the ten kept")
+      gate.open()
+      await back.value
+      #expect(store.rows.map(\.id) == ["all"])
+    }
+
     @Test func aResponseForAnOlderQueryIsDiscarded() async throws {
       let c = client { r in
         if TestData.query(of: r, "search") == nil {

@@ -59,17 +59,42 @@ extension StubbedNetworkTests {
 
     @Test func analyticsAreSavedOnlyForTheLaunchRange() async throws {
       let c = client(try TestData.fixture("analytics"))
-      let got = try await c.analytics(months: AnalyticsStore.launchRange)
-      #expect(c.savedAnalytics(months: AnalyticsStore.launchRange) == got)
-      _ = try await c.analytics(months: 6)
+      let got = try await c.analytics(months: 3, launchRange: 3)
+      #expect(c.savedAnalytics(months: 3) == got)
+      _ = try await c.analytics(months: 6, launchRange: 3)
       #expect(c.savedAnalytics(months: 6) == nil)
     }
 
     @Test func anotherRangeLeavesTheLaunchRangeSaved() async throws {
       let c = client(try TestData.fixture("analytics"))
-      let launch = try await c.analytics(months: 3)
-      _ = try await c.analytics(months: 12)
+      let launch = try await c.analytics(months: 3, launchRange: 3)
+      _ = try await c.analytics(months: 12, launchRange: 3)
       #expect(c.savedAnalytics(months: 3) == launch)
+    }
+
+    @Test func anAnswerForARangeLeftWhileItLoadedIsNotSaved() async throws {
+      let body = try TestData.fixture("analytics")
+      let cache = ResponseCache(
+        root: FileManager.default.temporaryDirectory.appending(path: UUID().uuidString))
+      let gate = Gate { _ in true }
+      let c = APIClient(
+        baseURL: base, session: StubURLProtocol.session({ _ in (200, body) }, gates: [gate]),
+        token: "sample-token", cache: cache)
+      let picked = RangeBox(3)
+      let slow = Task { try await c.analytics(months: 3, launchRange: { picked.value }) }
+      await gate.arrival()
+      picked.value = 6  // the user picks 6 months meanwhile
+      gate.open()
+      _ = try await slow.value
+      #expect(c.savedAnalytics(months: 3) == nil)
+    }
+
+    @Test func aPickedLaunchRangeReplacesTheOldRangesCopy() async throws {
+      let c = client(try TestData.fixture("analytics"))
+      _ = try await c.analytics(months: 3, launchRange: 3)
+      let picked = try await c.analytics(months: 12, launchRange: 12)
+      #expect(c.savedAnalytics(months: 12) == picked)
+      #expect(c.savedAnalytics(months: 3) == nil)
     }
 
     @Test func cashflowIsSaved() async throws {
@@ -121,4 +146,10 @@ extension StubbedNetworkTests {
       #expect(c.savedUIState("spendingMonthlyLimit") == nil)
     }
   }
+}
+
+/// A launch range a test changes while a request is in flight.
+final class RangeBox: @unchecked Sendable {
+  var value: Int
+  init(_ value: Int) { self.value = value }
 }

@@ -6,9 +6,13 @@ struct AccountsView: View {
   @State private var store = AccountsStore {
     APIClient.saved()
   }
+  @State private var link = MacLinkStore {
+    APIClient.saved()
+  }
   /// Accounts hidden on this phone only; they stay out of every total.
   @State private var hidden = HiddenAccounts()
   @State private var showHidden = false
+  @State private var showLink = false
   /// Bumped by Settings when a bank is disconnected.
   let changes: DataChanges
 
@@ -19,13 +23,50 @@ struct AccountsView: View {
         .navigationDestination(for: AccountDTO.self) { account in
           AccountEditView(account: account, store: store, hidden: hidden)
         }
+        .toolbar {
+          ToolbarItem(placement: .topBarTrailing) {
+            MacLinkDot(link: link.link, updated: store.updatedAt, isShowing: $showLink)
+          }
+        }
+    }
+    // The dot's card, at the top right where the dot is; a tap anywhere
+    // closes it.
+    .overlay(alignment: .topTrailing) {
+      if showLink {
+        ZStack(alignment: .topTrailing) {
+          Color.clear
+            .contentShape(.rect)
+            .ignoresSafeArea()
+            .onTapGesture { withAnimation(.snappy) { showLink = false } }
+            .accessibilityHidden(true)
+          MacLinkCard(link: link.link, updated: store.updatedAt)
+            .padding(.horizontal, 16)
+            .padding(.top, 4)
+            .transition(.scale(scale: 0.5, anchor: .topTrailing).combined(with: .opacity))
+            .accessibilityAction(.escape) { withAnimation(.snappy) { showLink = false } }
+        }
+      }
     }
     .task { await store.load() }
     // Another device may have changed something while this one was away.
     .onChange(of: scenePhase) { _, phase in
+      showLink = false
       if phase == .active { Task { await store.load() } }
     }
-    .onChange(of: server) { Task { await store.load() } }
+    .onChange(of: server) {
+      link.serverChanged()
+      Task { await store.load() }
+      Task { await link.check() }
+    }
+    // The connection dot asks the Mac again every so often while Accounts is
+    // on screen and the app is in front. Ends when either stops.
+    .task(id: scenePhase) {
+      guard scenePhase == .active else { return }
+      while !Task.isCancelled {
+        await link.check()
+        try? await Task.sleep(for: MacLinkStore.interval)
+      }
+    }
     // A bank disconnected in Settings. GET only: never refreshes from Plaid.
     .onChange(of: changes.accountsVersion) { Task { await store.load() } }
   }

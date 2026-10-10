@@ -4,12 +4,15 @@
 # opens your browser; if the code changed since the last build it rebuilds
 # automatically first. The server runs in the background, so you can close the
 # Terminal window once it opens.
-# Usage: Budget.command [--no-open] [--rebuild] [--check-only] [--update]
+# Usage: Budget.command [--no-open] [--rebuild] [--check-only] [--update] [--login on|off] [--update-status]
 #   --no-open      start/refresh the server without opening the browser
 #   --rebuild      force a rebuild even if no change was detected
 #   --check-only   report setup and update status without building or starting
 #   --update       pull the latest version and apply any new migrations
 #                  (contradicts --check-only; combining them is rejected)
+#   --login on     start Budget when you log in (and restart it if it stops)
+#   --login off    stop doing that
+#   --update-status  print this clone's version and the published one, as JSON
 #   BUDGET_PORT    (env var) testing override for the port; defaults to 3000
 #
 # Everything this script actually *does* lives in main() at the bottom, and the
@@ -197,15 +200,6 @@ do_update() {
   fi
 }
 
-# Best-effort and always silent on failure: an offline launch is a normal
-# launch. GIT_HTTP_LOW_SPEED_LIMIT/TIME only govern git's HTTP transport --
-# an SSH origin ignores them entirely, and a black-holed connection or a
-# host-key/passphrase prompt with no TTY to answer it can then hang
-# indefinitely, which would block every launch. GIT_TERMINAL_PROMPT=0 and
-# BatchMode=yes rule out prompting, and ConnectTimeout bounds the initial
-# handshake, but none of that bounds a connection that opens and then goes
-# silent -- so the fetch is backgrounded and polled against a 10s wall-clock
-# cap as the real backstop, standing in for `timeout`, which macOS lacks.
 # The "version" field of a package.json fed in on stdin. Read from a file for
 # this clone and from `git show` for the published one, so the two can be
 # compared without checking anything out.
@@ -217,9 +211,20 @@ app_version() {
   read_version < "$SCRIPT_DIR/package.json" 2>/dev/null
 }
 
-check_updates() {
-  updatable || return 0
-
+# Best-effort and always silent on failure: an offline launch is a normal
+# launch. GIT_HTTP_LOW_SPEED_LIMIT/TIME only govern git's HTTP transport --
+# an SSH origin ignores them entirely, and a black-holed connection or a
+# host-key/passphrase prompt with no TTY to answer it can then hang
+# indefinitely, which would block every launch. GIT_TERMINAL_PROMPT=0 and
+# BatchMode=yes rule out prompting, and ConnectTimeout bounds the initial
+# handshake, but none of that bounds a connection that opens and then goes
+# silent -- so the fetch is backgrounded and polled against a 10s wall-clock
+# cap as the real backstop, standing in for `timeout`, which macOS lacks.
+#
+# This is the bounded, prompt-free fetch both update checks use. Returns
+# non-zero when it failed or ran past its 10s cap; either way nothing is left
+# running.
+fetch_origin() {
   GIT_TERMINAL_PROMPT=0 GIT_SSH_COMMAND="ssh -oBatchMode=yes -oConnectTimeout=5" \
   GIT_HTTP_LOW_SPEED_LIMIT=1000 GIT_HTTP_LOW_SPEED_TIME=5 \
     git -C "$SCRIPT_DIR" fetch --quiet origin 2>/dev/null &
@@ -231,12 +236,36 @@ check_updates() {
     if [ "$tries" -ge 100 ]; then
       kill "$fetch_pid" 2>/dev/null
       wait "$fetch_pid" 2>/dev/null
-      return 0
+      return 1
     fi
     sleep 0.1
     tries=$((tries + 1))
   done
-  wait "$fetch_pid" 2>/dev/null || return 0
+  wait "$fetch_pid" 2>/dev/null
+}
+
+# --update-status: what the app's Settings → Updates shows, as one JSON line
+# for the server to read (src/lib/updater.ts). Read-only: no setup, no lock.
+update_status_json() {
+  local blocker version latest="" behind=0 branch
+  blocker=$(update_blocker)
+  version=$(app_version)
+  if [ -z "$blocker" ] && fetch_origin; then
+    branch=$(git -C "$SCRIPT_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null)
+    if [ -n "$branch" ] && git -C "$SCRIPT_DIR" rev-parse --verify --quiet "origin/$branch" >/dev/null; then
+      behind=$(git -C "$SCRIPT_DIR" rev-list --count "HEAD..origin/$branch" 2>/dev/null)
+      latest=$(git -C "$SCRIPT_DIR" show "origin/$branch:package.json" 2>/dev/null | read_version)
+    fi
+  fi
+  local latest_json=null
+  [ -n "$latest" ] && latest_json="\"$latest\""
+  printf '{"version":"%s","latest":%s,"behind":%d,"blocker":"%s"}\n' \
+    "$version" "$latest_json" "${behind:-0}" "$blocker"
+}
+
+check_updates() {
+  updatable || return 0
+  fetch_origin || return 0
 
   local branch behind
   branch=$(git -C "$SCRIPT_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null) || return 0
@@ -351,6 +380,120 @@ snapshot_db_before_migrate() {
   find "$BACKUP_DIR" -name 'pre-update-*.db' -type f -mtime +$KEEP_DAYS -delete 2>/dev/null
 }
 
+# Start at login: one LaunchAgent in ~/Library/LaunchAgents, written and
+# removed only here -- the same shape as ios/scripts/phone.sh's schedule.
+# The agent runs this launcher, then waits while the port is served. When the
+# server stops after running, the job exits 1 and KeepAlive (SuccessfulExit
+# false) runs it again. A launch that fails -- a build error, say -- exits 0
+# instead, so launchd stops there rather than rebuilding every 30 seconds
+# forever under caffeinate; the next login or a manual launch tries again.
+# The folder is handed to `bash -c` as $0 rather than written into the
+# command, so no path can break the command's quoting.
+# (LOGIN_LABEL is set in main(): only function definitions live at top level.)
+
+xml_escape() {
+  sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g' -e 's/"/\&quot;/g'
+}
+
+login_on() {
+  local plist dir
+  plist="$LAUNCH_AGENTS_DIR/$LOGIN_LABEL.plist"
+  dir=$(printf '%s' "$SCRIPT_DIR" | xml_escape)
+  mkdir -p "$LAUNCH_AGENTS_DIR" || { echo "Couldn't create $LAUNCH_AGENTS_DIR."; return 1; }
+  # <<- strips the tabs: they keep the XML off column 0, where a test
+  # insists only function definitions may sit.
+  cat >"$plist" <<-EOF
+	<?xml version="1.0" encoding="UTF-8"?>
+	<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+	<plist version="1.0">
+	<dict>
+	  <key>Label</key><string>$LOGIN_LABEL</string>
+	  <key>ProgramArguments</key>
+	  <array>
+	    <string>/usr/bin/caffeinate</string>
+	    <string>-i</string>
+	    <string>/bin/bash</string>
+	    <string>-c</string>
+	    <string>cd "\$0" &amp;&amp; ./Budget.command --no-open || exit 0; while lsof -nP -iTCP:$PORT -sTCP:LISTEN &gt;/dev/null 2&gt;&amp;1; do sleep 30; done; exit 1</string>
+	    <string>$dir</string>
+	  </array>
+	  <key>RunAtLoad</key><true/>
+	  <key>KeepAlive</key><dict><key>SuccessfulExit</key><false/></dict>
+	  <key>ThrottleInterval</key><integer>30</integer>
+	  <key>StandardOutPath</key><string>$dir/.launchd.log</string>
+	  <key>StandardErrorPath</key><string>$dir/.launchd.log</string>
+	</dict>
+	</plist>
+	EOF
+  "$LAUNCHCTL" bootout "gui/$(id -u)/$LOGIN_LABEL" >/dev/null 2>&1
+  if ! "$LAUNCHCTL" bootstrap "gui/$(id -u)" "$plist" >>"$LOG" 2>&1; then
+    # No agent file without a loaded agent: the installer only asks when the
+    # file is missing, so a leftover would stop it asking ever again.
+    rm -f "$plist"
+    echo "launchctl couldn't load the agent, so Budget won't start at login. Details: $LOG"
+    return 1
+  fi
+  echo "Budget now starts when you log in, and starts again if it stops."
+  echo "It also keeps the Mac from going to sleep on its own while it runs, so your phone can reach it."
+  echo "Turn it off with: ./Budget.command --login off"
+}
+
+login_off() {
+  "$LAUNCHCTL" bootout "gui/$(id -u)/$LOGIN_LABEL" >/dev/null 2>&1
+  rm -f "$LAUNCH_AGENTS_DIR/$LOGIN_LABEL.plist"
+  echo "Budget no longer starts when you log in."
+}
+
+# Whether the lock's holder is gone. A holder that died without cleaning up
+# (a crash, a closed Terminal, a power cut) leaves its pid behind, and after a
+# restart that pid can belong to something else entirely -- so a pid only
+# counts while it is a Budget.command. An empty pid is a launch between its
+# mkdir and its write; one still empty after 10 seconds died there.
+lock_stale() {
+  local holder="$1" made
+  if [ -z "$holder" ]; then
+    made=$(stat -f %m "$LOCK_DIR/pid" 2>/dev/null || stat -f %m "$LOCK_DIR" 2>/dev/null) || return 1
+    [ $(( $(date +%s) - made )) -gt 10 ]
+    return
+  fi
+  kill -0 "$holder" 2>/dev/null || return 0
+  case "$(ps -p "$holder" -o command= 2>/dev/null)" in
+    *Budget.command*) return 1 ;;
+  esac
+  return 0
+}
+
+# One launch or update at a time. Start-at-login restarts Budget whenever the
+# server stops -- which an update does on purpose -- and without this the
+# restart would begin its own build in the middle of the update's. A stale
+# lock (see lock_stale) is taken over.
+take_lock() {
+  local waited=0 holder
+  while ! mkdir "$LOCK_DIR" 2>/dev/null; do
+    holder=$(cat "$LOCK_DIR/pid" 2>/dev/null)
+    if lock_stale "$holder"; then
+      rm -rf "$LOCK_DIR"
+      continue
+    fi
+    [ "$waited" -eq 0 ] && echo "Another Budget launch or update is running — waiting…"
+    if [ "$waited" -ge "$LOCK_WAIT" ]; then
+      echo "Still busy after $LOCK_WAIT seconds, so this launch stopped. Try again in a minute."
+      echo "If nothing else is running, delete the $LOCK_DIR folder in $SCRIPT_DIR."
+      exit 1
+    fi
+    sleep 1
+    waited=$((waited + 1))
+  done
+  echo $$ > "$LOCK_DIR/pid"
+  trap 'rm -rf "$LOCK_DIR"' EXIT
+}
+
+# "Step 2 of 3: …" for the work a launch actually does.
+step() {
+  STEP=$((STEP + 1))
+  echo "Step $STEP of $STEPS: $1"
+}
+
 main() {
   cd "$(dirname "$0")" || exit 1
 
@@ -362,6 +505,14 @@ main() {
   # this script gets a minimal PATH without node/npm — add the usual install
   # locations so it works no matter how it was started.
   export PATH="/usr/local/bin:/opt/homebrew/bin:$PATH"
+
+  # Started from the app, this inherits the running server's environment.
+  # `next start` sets NODE_ENV=production, under which `npm install` leaves
+  # out devDependencies -- the build tools -- so the build fails with the old
+  # server already stopped; __NEXT_PROCESSED_ENV would make the new build and
+  # server skip the .env files. (src/lib/updater.ts's updateEnv drops them
+  # too; this covers any other caller.)
+  unset NODE_ENV __NEXT_PROCESSED_ENV
 
   PORT="${BUDGET_PORT:-3000}"
   URL="http://localhost:$PORT"
@@ -386,14 +537,42 @@ main() {
   FORCE=false
   CHECK_ONLY=false
   UPDATE=false
-  for arg in "$@"; do
-    case "$arg" in
+  LOGIN=""
+  LOGIN_GIVEN=false
+  UPDATE_STATUS=false
+  while [ $# -gt 0 ]; do
+    case "$1" in
       --no-open) NO_OPEN=true ;;
       --rebuild) FORCE=true ;;
       --check-only) CHECK_ONLY=true ;;
       --update) UPDATE=true ;;
+      --update-status) UPDATE_STATUS=true ;;
+      --login) LOGIN_GIVEN=true; LOGIN="${2:-}"; [ $# -ge 2 ] && shift ;;
     esac
+    shift
   done
+  # (--login as the last argument has no value: LOGIN stays empty and the
+  # usage below is shown, rather than shifting past the end of the list.)
+
+  LOGIN_LABEL="local.budget.server"
+  LOCK_DIR=".budget.lock"
+  LOCK_WAIT="${BUDGET_LOCK_WAIT:-900}"
+  LAUNCHCTL="${LAUNCHCTL:-launchctl}"
+  LAUNCH_AGENTS_DIR="${LAUNCH_AGENTS_DIR:-$HOME/Library/LaunchAgents}"
+  # --login only manages the LaunchAgent: no setup, no build, no start.
+  if $LOGIN_GIVEN; then
+    case "$LOGIN" in
+      on) login_on; exit $? ;;
+      off) login_off; exit 0 ;;
+      *) echo "Usage: ./Budget.command --login on   (or --login off)"; exit 1 ;;
+    esac
+  fi
+
+  # --update-status only reads: no setup, no lock, no build.
+  if $UPDATE_STATUS; then
+    update_status_json
+    exit 0
+  fi
 
   # check-only promises to only report; update promises to change things.
   # Combining them would mean a caller who asked only for a report gets a real
@@ -404,6 +583,9 @@ main() {
     echo "the other changes things. Use one or the other."
     exit 1
   fi
+
+  # --check-only only reads, so it never waits behind a running update.
+  $CHECK_ONLY || take_lock
 
   bootstrap_env
 
@@ -420,7 +602,7 @@ main() {
       # block below already kills-and-restarts for a changed build, but that
       # happens after ensure_db -- leaving a stale server answering requests
       # against a freshly migrated schema in between if it ran first here too.
-      lsof -ti:"$PORT" | xargs kill 2>/dev/null
+      lsof -ti tcp:"$PORT" -sTCP:LISTEN | xargs kill 2>/dev/null
       snapshot_db_before_migrate
       ensure_db force
     fi
@@ -440,6 +622,16 @@ main() {
     exit 0
   fi
 
+  # Counted after any pull: what it brought decides whether a build is due.
+  STEP=0
+  STEPS=0
+  if needs_build; then
+    needs_install && STEPS=$((STEPS + 1))
+    STEPS=$((STEPS + 2))
+  elif ! server_running; then
+    STEPS=1
+  fi
+
   if server_running && ! needs_build; then
     echo "Budget is already running and up to date."
     $NO_OPEN || open "$URL"
@@ -447,17 +639,17 @@ main() {
   fi
 
   if needs_build; then
-    echo "Code changed since the last build — updating Budget (~30–60s)…"
     # Stop the old server (if any) so the new build takes over.
-    lsof -ti:"$PORT" | xargs kill 2>/dev/null
+    lsof -ti tcp:"$PORT" -sTCP:LISTEN | xargs kill 2>/dev/null
 
     if needs_install; then
-      echo "Installing dependencies…"
+      step "Installing dependencies…"
       npm install 2>&1 | tee -a "$LOG" || true
     fi
 
     ensure_db
 
+    step "Code changed since the last build — building (~30–60s)…"
     set -o pipefail
     if ! npm run build 2>&1 | tee -a "$LOG"; then
       echo
@@ -466,10 +658,12 @@ main() {
       exit 1
     fi
     set +o pipefail
+    # What the running build was made from; release.sh status reads it.
+    app_version > .next/budget-version
   fi
 
   if ! server_running; then
-    echo "Starting Budget…"
+    step "Starting Budget…"
     : > "$LOG"
     # Hand the server the same port this script watches. `next start` binds
     # 3000 unless told otherwise -- its --port default, env `PORT`, per next's
@@ -489,6 +683,12 @@ main() {
       exit 1
     fi
   fi
+
+  # A finished --update clears what an app-started one left: a failure from
+  # an earlier try would otherwise stay on Settings → Updates after this run
+  # fixed it. Run from the app, its wrapper writes .update-exit (0) after this
+  # returns, and with no .update-started that reads as neither running nor failed.
+  $UPDATE && rm -f .update-started .update-exit
 
   local version; version=$(app_version)
   echo "Budget${version:+ v$version} is ready at $URL"

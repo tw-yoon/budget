@@ -439,6 +439,8 @@ preupdate=$(ls "$tmp/app/prisma/backups"/pre-update-*.db 2>/dev/null | head -1)
                     || fail "backs the database up before migrating it" \
                             "no pre-update-*.db in $tmp/app/prisma/backups"
 assert_has "$out" "Code changed" "the existing rebuild check fires on its own after the pull"
+assert_has "$out" "Step 1 of 2: Code changed since the last build" "the build is numbered among the steps left"
+assert_lacks "$out" "Step 0" "steps count from 1"
 # The brief's own suggested check here -- assert_lacks "$out" "update(s)
 # available" -- is trivially true regardless of whether the pull worked:
 # do_update REPLACES check_updates when --update is passed, so that string
@@ -625,6 +627,189 @@ else
   fail "the --update path stops the server before forcing a migration (source order)" \
        "kill=$update_kill_line force=$update_force_line"
 fi
+
+echo "launcher: an update started from the app"
+# The app starts `--update` from inside the running server, so the launcher
+# inherits `next start`'s NODE_ENV=production (npm install then drops the
+# build tools) and Next's __NEXT_PROCESSED_ENV (the new server skips .env).
+# Same stubbed package.json as the port test above, committed so the clone is
+# clean for the pull: `build` and `start` record what they were handed, under
+# .next/ (gitignored), and `start` listens on the port.
+au=$(make_fixture)
+cp "$port_fx/app/stub-server.js" "$au/app/stub-server.js"
+node -e '
+  const fs = require("fs");
+  const f = process.argv[1] + "/package.json";
+  const pkg = JSON.parse(fs.readFileSync(f, "utf8"));
+  pkg.scripts.build = "mkdir -p .next && echo \"${NODE_ENV:-unset} ${__NEXT_PROCESSED_ENV:-unset}\" > .next/env-seen && date +%s > .next/BUILD_ID";
+  pkg.scripts.start = "node stub-server.js";
+  fs.writeFileSync(f, JSON.stringify(pkg, null, 2) + "\n");
+' "$au/app"
+sed -i '' "s/'.port-seen'/'.next\/port-seen'/" "$au/app/stub-server.js"
+git -C "$au/app" add -A
+git -C "$au/app" -c user.email=t@test -c user.name=test commit -qm "stub build and start"
+git -C "$au/app" push -q origin main
+git -C "$au/app" -c user.email=t@test -c user.name=test commit -q --allow-empty -m "published"
+git -C "$au/app" push -q origin main
+git -C "$au/app" reset -q --hard HEAD~1
+echo 'DATABASE_URL="file:./dev.db"' > "$au/app/.env"
+cp "$au/app/.env.example" "$au/app/.env.local"
+printf 'PLAID_CLIENT_ID=x\nPLAID_SECRET=y\n' >> "$au/app/.env.local"
+# An earlier app-started try that failed.
+echo 1000 > "$au/app/.update-started"
+echo 1 > "$au/app/.update-exit"
+out=$(NODE_ENV=production __NEXT_PROCESSED_ENV=true run_update "$au/app" --update)
+assert_has "$out" "ready at http://localhost:39173" "an update run with the server's environment still finishes"
+seen=$(cat "$au/app/.next/env-seen" 2>/dev/null)
+[ "$seen" = "unset unset" ] && pass "the build never sees the server's NODE_ENV or __NEXT_PROCESSED_ENV" \
+                            || fail "the build never sees the server's NODE_ENV or __NEXT_PROCESSED_ENV" "build saw: ${seen:-<never built>}"
+[ ! -e "$au/app/.update-started" ] && [ ! -e "$au/app/.update-exit" ] \
+  && pass "a finished --update clears an earlier failure's state files" \
+  || fail "a finished --update clears an earlier failure's state files" "$(ls -a "$au/app" | grep update-)"
+
+echo "launcher: start at login"
+tmp=$(make_fixture)
+# A space in the folder name: the folder travels as its own argument, so it
+# must arrive intact without any quoting inside the agent's command.
+mv "$tmp/app" "$tmp/my app"
+login_dir="$tmp/my app"
+# The launcher resolves symlinks (/var -> /private/var), so compare against that.
+login_real=$( cd "$login_dir" && pwd -P )
+agents="$tmp/agents"
+fakebin="$tmp/fakebin"; mkdir -p "$fakebin"
+cat > "$fakebin/launchctl" <<'EOF'
+#!/bin/bash
+echo "$*" >> "$(dirname "$0")/launchctl.log"
+EOF
+chmod +x "$fakebin/launchctl"
+out=$( cd "$login_dir" && LAUNCHCTL="$fakebin/launchctl" LAUNCH_AGENTS_DIR="$agents" BUDGET_PORT=39173 ./Budget.command --login on 2>&1 )
+plist="$agents/local.budget.server.plist"
+[ -f "$plist" ] && pass "--login on writes the agent" || fail "--login on writes the agent" "no $plist; output: $out"
+plutil -lint "$plist" >/dev/null 2>&1 && pass "the agent is a valid plist" || fail "the agent is a valid plist" "$(plutil -lint "$plist" 2>&1)"
+[ "$(plutil -extract ProgramArguments.5 raw "$plist" 2>/dev/null)" = "$login_real" ] \
+  && pass "the folder is passed intact, space and all" \
+  || fail "the folder is passed intact, space and all" "got: $(plutil -extract ProgramArguments.5 raw "$plist" 2>&1)"
+[ "$(plutil -extract RunAtLoad raw "$plist" 2>/dev/null)" = true ] && [ "$(plutil -extract KeepAlive.SuccessfulExit raw "$plist" 2>/dev/null)" = false ] \
+  && pass "starts at login and restarts only after a failing exit" \
+  || fail "starts at login and restarts only after a failing exit" "RunAtLoad not true or KeepAlive.SuccessfulExit not false"
+# The agent's own command, run against stand-in launchers: a launch that fails
+# must end the job successfully (no restart, so a broken build isn't retried
+# every 30s forever); a server that ran and stopped must end it with a failure
+# (so launchd starts it again). Nothing listens on 39173 here, so the wait
+# loop ends at once.
+agent_cmd=$(plutil -extract ProgramArguments.4 raw "$plist" 2>/dev/null)
+stand_in="$tmp/stand-in"; mkdir -p "$stand_in"
+printf '#!/bin/bash\nexit 1\n' > "$stand_in/Budget.command"; chmod +x "$stand_in/Budget.command"
+/bin/bash -c "$agent_cmd" "$stand_in" >/dev/null 2>&1
+status=$?
+[ "$status" -eq 0 ] && pass "a failed launch ends the agent's job without a restart" \
+                    || fail "a failed launch ends the agent's job without a restart" "exit $status"
+printf '#!/bin/bash\nexit 0\n' > "$stand_in/Budget.command"
+/bin/bash -c "$agent_cmd" "$stand_in" >/dev/null 2>&1
+status=$?
+[ "$status" -eq 1 ] && pass "a server that stopped ends the job so launchd restarts it" \
+                    || fail "a server that stopped ends the job so launchd restarts it" "exit $status"
+assert_has "$(plutil -extract ProgramArguments.4 raw "$plist" 2>/dev/null)" "39173" "the agent watches this launcher's port"
+grep -q "^bootstrap gui/$(id -u) $plist$" "$fakebin/launchctl.log" \
+  && pass "loads the agent with launchctl" || fail "loads the agent with launchctl" "$(cat "$fakebin/launchctl.log")"
+assert_has "$out" "--login off" "says how to turn it off"
+out=$( cd "$login_dir" && LAUNCHCTL="$fakebin/launchctl" LAUNCH_AGENTS_DIR="$agents" ./Budget.command --login off 2>&1 )
+[ ! -e "$plist" ] && pass "--login off removes the agent" || fail "--login off removes the agent" "still there"
+grep -q "^bootout gui/$(id -u)/local.budget.server$" "$fakebin/launchctl.log" \
+  && pass "unloads the agent" || fail "unloads the agent" "$(cat "$fakebin/launchctl.log")"
+out=$( cd "$login_dir" && LAUNCHCTL="$fakebin/launchctl" LAUNCH_AGENTS_DIR="$agents" ./Budget.command --login maybe 2>&1 )
+status=$?
+[ "$status" -ne 0 ] && pass "an unknown --login value is refused" || fail "an unknown --login value is refused" "exit 0"
+assert_has "$out" "--login on" "and the usage is shown"
+[ ! -f "$login_dir/.env.local" ] && pass "--login never bootstraps the app" || fail "--login never bootstraps the app" ".env.local created"
+out=$( cd "$login_dir" && LAUNCHCTL="$fakebin/launchctl" LAUNCH_AGENTS_DIR="$agents" ./Budget.command --login 2>&1 )
+status=$?
+[ "$status" -eq 1 ] && pass "--login with no value exits 1" || fail "--login with no value exits 1" "exit $status"
+assert_has "$out" "--login on" "and shows the usage"
+# A launchctl that refuses the agent leaves no agent file behind: the
+# installer asks about start-at-login only when the file is missing.
+cat > "$fakebin/launchctl" <<'EOF'
+#!/bin/bash
+[ "$1" = bootstrap ] && exit 5
+exit 0
+EOF
+out=$( cd "$login_dir" && LAUNCHCTL="$fakebin/launchctl" LAUNCH_AGENTS_DIR="$agents" BUDGET_PORT=39173 ./Budget.command --login on 2>&1 )
+status=$?
+[ "$status" -ne 0 ] && pass "a refused bootstrap fails --login on" || fail "a refused bootstrap fails --login on" "exit 0"
+[ ! -e "$plist" ] && pass "and removes the agent file it wrote" || fail "and removes the agent file it wrote" "still there"
+
+echo "launcher: lock"
+tmp=$(make_fixture)
+# A live holder is a running Budget.command; this stand-in carries the name
+# in its command line (`; :` keeps bash from exec-ing into sleep). Started in
+# this shell, not in $(...), so the pid is in hand without waiting on it.
+/bin/bash -c 'sleep 30; :' Budget.command & holder=$!
+# Each takeover run below stops at the Plaid check (no .env.local), so none
+# reaches a real build.
+lock_run() { rm -f "$tmp/app/.env.local"; ( cd "$tmp/app" && BUDGET_PORT=39173 BUDGET_LOCK_WAIT=2 ./Budget.command --no-open 2>&1 ); }
+mkdir "$tmp/app/.budget.lock"
+echo "$holder" > "$tmp/app/.budget.lock/pid"
+out=$( cd "$tmp/app" && BUDGET_PORT=39173 BUDGET_LOCK_WAIT=2 ./Budget.command --no-open 2>&1 )
+status=$?
+assert_has "$out" "Another Budget launch or update is running" "waits for a live holder"
+[ "$status" -eq 1 ] && pass "gives up after the wait" || fail "gives up after the wait" "exit $status; output: $out"
+assert_has "$out" "delete the .budget.lock folder in" "names the lock folder when it gives up"
+[ ! -f "$tmp/app/.env.local" ] && pass "does nothing while it waits" || fail "does nothing while it waits" ".env.local created"
+out=$(run_app "$tmp/app")
+assert_lacks "$out" "Another Budget launch" "--check-only never waits for the lock"
+kill "$holder" 2>/dev/null
+echo 999999 > "$tmp/app/.budget.lock/pid"     # no such process
+out=$(lock_run)
+assert_lacks "$out" "Another Budget launch" "takes over a dead holder's lock"
+assert_has "$out" "Plaid" "and carries on with the launch"
+[ ! -e "$tmp/app/.budget.lock" ] && pass "releases the lock on exit" || fail "releases the lock on exit" "still there"
+# After a power cut the old pid can belong to some other live process.
+mkdir "$tmp/app/.budget.lock"; sleep 30 & other=$!; echo "$other" > "$tmp/app/.budget.lock/pid"
+out=$(lock_run)
+kill "$other" 2>/dev/null
+assert_lacks "$out" "Another Budget launch" "takes over a lock whose pid is now another program"
+# A holder that died between mkdir and writing its pid.
+mkdir "$tmp/app/.budget.lock"; : > "$tmp/app/.budget.lock/pid"
+touch -t 202001010000 "$tmp/app/.budget.lock/pid"
+out=$(lock_run)
+assert_lacks "$out" "Another Budget launch" "takes over a lock whose pid file stayed empty"
+
+echo "launcher: what triggers a rebuild"
+tmp=$(make_fixture)
+echo 'DATABASE_URL="file:./dev.db"' > "$tmp/app/.env"
+cp "$tmp/app/.env.example" "$tmp/app/.env.local"
+mkdir -p "$tmp/app/.next"; echo fake > "$tmp/app/.next/BUILD_ID"
+touch -t 202001010000 "$tmp/app/.next/BUILD_ID"
+find "$tmp/app" -path "$tmp/app/node_modules" -prune -o -path "$tmp/app/.next" -prune -o -type f -exec touch -t 201901010000 {} +
+touch "$tmp/app/README.md" "$tmp/app/CHANGELOG.md"
+out=$(run_app "$tmp/app")
+assert_lacks "$out" "rebuild is pending" "a docs-only change does not rebuild"
+touch "$tmp/app/src/app/layout.tsx"
+out=$(run_app "$tmp/app")
+assert_has "$out" "rebuild is pending" "an app change does"
+
+echo "launcher: update status"
+tmp=$(make_fixture)
+here=$(sed -n 's/^[[:space:]]*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$ROOT/package.json" | head -1)
+out=$( cd "$tmp/app" && ./Budget.command --update-status 2>&1 )
+[ "$out" = "{\"version\":\"$here\",\"latest\":\"$here\",\"behind\":0,\"blocker\":\"\"}" ] \
+  && pass "up to date: one JSON line" || fail "up to date: one JSON line" "got: $out"
+[ ! -f "$tmp/app/.env.local" ] && [ ! -e "$tmp/app/.budget.lock" ] \
+  && pass "--update-status sets nothing up and takes no lock" || fail "--update-status sets nothing up and takes no lock" "files created"
+sed -i '' "s/\"version\": \"$here\"/\"version\": \"9.9.9\"/" "$tmp/seed/package.json"
+grep -q '"version": "9.9.9"' "$tmp/seed/package.json" \
+  && pass "seed version bumped" || fail "seed version bumped" "sed did not match the seed's version line"
+git -C "$tmp/seed" -c user.email=t@test -c user.name=test commit -qam "bump"
+git -C "$tmp/seed" push -q "$tmp/origin.git" main
+out=$( cd "$tmp/app" && ./Budget.command --update-status 2>&1 )
+[ "$out" = "{\"version\":\"$here\",\"latest\":\"9.9.9\",\"behind\":1,\"blocker\":\"\"}" ] \
+  && pass "behind: names the published version" || fail "behind: names the published version" "got: $out"
+mono=$(mktemp -d "$SUITE_TMP/XXXXXX")
+git -C "$mono" init -q
+cp -R "$tmp/seed" "$mono/budget"; rm -rf "$mono/budget/.git"
+out=$( cd "$mono/budget" && ./Budget.command --update-status 2>&1 )
+[ "$out" = "{\"version\":\"9.9.9\",\"latest\":null,\"behind\":0,\"blocker\":\"subfolder\"}" ] \
+  && pass "a subfolder reports its blocker and fetches nothing" || fail "a subfolder reports its blocker and fetches nothing" "got: $out"
 
 echo "$PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

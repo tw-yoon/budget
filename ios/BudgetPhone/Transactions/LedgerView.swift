@@ -14,6 +14,8 @@ struct LedgerView: View {
   @AppStorage(ServerAddress.storageKey) private var server = ""
   /// Filters and sort, kept per device (search is not kept).
   @AppStorage(Self.filtersKey) private var savedFilters = Data()
+  /// The row the list was at, for the next launch (LedgerPosition).
+  @AppStorage(LedgerPosition.key) private var savedPosition = Data()
   /// Drawn density; CompactRowsSync keeps it and the saved setting in step.
   @State private var compactRows = CompactRows.saved
   @State private var visibleRows: Set<String> = []
@@ -36,7 +38,12 @@ struct LedgerView: View {
         if store.rows.isEmpty && store.error == nil { await store.reload() }
       }
       .onChange(of: scenePhase) { _, phase in
-        if phase == .active { Task { await store.reload() } }
+        if phase == .active { Task { await store.reload() } } else { keepPosition(position) }
+      }
+      // A new search, filters or sort: the kept row was for the old list.
+      .onChange(of: store.query) { _, query in
+        let kept = LedgerPosition.kept(LedgerPosition.decode(savedPosition), whenQueryBecomes: query)
+        savedPosition = LedgerPosition.encode(kept)
       }
       .onChange(of: store.rows) { _, rows in
         for row in rows { catalog.noteUsed(row.userCategory) }
@@ -83,6 +90,56 @@ struct LedgerView: View {
     .scrollDismissesKeyboard(.immediately)
     .refreshable { await store.sync() }
     .modifier(CompactRowsSync(compact: $compactRows))
+    .onAppear { restorePosition(proxy) }
+    .onChange(of: store.rows) { restorePosition(proxy) }
+    .onChange(of: store.isLoading) { restorePosition(proxy) }
+    // Kept once the list has rested there, not on every frame of a scroll.
+    .task(id: position) {
+      let position = position
+      try? await Task.sleep(for: LedgerPosition.settle)
+      guard !Task.isCancelled else { return }
+      keepPosition(position)
+    }
+    }
+  }
+
+  /// Where the list is now: its topmost visible row, under the current query.
+  private var position: LedgerPosition? {
+    let ids = store.rows.map(\.id)
+    return LedgerPosition.taken(
+      top: LedgerPosition.top(of: ids, visible: visibleRows), rows: ids, query: store.query)
+  }
+
+  /// Saves a position taken from what is on screen. Never clears: with a
+  /// transaction pushed over the list no row is visible, and quitting there
+  /// must still reopen at the row. Only a query change clears.
+  private func keepPosition(_ position: LedgerPosition?) {
+    // Until the launch has had its chance to restore, the list sits at the
+    // top, which would overwrite the row it is about to go back to.
+    guard store.positionRestored, let data = LedgerPosition.toSave(position) else { return }
+    savedPosition = data
+  }
+
+  /// The first load only: back to the row the last launch was at, if the
+  /// rows loaded so far (the saved page, then the server's) hold it.
+  /// Otherwise the list starts at the top.
+  private func restorePosition(_ proxy: ScrollViewProxy) {
+    guard !store.positionRestored, !store.rows.isEmpty else { return }
+    let ids = store.rows.map(\.id)
+    // Scrolled already: leave the list where the user put it.
+    if let top = LedgerPosition.top(of: ids, visible: visibleRows), top != ids.first {
+      store.positionRestored = true
+      return
+    }
+    let target = LedgerPosition.restoreTarget(
+      LedgerPosition.decode(savedPosition), query: store.query, rows: ids)
+    if let target {
+      store.positionRestored = true
+      // After the rows have laid out, so the lazy stack can find it.
+      Task { proxy.scrollTo(target, anchor: .top) }
+    } else if !store.isLoading {
+      store.positionRestored = true
+      savedPosition = Data()
     }
   }
 

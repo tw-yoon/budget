@@ -441,8 +441,20 @@ v0.10.0 available (you have v0.9.1) — run ./Budget.command --update
 [CHANGELOG.md](CHANGELOG.md) says what changed in each version. Your version
 is shown at the bottom of Budget's sidebar.
 
+You can also update from Budget itself: Settings → Updates on the web, or
+Settings → About on the iPhone, shows **Install** when a new version is out.
+
 **Stopping Budget never loses data.** Everything stays on your Mac and is
 there next time.
+
+### Start Budget when you log in
+
+The installer offers this. To turn it on or off yourself, paste one of these into Terminal from the Budget folder:
+
+    ./Budget.command --login on
+    ./Budget.command --login off
+
+While it's on, Budget starts when you log in, starts again if it stops, and keeps the Mac from going to sleep on its own so your iPhone can reach it (the screen still turns off).
 
 ### If an update goes wrong
 

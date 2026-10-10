@@ -1,3 +1,4 @@
+import { withServerTiming } from "@/lib/server-timing";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getUserCardsWithProgress } from "@/services/benefits.service";
@@ -5,7 +6,7 @@ import { CARD_PRESETS } from "@/data/card-presets";
 
 const ISSUERS = new Set(["AMEX", "CHASE", "DISCOVER"]);
 
-export async function GET() {
+async function handleGET() {
   try {
     const cards = await getUserCardsWithProgress();
     return NextResponse.json({ cards });
@@ -99,3 +100,5 @@ export async function POST(req: NextRequest) {
 function bad(message: string) {
   return NextResponse.json({ error: message }, { status: 400 });
 }
+
+export const GET = withServerTiming(handleGET);

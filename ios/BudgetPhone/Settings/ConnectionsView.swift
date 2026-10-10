@@ -59,7 +59,7 @@ struct ConnectionsView: View {
     } else if let error = store.error {
       ErrorView(error: error, server: server) { Task { await store.load() } }
     } else {
-      ProgressView()
+      PlaceholderList.connections
     }
   }
 

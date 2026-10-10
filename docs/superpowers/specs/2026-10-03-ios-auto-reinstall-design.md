@@ -158,3 +158,24 @@ moving the folder.
 
 Tailscale changes, offline data on the phone, pulling new code from GitHub,
 anything for paid developer accounts.
+
+---
+
+## Amendment, 2026-10-07: renew the signature, go by its expiry
+
+Reinstalling did not renew anything. Xcode keeps the free profile it made
+(`~/Library/Developer/Xcode/UserData/Provisioning Profiles`) and signs every
+build with it until it runs out, so the app stopped opening 7 days after the
+*first* install however often it was reinstalled. Now:
+
+- `install` first moves this app's saved profiles (matched by
+  `Entitlements.application-identifier` ending in the bundle ID) into
+  `build/phone/old-profiles`, so `-allowProvisioningUpdates` makes a fresh
+  7-day one. A failed build moves them back; a good install deletes them.
+- After installing it reads `ExpirationDate` from the installed app's
+  `embedded.mobileprovision`, writes it to `build/phone/expires`, and says
+  "The app opens until <day>". If the signature is over a day old it says
+  Xcode reused an old one.
+- `auto` goes by `expires`: it reinstalls once 5 days or fewer are left (no
+  recorded expiry reinstalls at once), and notifies on failure with 2 days or
+  fewer left. `last-success` is still written but no longer decides anything.

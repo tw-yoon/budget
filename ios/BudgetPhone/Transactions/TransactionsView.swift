@@ -77,6 +77,11 @@ struct TransactionsView: View {
         TransactionDetailView(id: route.id, store: ledger, catalog: catalog, proMode: proMode)
       }
     }
+    // A tap when a save works (a category, link or split, Sync, an import),
+    // a buzz when it fails. On the stack, so it plays on a pushed screen too.
+    .saveFeedback(ledger.feedback)
+    .saveFeedback(venmo.feedback)
+    .saveFeedback(zelle.feedback)
     .task {
       await catalog.load()
     }
@@ -94,6 +99,7 @@ struct TransactionsView: View {
     // categories, so the rows here may show old ones. GET only: never Sync.
     .onChange(of: changes.categoriesVersion) {
       Task {
+        ledger.forgetRecent()
         await ledger.reload()
         if venmo.data != nil { await venmo.load() }
         if zelle.data != nil { await zelle.load() }
@@ -102,6 +108,7 @@ struct TransactionsView: View {
     // A bank disconnected in Settings took its transactions with it.
     .onChange(of: changes.accountsVersion) {
       Task {
+        ledger.forgetRecent()
         await ledger.reload()
         if venmo.data != nil { await venmo.load() }
         if zelle.data != nil { await zelle.load() }

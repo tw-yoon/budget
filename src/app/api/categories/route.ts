@@ -1,3 +1,4 @@
+import { withServerTiming } from "@/lib/server-timing";
 import { NextRequest, NextResponse } from "next/server";
 import {
   listCategories,
@@ -11,7 +12,7 @@ import { PFC_PRIMARIES } from "@/lib/rules";
 // the UI disable a delete and explain the refusal. `unmappedPrimaries` is the
 // set of real Plaid primaries in use that `primaries` doesn't cover and that
 // therefore resolve to no category — see listUnmappedPrimaries.
-export async function GET() {
+async function handleGET() {
   try {
     return NextResponse.json({
       categories: await listCategories(),
@@ -53,3 +54,5 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Failed to create category" }, { status: 500 });
   }
 }
+
+export const GET = withServerTiming(handleGET);

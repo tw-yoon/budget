@@ -1,3 +1,4 @@
+import { withServerTiming } from "@/lib/server-timing";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { humanizePfc, humanizePfcDetailed } from "@/lib/format";
@@ -22,7 +23,7 @@ import type { Prisma } from "@prisma/client";
 //                             of a connected payment; the purchase itself stays)
 //   &sort=date|label          ordering column (default date)
 //   &dir=asc|desc             ordering direction (default desc)
-export async function GET(req: NextRequest) {
+async function handleGET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
 
@@ -296,3 +297,5 @@ function parseDate(raw: string | null): Date | undefined {
   const d = new Date(raw);
   return isNaN(d.getTime()) ? undefined : d;
 }
+
+export const GET = withServerTiming(handleGET);

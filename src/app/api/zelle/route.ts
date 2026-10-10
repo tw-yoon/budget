@@ -1,3 +1,4 @@
+import { withServerTiming } from "@/lib/server-timing";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { isZelleName, parseZelleCounterparty } from "@/lib/zelle";
@@ -7,7 +8,7 @@ import { resolveLinkedCategory } from "@/lib/links";
 
 // GET /api/zelle — native Zelle transactions from the Plaid feed, parsed and
 // ready to categorize. (Nothing is imported; these rows already exist.)
-export async function GET() {
+async function handleGET() {
   try {
     const rows = await prisma.transaction.findMany({
       where: { source: "PLAID", name: { contains: "Zelle" } },
@@ -70,3 +71,5 @@ export async function GET() {
     return NextResponse.json({ error: "Failed to load Zelle transactions" }, { status: 500 });
   }
 }
+
+export const GET = withServerTiming(handleGET);

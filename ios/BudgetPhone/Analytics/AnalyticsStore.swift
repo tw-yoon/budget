@@ -12,13 +12,13 @@ final class AnalyticsStore {
   /// SpendingGraph's LIMIT_KEY in /api/ui-state.
   static let limitKey = "spendingMonthlyLimit"
   /// AnalyticsDashboard's RANGES.
-  static let ranges = [3, 6, 12]
+  nonisolated static let ranges = [3, 6, 12]
 
-  /// The web opens on 6 months; the phone opens on 3 by the owner's choice.
-  /// Only this range's summary is saved, since it is the one a launch shows.
+  /// The web opens on 6 months; the phone opens on 3 by the owner's choice,
+  /// until a range is picked: then it reopens on that one (AnalyticsRange).
   nonisolated static let launchRange = 3
 
-  private(set) var range = AnalyticsStore.launchRange
+  private(set) var range: Int
   private(set) var summary: AnalyticsSummary?
   /// The range's top merchants, from the same call as `summary`. Phone-only:
   /// the server sends them but the web page doesn't show them.
@@ -47,8 +47,19 @@ final class AnalyticsStore {
   private var limitSaves = 0
   private var limitSavesInFlight = 0
 
-  init(client: @escaping @MainActor () -> APIClient?) {
+  private let defaults: UserDefaults
+
+  /// The range a launch opens on, read when a summary arrives.
+  private var launchRange: @Sendable () -> Int {
+    // UserDefaults is documented thread-safe, though not marked Sendable.
+    nonisolated(unsafe) let defaults = defaults
+    return { AnalyticsRange.remembered(in: defaults) }
+  }
+
+  init(client: @escaping @MainActor () -> APIClient?, defaults: UserDefaults = .standard) {
     self.client = client
+    self.defaults = defaults
+    range = AnalyticsRange.remembered(in: defaults)
   }
 
   /// The tab's GETs, one after another. The first failure decides the
@@ -83,7 +94,7 @@ final class AnalyticsStore {
     var failure: APIError?
 
     do throws(APIError) {
-      let result = try await client.analytics(months: range)
+      let result = try await client.analytics(months: range, launchRange: launchRange)
       // This load now owns the summary, so a range change it superseded can
       // no longer clear the dimming itself.
       if summaryGen == summaryGeneration { isLoadingSummary = false }
@@ -134,6 +145,7 @@ final class AnalyticsStore {
   /// (dimmed) until the new ones arrive.
   func changeRange(_ months: Int) async {
     range = months
+    AnalyticsRange.remember(months, in: defaults)
     summaryGeneration += 1
     let generation = summaryGeneration
     guard let client = client() else { return }
@@ -141,7 +153,7 @@ final class AnalyticsStore {
     isLoadingSummary = true
     defer { if generation == summaryGeneration { isLoadingSummary = false } }
     do throws(APIError) {
-      let result = try await client.analytics(months: months)
+      let result = try await client.analytics(months: months, launchRange: launchRange)
       guard generation == summaryGeneration else { return }
       summary = result.summary
       topMerchants = result.topMerchants ?? []
@@ -195,5 +207,23 @@ final class AnalyticsStore {
     }
     if failure == .cancelled { return }
     if hasData { banner = failure.loadBanner } else { error = failure }
+  }
+}
+
+/// The Analytics range kept per device, so the tab reopens on the one last
+/// picked. Phone-only: the web always opens on its default.
+enum AnalyticsRange {
+  static let key = "analytics.range"
+
+  /// The kept range; the launch default when none is kept or the kept value
+  /// isn't one of the picker's.
+  static func remembered(in defaults: UserDefaults = .standard) -> Int {
+    let kept = defaults.integer(forKey: key)
+    return AnalyticsStore.ranges.contains(kept) ? kept : AnalyticsStore.launchRange
+  }
+
+  static func remember(_ months: Int, in defaults: UserDefaults = .standard) {
+    guard AnalyticsStore.ranges.contains(months) else { return }
+    defaults.set(months, forKey: key)
   }
 }

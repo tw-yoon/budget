@@ -9,6 +9,44 @@ middle number; one carrying fixes and small changes moves the last.
 Still `0.x`: the database schema changes between releases (migrations run on
 update), so nothing here is a stability promise.
 
+## Unreleased
+
+## 0.12.0 — 2026-10-09
+
+- iPhone app: haptics when a save works or fails and on segment switches; Analytics
+  reopens on the range last picked, and the ledger on the row you were at.
+- iPhone app: Venmo, Zelle, Categories, Rules and Connections open instantly
+  with last time's data; placeholder rows instead of spinners while a list loads.
+- Update iPhone: when it fails because Xcode is signed out of your Apple ID, or
+  the Mac can't see the phone, it now says so and how to fix it, instead of
+  "Build failed".
+- iPhone app: a coloured dot at the top of Accounts shows whether the phone
+  can reach your Mac — green when connected, red when it can't, orange when
+  the access token was refused. Tap it to see how fresh the data is or what to
+  check.
+- iPhone app: screens load with about a sixth of the data. The server now
+  compresses what it sends the phone (Next.js compresses pages, not API
+  answers).
+- Update iPhone: in Settings → Updates on the web, or Settings → About on the
+  iPhone, the Mac rebuilds the iPhone app and installs it on the paired phone.
+- iPhone app: reinstalling from the Mac now really renews the 7 days. Before,
+  the Mac kept re-signing with its first signature, so the app stopped
+  opening 7 days after the first install however often it was reinstalled.
+  `phone.sh install` now says the actual last day.
+- iPhone app: going back to one of your last ten ledger searches or filter
+  settings shows its results at once, then refreshes them.
+- iPhone app: with Pro Mode on, Settings → Load Times shows how long each
+  screen took to load on this phone, split into server, network and reading
+  time. The server now reports its own share in a `Server-Timing` header.
+- Updates from the app: Settings → Updates on the web and Settings → About on
+  the iPhone show when a new version is out, with an Install button. Budget
+  stops for about a minute and comes back on the new version.
+- Budget can start when you log in: `./Budget.command --login on` (or `off`).
+  The installer asks.
+- iPhone app: Settings → About shows your Mac's version, says when the Mac is
+  newer than the app, and shows when this install stops opening.
+- The launcher numbers its steps and runs one launch or update at a time.
+
 ## 0.11.0 — 2026-10-04
 
 - iPhone app: opens instantly with the data from last time, then refreshes in

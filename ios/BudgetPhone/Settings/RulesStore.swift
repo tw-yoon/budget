@@ -14,6 +14,7 @@ enum RuleWrite: Equatable, Sendable {
 /// shared by the list, the detail screen and the Add sheet. Same failure
 /// rules as the other stores: with nothing on screen an error is
 /// full-screen; with data showing it becomes a banner and the data stays.
+/// Opens with the rules saved last time while the server answers.
 @MainActor
 @Observable
 final class RulesStore {
@@ -29,6 +30,8 @@ final class RulesStore {
   private(set) var recategorizeCount = 0
   var banner: String?
   var notice: String?
+  /// Rules added with the Add sheet, for their haptics (RulesView).
+  private(set) var feedback = SaveFeedback()
 
   private let client: @MainActor () -> APIClient?
   private var loadGeneration = 0
@@ -49,7 +52,10 @@ final class RulesStore {
       error = .notConfigured
       return
     }
-    if data == nil { error = nil }
+    if data == nil {
+      error = nil
+      data = client.savedRules()
+    }
     isLoading = true
     defer { if generation == loadGeneration { isLoading = false } }
     do throws(APIError) {
@@ -134,7 +140,13 @@ final class RulesStore {
     guard let client = client() else { throw .notConfigured }
     banner = nil
     notice = nil
-    try await client.createRule(rule)
+    do throws(APIError) {
+      try await client.createRule(rule)
+    } catch {
+      feedback.record(error)
+      throw error
+    }
+    feedback.record(nil)
     await load()
   }
 }

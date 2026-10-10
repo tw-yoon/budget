@@ -27,7 +27,7 @@ struct LinkPurchaseView: View {
               .disabled(c.label == nil || saving)
           }
         } else {
-          ProgressView()
+          Self.placeholderRows
         }
       } header: {
         Text("Likely purchases")
@@ -65,6 +65,18 @@ struct LinkPurchaseView: View {
     }
   }
 
+  /// While the candidates load: grey rows in a candidate's shape. Each is
+  /// its own Form row, so VoiceOver gets one "Loading" and skips the rest.
+  static var placeholderRows: some View {
+    ForEach(1...3, id: \.self) { i in
+      PlaceholderRow(
+        title: "Sample Mart", detail: "#\(700 + i) · Sep \(10 + i), 2026 · Shopping",
+        amount: "$25.00")
+        .loadingPlaceholder()
+        .accessibilityHidden(i > 1)
+    }
+  }
+
   private func candidateRow(_ c: LinkCandidate) -> some View {
     HStack(alignment: .firstTextBaseline) {
       VStack(alignment: .leading, spacing: 2) {
@@ -93,5 +105,19 @@ struct LinkPurchaseView: View {
         if error != .cancelled { failure = error.message }
       }
     }
+  }
+}
+
+#Preview("Candidates loading") {
+  NavigationStack {
+    Form {
+      Section {
+        LinkPurchaseView.placeholderRows
+      } header: {
+        Text("Likely purchases")
+      }
+    }
+    .navigationTitle("Connect to a Purchase")
+    .navigationBarTitleDisplayMode(.inline)
   }
 }

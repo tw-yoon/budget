@@ -9,8 +9,10 @@ private struct EnabledPatch: Encodable { let enabled: Bool }
 extension APIClient {
   /// GET /api/rules — all rules in evaluation order, with outcomes.
   func rules() async throws(APIError) -> RulesResponse {
-    try decode(await send("GET", "api/rules", timeout: 15))
+    try await get("api/rules", timeout: 15, saveAs: "rules")
   }
+
+  func savedRules() -> RulesResponse? { saved("rules", "api/rules") }
 
   /// POST /api/rules — `{ field, matchType, pattern, category }`.
   func createRule(_ rule: NewRule) async throws(APIError) {

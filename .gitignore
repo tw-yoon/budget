@@ -66,3 +66,7 @@ next-env.d.ts
 # scratch files written by npm test (scripts/test-ui-state.mjs)
 /.test-tmp/
 
+.budget.lock
+.update-started
+.update-exit
+.update.log

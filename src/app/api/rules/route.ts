@@ -1,3 +1,4 @@
+import { withServerTiming } from "@/lib/server-timing";
 import { NextRequest, NextResponse } from "next/server";
 import { listRulesWithOutcomes, createRule } from "@/services/rules.service";
 import {
@@ -9,7 +10,7 @@ import {
 
 // GET /api/rules — all rules in evaluation order, each with how the rows it
 // matches stand (`outcome`, null for a rule that is off).
-export async function GET() {
+async function handleGET() {
   try {
     const rules = await listRulesWithOutcomes();
     return NextResponse.json({ rules });
@@ -56,3 +57,5 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Failed to create rule" }, { status: 500 });
   }
 }
+
+export const GET = withServerTiming(handleGET);

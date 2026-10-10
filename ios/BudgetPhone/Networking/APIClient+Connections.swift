@@ -6,9 +6,13 @@ import Foundation
 
 extension APIClient {
   /// GET /api/accounts, read for its `banks`, `debitCards` and checking accounts.
+  /// Saved under Accounts' name: the same GET, so either screen opens with
+  /// whichever loaded last.
   func connections() async throws(APIError) -> ConnectionsResponse {
-    try decode(await send("GET", "api/accounts", timeout: 15))
+    try await get("api/accounts", timeout: 15, saveAs: "accounts")
   }
+
+  func savedConnections() -> ConnectionsResponse? { saved("accounts", "api/accounts") }
 
   /// POST /api/debit-cards — `{ name, last4, accountId }`.
   func addDebitCard(_ card: NewDebitCard) async throws(APIError) {

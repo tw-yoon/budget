@@ -23,6 +23,7 @@ struct RulesView: View {
         }
       }
       .sheet(isPresented: $adding) { AddRuleSheet(store: store, catalog: catalog) }
+      .saveFeedback(store.feedback)
       .navigationDestination(item: $selected) { id in
         RuleDetailView(id: id, store: store, catalog: catalog)
       }
@@ -43,7 +44,7 @@ struct RulesView: View {
     } else if let error = store.error {
       ErrorView(error: error, server: server) { Task { await store.load() } }
     } else {
-      ProgressView()
+      PlaceholderList.rules
     }
   }
 

@@ -71,11 +71,12 @@ struct APIClient: Sendable {
   var session: URLSession = .shared
   var token: String? = nil
   var cache: ResponseCache? = nil
+  var loadTimes: LoadTimes? = nil
 
   /// The saved server with the saved token; nil until a server is set.
   static func saved() -> APIClient? {
     ServerAddress.saved().map {
-      APIClient(baseURL: $0, token: AccessToken.saved(), cache: .shared)
+      APIClient(baseURL: $0, token: AccessToken.saved(), cache: .shared, loadTimes: .shared)
     }
   }
 
@@ -85,6 +86,11 @@ struct APIClient: Sendable {
 
   /// The accounts last saved, for the next launch to show before the server answers.
   func savedAccounts() -> AccountsResponse? { saved("accounts", "api/accounts") }
+
+  /// When `savedAccounts()` was saved.
+  func savedAccountsDate() -> Date? {
+    cache?.date("accounts", request: cacheRequest("api/accounts", []), owner: owner)
+  }
 
   /// Calls Plaid once per linked bank, hence the long timeout. A bank that
   /// fails comes back in `errors`; the call itself still succeeds.
@@ -138,13 +144,24 @@ struct APIClient: Sendable {
   }
 
   /// A GET that decodes, then — only once it decoded — saves the bytes under
-  /// `saveAs` for `saved(_:_:query:)` to show at the next launch.
+  /// `saveAs` for `saved(_:_:query:)` to show at the next launch. Its timing
+  /// goes to `loadTimes`. `saveIf`, when given, is asked as the answer
+  /// arrives, for a save that depends on what the user did meanwhile.
   func get<T: Decodable>(
-    _ path: String, query: [URLQueryItem] = [], timeout: TimeInterval, saveAs name: String? = nil
+    _ path: String, query: [URLQueryItem] = [], timeout: TimeInterval, saveAs name: String? = nil,
+    saveIf shouldSave: (@Sendable () -> Bool)? = nil
   ) async throws(APIError) -> T {
-    let data = try await send("GET", path, query: query, timeout: timeout)
+    let clock = ContinuousClock()
+    let start = clock.now
+    let (status, data, response) = try await exchange("GET", path, query: query, body: nil, timeout: timeout)
+    guard (200..<300).contains(status) else { throw Self.serverError(status: status, data: data) }
+    let received = clock.now
     let value: T = try decode(data)
-    if let name { save(data, as: name, path, query: query) }
+    loadTimes?.record(LoadTime(
+      date: .now, path: path, request: (received - start).milliseconds,
+      server: LoadTimes.serverMilliseconds(response.value(forHTTPHeaderField: "Server-Timing")),
+      reading: (clock.now - received).milliseconds))
+    if let name, shouldSave?() ?? true { save(data, as: name, path, query: query) }
     return value
   }
 
@@ -170,6 +187,14 @@ struct APIClient: Sendable {
     _ method: String, _ path: String, query: [URLQueryItem] = [], body: Data? = nil,
     timeout: TimeInterval
   ) async throws(APIError) -> (status: Int, data: Data) {
+    let (status, data, _) = try await exchange(method, path, query: query, body: body, timeout: timeout)
+    return (status, data)
+  }
+
+  /// `sendRaw`, keeping the response for its headers.
+  private func exchange(
+    _ method: String, _ path: String, query: [URLQueryItem], body: Data?, timeout: TimeInterval
+  ) async throws(APIError) -> (status: Int, data: Data, response: HTTPURLResponse) {
     let url = url(path, query: query)
     var request = URLRequest(url: url, timeoutInterval: timeout)
     request.httpMethod = method
@@ -192,7 +217,7 @@ struct APIClient: Sendable {
     guard let http = response as? HTTPURLResponse else {
       throw .unreachable("No HTTP response.")
     }
-    return (http.statusCode, data)
+    return (http.statusCode, data, http)
   }
 
   func send(

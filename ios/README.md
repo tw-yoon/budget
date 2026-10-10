@@ -217,8 +217,10 @@ Wi-Fi, without a cable.
    after a minute or two:
 
    ```
-   Installed. The app opens for another 7 days.
+   Installed. The app opens until Wednesday, October 14.
    ```
+
+   (Your date will be 7 days from today.)
 
    ❌ **If you see** `Install failed. Is the iPhone unlocked and on the same
    Wi-Fi as the Mac?`: unlock the phone, check it's on the same Wi-Fi as the
@@ -244,10 +246,11 @@ Wi-Fi, without a cable.
    ```
 
    ✅ **You should see** `Scheduled. Every 3 hours the Mac reinstalls the app
-   if it's 2 or more days old.`
+   once fewer than 5 days of its 7 are left.`
 
-That's it. Every 3 hours your Mac checks, and if the app was put on the phone
-2 or more days ago, it does it again. For this to work:
+That's it. Every 3 hours your Mac checks, and once the app has fewer than 5
+of its 7 days left, it puts a freshly signed copy on the phone. On the phone,
+**Settings → About** shows when it was installed and when it stops opening. For this to work:
 
 - the Mac has to be **awake and logged in**, and
 - the iPhone has to be on the **same Wi-Fi** as the Mac.

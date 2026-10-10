@@ -1,3 +1,4 @@
+import { withServerTiming } from "@/lib/server-timing";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { listCategoryNames } from "@/services/categories.service";
@@ -5,7 +6,7 @@ import { humanizePfc } from "@/lib/format";
 import { resolveLinkedCategory } from "@/lib/links";
 
 // GET /api/venmo — list imported Venmo transactions (for the categorizer page).
-export async function GET() {
+async function handleGET() {
   try {
     const rows = await prisma.transaction.findMany({
       where: { source: "VENMO" },
@@ -66,3 +67,5 @@ export async function GET() {
     return NextResponse.json({ error: "Failed to load Venmo transactions" }, { status: 500 });
   }
 }
+
+export const GET = withServerTiming(handleGET);

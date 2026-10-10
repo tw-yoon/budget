@@ -108,6 +108,8 @@ final class StubURLProtocol: URLProtocol {
   nonisolated(unsafe) static var handler: ((URLRequest) throws -> (Int, Data))?
   nonisolated(unsafe) static var requests: [URLRequest] = []
   nonisolated(unsafe) static var gates: [Gate] = []
+  /// Response headers for every answer; reset by `session`.
+  nonisolated(unsafe) static var headers: [String: String]?
 
   /// `gates` hold back the requests they match until the test opens them.
   static func session(
@@ -115,6 +117,7 @@ final class StubURLProtocol: URLProtocol {
   ) -> URLSession {
     self.handler = handler
     self.gates = gates
+    headers = nil
     requests = []
     let config = URLSessionConfiguration.ephemeral
     config.protocolClasses = [StubURLProtocol.self]
@@ -158,7 +161,7 @@ final class StubURLProtocol: URLProtocol {
     do {
       let (status, data) = try Self.handler!(request)
       let response = HTTPURLResponse(
-        url: request.url!, statusCode: status, httpVersion: nil, headerFields: nil)!
+        url: request.url!, statusCode: status, httpVersion: nil, headerFields: Self.headers)!
       client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
       client?.urlProtocol(self, didLoad: data)
       client?.urlProtocolDidFinishLoading(self)

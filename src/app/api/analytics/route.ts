@@ -1,8 +1,9 @@
+import { withServerTiming } from "@/lib/server-timing";
 import { NextRequest, NextResponse } from "next/server";
 import { getAnalytics } from "@/services/analytics.service";
 
 // GET /api/analytics?months=6
-export async function GET(req: NextRequest) {
+async function handleGET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const months = Math.min(
@@ -20,3 +21,5 @@ export async function GET(req: NextRequest) {
     );
   }
 }
+
+export const GET = withServerTiming(handleGET);

@@ -369,3 +369,25 @@ export interface UserCardDTO {
 export interface UserCardsResponse {
   cards: UserCardDTO[];
 }
+
+/** GET /api/update — Settings → Updates (web) and About (iPhone). */
+export interface UpdateStatusDTO {
+  version: string;
+  latest: string | null;
+  available: boolean;
+  canUpdate: boolean;
+  updating: boolean;
+  failed: string | null;
+  checkedAt: string;
+}
+
+/** GET /api/update/phone — Update iPhone, on the web and the iPhone. */
+export interface PhoneUpdateStatusDTO {
+  /** The iPhone app is set up on this Mac (ios/Config/Local.xcconfig). */
+  available: boolean;
+  installing: boolean;
+  /** phone.sh's last line when the last Update iPhone failed. */
+  failed: string | null;
+  /** The last good install from this Mac, by hand or on the schedule. */
+  lastInstalled: string | null;
+}

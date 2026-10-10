@@ -42,8 +42,10 @@ extension APIClient {
     _ = try await send("DELETE", "api/transactions/\(transactionId)/splits/\(splitId)", timeout: 15)
   }
 
+  /// Saved as Settings → Categories' answer too: the same GET, so
+  /// whichever ran last opens that screen.
   func categories() async throws(APIError) -> CategoriesResponse {
-    try decode(await send("GET", "api/categories", timeout: 15))
+    try await get("api/categories", timeout: 15, saveAs: "categories")
   }
 
   /// GET /api/ui-state?key= → `{ value }`.

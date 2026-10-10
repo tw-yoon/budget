@@ -16,18 +16,26 @@ final class AccountsStore {
   private(set) var isRefreshing = false
   /// A non-blocking message over data that is still valid.
   var banner: String?
+  /// How old `data` is: the last successful load, or when the saved copy
+  /// shown at launch was saved.
+  private(set) var updatedAt: Date?
 
   /// Resolves the client at call time, so a server changed in Settings takes
   /// effect on the next load.
   private let client: @MainActor () -> APIClient?
+  private let now: @MainActor () -> Date
 
   /// Bumped on every `load()` call; a completion only applies its result if
   /// it is still the most recent one. Guards against overlapping loads
   /// (`.task`, `scenePhase`, `onChange(server)`) finishing out of order.
   private var loadGeneration = 0
 
-  init(client: @escaping @MainActor () -> APIClient?) {
+  init(
+    client: @escaping @MainActor () -> APIClient?,
+    now: @escaping @MainActor () -> Date = { .now }
+  ) {
     self.client = client
+    self.now = now
   }
 
   func load() async {
@@ -36,6 +44,7 @@ final class AccountsStore {
 
     guard let client = client() else {
       data = nil
+      updatedAt = nil
       error = .notConfigured
       return
     }
@@ -45,6 +54,7 @@ final class AccountsStore {
     if data == nil {
       error = nil
       data = client.savedAccounts()
+      updatedAt = data == nil ? nil : client.savedAccountsDate()
     }
     isLoading = true
     defer { if generation == loadGeneration { isLoading = false } }
@@ -52,6 +62,7 @@ final class AccountsStore {
       let result = try await client.accounts()
       guard generation == loadGeneration else { return }
       data = result
+      updatedAt = now()
       error = nil
       banner = nil
     } catch {

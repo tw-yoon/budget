@@ -1,8 +1,9 @@
+import { withServerTiming } from "@/lib/server-timing";
 import { NextResponse } from "next/server";
 import { getDailySpending } from "@/services/analytics.service";
 
 // GET /api/analytics/spending — daily spend totals for the cumulative graph.
-export async function GET() {
+async function handleGET() {
   try {
     return NextResponse.json(await getDailySpending(24));
   } catch (err) {
@@ -13,3 +14,5 @@ export async function GET() {
     );
   }
 }
+
+export const GET = withServerTiming(handleGET);

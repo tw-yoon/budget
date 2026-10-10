@@ -212,6 +212,7 @@ assert_lacks "$out" "$TEST_SECRET" "the secret is never printed"
 assert_lacks "$out" "paste them into .env.local" "Budget.command's own key instructions are silenced"
 assert_has "$out" "Would run: ./Budget.command" "launches Budget last"
 assert_lacks "$out" "--update" "a fresh clone is not launched with --update"
+assert_lacks "$out" "--login on" "no answer to the login question means no"
 
 echo "installer: run again"
 cp "$app/.env.local" "$SUITE_TMP/env-before"
@@ -234,6 +235,19 @@ out=$(run_install "$mac" "$(answers "$TEST_ID" "$TEST_SECRET")" VIA_PIPE=1)
 [ "$(rc_of "$mac")" = 0 ] && pass "piped install exits 0" || fail "piped install exits 0" "rc=$(rc_of "$mac"); output: $out"
 grep -qx "PLAID_SECRET=$TEST_SECRET" "$mac/home/Documents/budget/.env.local" 2>/dev/null \
   && pass "piped install reads answers from the keyboard" || fail "piped install reads answers from the keyboard" "secret not written"
+
+echo "installer: start at login"
+mac=$(make_mac); touch "$mac/state/clt"; echo v24.0.0 > "$mac/state/node-version"
+out=$(run_install "$mac" "$(answers "$TEST_ID" "$TEST_SECRET" "")")
+assert_has "$out" "Start Budget automatically when you log in?" "asks about starting at login"
+assert_has "$out" "Would run: ./Budget.command --login on" "Return means yes"
+mac=$(make_mac); touch "$mac/state/clt"; echo v24.0.0 > "$mac/state/node-version"
+out=$(run_install "$mac" "$(answers "$TEST_ID" "$TEST_SECRET" "n")")
+assert_lacks "$out" "--login on" "n means no"
+mac=$(make_mac); touch "$mac/state/clt"; echo v24.0.0 > "$mac/state/node-version"
+mkdir -p "$mac/home/Library/LaunchAgents"; touch "$mac/home/Library/LaunchAgents/local.budget.server.plist"
+out=$(run_install "$mac" "$(answers "$TEST_ID" "$TEST_SECRET")")
+assert_lacks "$out" "when you log in?" "not asked when it's already on"
 
 echo "installer: Node.js versions"
 mac=$(make_mac); touch "$mac/state/clt"; echo v18.19.0 > "$mac/state/node-version"

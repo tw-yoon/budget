@@ -1,3 +1,4 @@
+import { withServerTiming } from "@/lib/server-timing";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { CADENCES, CADENCE_LABELS, monthlyCost } from "@/lib/subscriptions";
@@ -6,7 +7,7 @@ const round = (n: number) => Math.round(n * 100) / 100;
 const VALID_CADENCE = new Set<string>(CADENCES);
 
 // GET /api/subscriptions — list + total monthly cost (active subs only).
-export async function GET() {
+async function handleGET() {
   try {
     const subs = await prisma.subscription.findMany({
       orderBy: [{ isActive: "desc" }, { name: "asc" }],
@@ -79,3 +80,5 @@ export async function POST(req: NextRequest) {
 function bad(message: string) {
   return NextResponse.json({ error: message }, { status: 400 });
 }
+
+export const GET = withServerTiming(handleGET);

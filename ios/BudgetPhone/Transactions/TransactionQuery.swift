@@ -2,7 +2,7 @@ import Foundation
 
 /// The ledger's search, filters and sort — TransactionLedger.tsx's state —
 /// and the query string it sends.
-struct TransactionQuery: Equatable, Sendable, Codable {
+struct TransactionQuery: Hashable, Sendable, Codable {
   enum Sort: String, Codable, Sendable, CaseIterable { case date, label }
 
   static let pageSize = 50

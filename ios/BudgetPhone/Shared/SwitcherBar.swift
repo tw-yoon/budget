@@ -37,6 +37,8 @@ struct SwitcherBar<Segment: Hashable, Trailing: View>: View {
       }
     }
     .frame(width: max(0, width - 2 * SwitcherBarMetrics.margin))
+    // A tick as the segment changes, as a system segmented control gives.
+    .sensoryFeedback(.selection, trigger: selection)
   }
 }
 

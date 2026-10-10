@@ -53,7 +53,7 @@ struct P2PCategorizerView: View {
     } else if let error = store.error {
       ErrorView(error: error, server: server) { Task { await store.load() } }
     } else {
-      ProgressView()
+      P2PPlaceholder()
     }
   }
 
@@ -266,5 +266,57 @@ private struct P2PRow: View {
     return Binding(get: { row.category }, set: { category in
       Task { await store.setCategory(id, to: category) }
     })
+  }
+}
+
+/// A feed's first load: the totals card and payment rows, drawn as grey
+/// placeholders in the list's own shape.
+struct P2PPlaceholder: View {
+  private static let rows = [
+    PlaceholderRow(title: "Sample Friend", detail: "dinner\n#801 · Sep 10, 2026", amount: "\u{2212}$40.00"),
+    PlaceholderRow(title: "Sample Person", detail: "tickets\n#802 · Sep 11, 2026", amount: "+$15.00"),
+    PlaceholderRow(title: "Sample Roommate", detail: "rent share\n#803 · Sep 12, 2026", amount: "\u{2212}$500.00"),
+    PlaceholderRow(title: "Sample Friend", detail: "groceries\n#804 · Sep 13, 2026", amount: "+$20.00"),
+    PlaceholderRow(title: "Sample Person", detail: "coffee\n#805 · Sep 14, 2026", amount: "\u{2212}$6.00"),
+  ]
+
+  var body: some View {
+    ScrollView {
+      VStack(alignment: .leading, spacing: 0) {
+        HStack {
+          ForEach(["Sent", "Received", "Net spend"], id: \.self) { label in
+            VStack(alignment: .leading, spacing: 2) {
+              Text(label).font(.caption).foregroundStyle(.secondary)
+              Text("$100.00").font(.subheadline.weight(.semibold)).monospacedDigit()
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+          }
+        }
+        .groupedRow(isLast: true)
+        .groupedCard()
+        .padding(.top, 12)
+        Text("Categorized payments only — Uncategorized and Transfer don't count.")
+          .groupedFooter()
+          .unredacted()
+        VStack(spacing: 0) {
+          ForEach(Self.rows.indices, id: \.self) { i in
+            Self.rows[i].groupedRow(isLast: i == Self.rows.count - 1)
+          }
+        }
+        .groupedCard()
+      }
+    }
+    .scrollDisabled(true)
+    .loadingPlaceholder()
+  }
+}
+
+#Preview("Venmo loading") {
+  NavigationStack {
+    P2PPlaceholder()
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
+      .background(Color(.systemGroupedBackground))
+      .navigationTitle("Transactions")
+      .navigationBarTitleDisplayMode(.inline)
   }
 }

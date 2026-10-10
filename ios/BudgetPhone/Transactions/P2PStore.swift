@@ -3,7 +3,8 @@ import Observation
 
 /// One categorizer feed (Venmo or Zelle). A category change shows at once
 /// and is sent in the background; if the server refuses it, the message goes
-/// in the banner and the list reloads — P2pCategorizer's behaviour.
+/// in the banner and the list reloads — P2pCategorizer's behaviour. Opens
+/// with the feed saved last time while the server answers, as Subscriptions.
 @MainActor
 @Observable
 final class P2PStore {
@@ -15,6 +16,8 @@ final class P2PStore {
   var banner: String?
   /// The import result, shown until the next import or dismissal.
   var notice: String?
+  /// Category changes and imports, for their haptics (TransactionsView).
+  private(set) var feedback = SaveFeedback()
 
   private let client: @MainActor () -> APIClient?
   private var generation = 0
@@ -40,7 +43,10 @@ final class P2PStore {
       error = .notConfigured
       return
     }
-    if data == nil { error = nil }
+    if data == nil {
+      error = nil
+      data = client.savedP2P(source)
+    }
     isLoading = true
     defer { if current == generation { isLoading = false } }
     do throws(APIError) {
@@ -68,7 +74,12 @@ final class P2PStore {
     data = P2PResponse(transactions: rows, categories: current.categories)
     do throws(APIError) {
       try await client.setP2PCategory(source, id: id, category: category)
+      feedback.record(nil)
+      // A GET still in flight (saved rows are editable while the first one
+      // runs) was read before this change; a fresh load supersedes it.
+      if isLoading { await load() }
     } catch {
+      feedback.record(error)
       guard error != .cancelled else { return }
       await load()
       // P2pCategorizer.tsx: `body.error ?? fallback` — only a route that
@@ -93,8 +104,10 @@ final class P2PStore {
     banner = nil
     do throws(APIError) {
       notice = try await client.importP2P(source).notice
+      feedback.record(nil)
       await load()
     } catch {
+      feedback.record(error)
       if error != .cancelled { banner = error.message }
     }
   }

@@ -2,6 +2,8 @@
 # Builds the iPhone app and installs it on the paired iPhone, and can schedule
 # that to repeat. A free Apple ID signs the app for only 7 days, after which it
 # stops opening; installing again from the Mac renews it and keeps its data.
+# Renewing needs a new signature: Xcode reuses its saved provisioning profile
+# until that runs out, so each install first sets the saved one aside.
 # Design: docs/superpowers/specs/2026-10-03-ios-auto-reinstall-design.md.
 #
 #   bash scripts/phone.sh install        build and install now
@@ -19,7 +21,11 @@ OSASCRIPT="${OSASCRIPT:-osascript}"
 LAUNCHCTL="${LAUNCHCTL:-launchctl}"
 LAUNCH_AGENTS_DIR="${LAUNCH_AGENTS_DIR:-$HOME/Library/LaunchAgents}"
 LOCAL_XCCONFIG="${LOCAL_XCCONFIG:-$IOS/Config/Local.xcconfig}"
+SHARED_XCCONFIG="${SHARED_XCCONFIG:-$IOS/Config/Shared.xcconfig}"
 STATE_DIR="${PHONE_STATE_DIR:-$IOS/build/phone}"
+PROFILES_DIR="${PHONE_PROFILES_DIR:-$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles}"
+DERIVED="${PHONE_DERIVED_DATA:-$IOS/build/DerivedData-phone}"
+APP="$DERIVED/Build/Products/Debug-iphoneos/BudgetPhone.app"
 NOW="${PHONE_NOW:-$(date +%s)}"
 LOG="$STATE_DIR/log"
 DAY=86400
@@ -34,11 +40,53 @@ devicectl() {
   if [ -n "$DEVICECTL" ]; then "$DEVICECTL" "$@"; else xcrun devicectl "$@"; fi
 }
 
-# The value of KEY in Local.xcconfig, or nothing. The last line wins, as in Xcode.
+# The value of KEY in Local.xcconfig (or in the file given as $2), or nothing.
+# The last line wins, as in Xcode.
 xcconfig_value() {
-  [ -f "$LOCAL_XCCONFIG" ] || return 0
-  sed -n "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*//p" "$LOCAL_XCCONFIG" |
+  local file="${2:-$LOCAL_XCCONFIG}"
+  [ -f "$file" ] || return 0
+  sed -n "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*//p" "$file" |
     tail -n 1 | sed 's/[[:space:]]*$//'
+}
+
+# The app's bundle ID, as Shared.xcconfig builds it.
+bundle_id() {
+  local prefix
+  prefix=$(xcconfig_value BUNDLE_ID_PREFIX)
+  echo "${prefix:-local.budget}.BudgetPhone"
+}
+
+# One value from a provisioning profile. Real profiles are signed (CMS) with
+# the plist inside; the tests' fixtures are the bare plist.
+profile_value() {
+  { security cms -D -i "$1" 2>/dev/null || cat "$1"; } | plutil -extract "$2" raw - 2>/dev/null
+}
+
+# "2026-10-09T07:59:27Z" → seconds since 1970.
+iso_epoch() {
+  date -j -u -f "%Y-%m-%dT%H:%M:%SZ" "$1" +%s 2>/dev/null
+}
+
+# Moves Xcode's saved profiles for this app into $STATE_DIR/old-profiles, so
+# the build has to ask Apple for a fresh 7-day one. Moved, not deleted: a
+# build that fails (offline, signed out of Xcode) puts them back.
+set_aside_profiles() {
+  local f id want
+  want=".$(bundle_id)"
+  rm -rf "$STATE_DIR/old-profiles"
+  mkdir -p "$STATE_DIR/old-profiles"
+  for f in "$PROFILES_DIR"/*.mobileprovision; do
+    [ -f "$f" ] || continue
+    id=$(profile_value "$f" Entitlements.application-identifier)
+    case "$id" in *"$want") mv "$f" "$STATE_DIR/old-profiles/" ;; esac
+  done
+}
+
+restore_profiles() {
+  local f
+  for f in "$STATE_DIR/old-profiles"/*.mobileprovision; do
+    [ -f "$f" ] && mv "$f" "$PROFILES_DIR/"
+  done
 }
 
 # Picks the phone from devicectl's JSON device list. argv: the JSON file, then
@@ -100,55 +148,92 @@ cmd_install() {
   log "install: start"
   resolve_phone || { log "install: no phone"; return 1; }
   say "Building for the iPhone…"
+  set_aside_profiles
+  local logged
+  logged=$(wc -c <"$LOG" 2>/dev/null || echo 0)
   if ! "$XCODEBUILD" build -project "$IOS/BudgetPhone.xcodeproj" -scheme BudgetPhone \
       -configuration Debug -destination "id=$PHONE_UDID" \
-      -derivedDataPath "$IOS/build/DerivedData-phone" -allowProvisioningUpdates -quiet \
+      -derivedDataPath "$DERIVED" -allowProvisioningUpdates -quiet \
       >>"$LOG" 2>&1; then
-    say "Build failed; the app on the phone is unchanged. Details: $LOG"
-    log "install: build failed"
+    restore_profiles
+    # Only this build's output, not earlier runs in the same log.
+    local output
+    output=$(tail -c +$((logged + 1)) "$LOG")
+    case "$output" in
+      *"No Accounts"*|*"Failed to load credentials"*)
+        FAILURE=signed-out
+        say "Xcode isn't signed in to your Apple ID. Open Xcode → Settings → Accounts, add your Apple ID, then try again."
+        log "install: build failed (Xcode signed out)" ;;
+      *"Unable to find a destination"*)
+        say "The Mac can't see your iPhone. Unlock it and put it on the same Wi-Fi as the Mac, then try again."
+        log "install: build failed (phone not seen)" ;;
+      *)
+        say "Build failed; the app on the phone is unchanged. Details: $LOG"
+        log "install: build failed" ;;
+    esac
     return 1
   fi
   say "Installing…"
-  if ! devicectl device install app --device "$PHONE_CORE" \
-      "$IOS/build/DerivedData-phone/Build/Products/Debug-iphoneos/BudgetPhone.app" \
+  if ! devicectl device install app --device "$PHONE_CORE" "$APP" \
       >>"$LOG" 2>&1; then
     say "Install failed. Is the iPhone unlocked and on the same Wi-Fi as the Mac? Details: $LOG"
     log "install: install failed"
     return 1
   fi
   echo "$NOW" >"$STATE_DIR/last-success"
-  say "Installed. The app opens for another 7 days."
-  log "install: ok"
+  xcconfig_value MARKETING_VERSION "$SHARED_XCCONFIG" >"$STATE_DIR/version"
+  rm -rf "$STATE_DIR/old-profiles"
+  # The date the phone goes by: the signature inside what was just installed.
+  local expires created
+  expires=$(iso_epoch "$(profile_value "$APP/embedded.mobileprovision" ExpirationDate)")
+  created=$(iso_epoch "$(profile_value "$APP/embedded.mobileprovision" CreationDate)")
+  if [ -z "$expires" ]; then
+    rm -f "$STATE_DIR/expires"
+    say "Installed."
+    log "install: ok (expiry unknown)"
+    return 0
+  fi
+  echo "$expires" >"$STATE_DIR/expires"
+  if [ -n "$created" ] && [ $((NOW - created)) -gt "$DAY" ]; then
+    say "Installed, but Xcode reused an old signature: the app still stops opening $(date -r "$expires" '+%A, %B %-d')."
+    log "install: ok (old signature)"
+  else
+    say "Installed. The app opens until $(date -r "$expires" '+%A, %B %-d')."
+    log "install: ok"
+  fi
 }
 
-# What the schedule runs. Reinstalls once the last install is 2 or more days
-# old, which leaves about 5 days to retry before the 7-day signature runs out.
+# What the schedule runs. Goes by the installed signature's expiry, not the
+# last install: reinstalls once fewer than 5 days are left, which leaves
+# about 5 days to retry. No recorded expiry (an older install) reinstalls now.
 cmd_auto() {
-  local last=""
-  [ -f "$STATE_DIR/last-success" ] && last=$(cat "$STATE_DIR/last-success")
-  if [ -n "$last" ] && [ $((NOW - last)) -lt $((2 * DAY)) ]; then
+  local expires=""
+  [ -f "$STATE_DIR/expires" ] && expires=$(cat "$STATE_DIR/expires")
+  if [ -n "$expires" ] && [ $((expires - NOW)) -gt $((5 * DAY)) ]; then
     return 0
   fi
   log "auto: reinstalling"
   cmd_install && return 0
-  if [ -z "$last" ] || [ $((NOW - last)) -ge $((5 * DAY)) ]; then
-    notify_failed "$last"
+  if [ -z "$expires" ] || [ $((expires - NOW)) -le $((2 * DAY)) ]; then
+    notify_failed "$expires"
   fi
   return 1
 }
 
-# A macOS notification that the app is close to expiring. $1 is the time of
-# the last good install, or empty if there never was one.
+# A macOS notification that the app is close to expiring. $1 is when the
+# installed signature runs out, or empty if that isn't known.
 notify_failed() {
   local when="soon" left
   if [ -n "$1" ]; then
-    left=$(( ($1 + 7 * DAY - NOW) / DAY ))
+    left=$(( ($1 - NOW) / DAY ))
     if [ "$left" -eq 1 ]; then when="in about 1 day"
     elif [ "$left" -gt 1 ]; then when="in about $left days"
     fi
   fi
+  local fix="Unlock your iPhone on home Wi-Fi with the Mac awake."
+  [ "${FAILURE:-}" = signed-out ] && fix="Sign in to Xcode: Settings → Accounts."
   log "auto: notified ($when)"
-  "$OSASCRIPT" -e "display notification \"Unlock your iPhone on home Wi-Fi with the Mac awake. It stops opening $when.\" with title \"Budget: couldn't update the iPhone app\"" >>"$LOG" 2>&1
+  "$OSASCRIPT" -e "display notification \"$fix It stops opening $when.\" with title \"Budget: couldn't update the iPhone app\"" >>"$LOG" 2>&1
 }
 
 # The LaunchAgent's name, unique per Apple ID the same way the bundle ID is.
@@ -186,7 +271,7 @@ EOF
     say "launchctl couldn't load $plist. Details: $LOG"
     return 1
   fi
-  say "Scheduled. Every 3 hours the Mac reinstalls the app if it's 2 or more days old."
+  say "Scheduled. Every 3 hours the Mac reinstalls the app once fewer than 5 days of its 7 are left."
 }
 
 schedule_off() {

@@ -53,6 +53,8 @@ access, and the design works without it.
 
 ### Repository
 
+**Superseded 2026-10-09: releases are one commit each, made by `scripts/release.sh`.** See `2026-10-09-release-script-design.md`. The replay steps below are kept for history.
+
 A new public repo, `tw-yoon/budget`, created once by extracting the subfolder
 with history.
 

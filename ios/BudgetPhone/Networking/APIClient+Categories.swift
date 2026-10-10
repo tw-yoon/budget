@@ -26,8 +26,12 @@ extension APIClient {
   /// GET /api/categories — the list with counts, Plaid's primaries, and
   /// the primaries no category maps.
   func categoriesAdmin() async throws(APIError) -> CategoriesAdminResponse {
-    try decode(await send("GET", "api/categories", timeout: 15))
+    try await get("api/categories", timeout: 15, saveAs: "categories")
   }
+
+  /// The categories last saved — by this screen or the ledger's pickers,
+  /// which read the same answer — for the next open.
+  func savedCategories() -> CategoriesAdminResponse? { saved("categories", "api/categories") }
 
   /// POST /api/categories — `{ name }`.
   func createCategory(name: String) async throws(APIError) {

@@ -1,10 +1,11 @@
+import { withServerTiming } from "@/lib/server-timing";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { LIABILITY_TYPES, summarizeAccounts } from "@/lib/account-totals";
 import { mergeLinks } from "@/lib/reconnect-merge";
 import type { AccountDTO } from "@/types";
 
-export async function GET() {
+async function handleGET() {
   try {
     const rows = await prisma.account.findMany({
       include: { item: { select: { institution: true, disconnectedAt: true } } },
@@ -98,3 +99,5 @@ export async function GET() {
     );
   }
 }
+
+export const GET = withServerTiming(handleGET);

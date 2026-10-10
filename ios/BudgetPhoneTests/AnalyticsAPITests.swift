@@ -14,7 +14,7 @@ extension StubbedNetworkTests {
 
     @Test func analyticsSendsTheRange() async throws {
       let json = String(decoding: try TestData.fixture("analytics"), as: UTF8.self)
-      _ = try await client(json).analytics(months: 12)
+      _ = try await client(json).analytics(months: 12, launchRange: 3)
       let request = try #require(StubURLProtocol.requests.first)
       #expect(request.httpMethod == "GET")
       #expect(request.url?.path() == "/api/analytics")

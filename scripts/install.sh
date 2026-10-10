@@ -260,7 +260,23 @@ ensure_keys() {
   echo "✅ Your Plaid keys are saved."
 }
 
+# Asked before the first start, while the person is still at the keyboard.
+# Return means yes; no answer at all (end of input) means no. Not asked when
+# the agent is already there.
+ask_login() {
+  [ -f "$HOME/Library/LaunchAgents/local.budget.server.plist" ] && return 1
+  echo
+  printf 'Start Budget automatically when you log in? It keeps running so your iPhone can reach it. [Y/n] '
+  local a=""
+  if ! read -r -u 3 a; then
+    echo
+    return 1
+  fi
+  case "$a" in ''|[Yy]*) return 0 ;; *) return 1 ;; esac
+}
+
 launch() {
+  local login=false; ask_login && login=true
   local args=""
   $EXISTING && args=" --update"
   echo
@@ -269,15 +285,20 @@ launch() {
   echo
   if [ "${BUDGET_INSTALL_SKIP_LAUNCH:-}" = 1 ]; then
     echo "Would run: ./Budget.command$args"
+    $login && echo "Would run: ./Budget.command --login on"
     return 0
   fi
   cd "$BUDGET_DIR" || stop "Couldn't open $BUDGET_DIR."
   # stdin from the keyboard, not the pipe the script came in on.
+  local rc
   if $EXISTING; then
     ./Budget.command --update <&3
   else
     ./Budget.command <&3
   fi
+  rc=$?
+  [ "$rc" -eq 0 ] && $login && ./Budget.command --login on
+  return "$rc"
 }
 
 main() {

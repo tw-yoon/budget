@@ -20,6 +20,9 @@ extension StubbedNetworkTests {
   struct AnalyticsStoreTests {
     let base = URL(string: "http://budget-mac.local:3000")!
     let stub = AnalyticsStub()
+    /// A fresh store of kept settings per test, so a picked range never
+    /// reaches the app's own or another test's.
+    let defaults = UserDefaults(suiteName: "test-\(UUID().uuidString)")!
 
     nonisolated static let cashflowJSON =
       #"{"months":[{"key":"2026-08","label":"Aug 2026","income":[{"source":"Paycheck","amount":300}],"spend":[{"category":"Groceries","amount":100}]}],"currentCash":0,"cashAsOf":null}"#
@@ -53,7 +56,7 @@ extension StubbedNetworkTests {
       let c = APIClient(
         baseURL: base,
         session: StubURLProtocol.session({ try Self.answer($0, stub) }, gates: gates))
-      return AnalyticsStore { c }
+      return AnalyticsStore(client: { c }, defaults: defaults)
     }
 
     func paths() -> [String] { StubURLProtocol.requests.compactMap { $0.url?.path() } }
@@ -124,7 +127,7 @@ extension StubbedNetworkTests {
     }
 
     @Test func noServerIsNotConfigured() async {
-      let s = AnalyticsStore { nil }
+      let s = AnalyticsStore(client: { nil }, defaults: defaults)
       await s.load(isPro: false)
       #expect(s.error == .notConfigured)
     }
@@ -332,7 +335,7 @@ extension StubbedNetworkTests.AnalyticsStoreTests {
           return try Self.answer(r, stub)
         }, gates: gates),
       token: token, cache: cache)
-    return AnalyticsStore { c }
+    return AnalyticsStore(client: { c }, defaults: defaults)
   }
 
   /// One Pro load's answers (summary with `txCount` 4), saved for `token`.
@@ -416,5 +419,77 @@ extension StubbedNetworkTests.AnalyticsStoreTests {
       return
     }
     #expect(s.banner == nil)
+  }
+}
+
+/// The range last picked is the one the tab reopens on, and the one whose
+/// summary is saved for the next launch.
+extension StubbedNetworkTests.AnalyticsStoreTests {
+  @Test func withNothingKeptTheTabOpensOnThreeMonths() async {
+    let s = store()
+    #expect(s.range == 3)
+    await s.load(isPro: false)
+    #expect(TestData.query(of: StubURLProtocol.requests[0], "months") == "3")
+  }
+
+  @Test func aPickedRangeIsWhatTheNextLaunchOpensOn() async {
+    let s = store()
+    await s.changeRange(12)
+    #expect(defaults.integer(forKey: AnalyticsRange.key) == 12)
+    let next = store()
+    #expect(next.range == 12)
+    await next.load(isPro: false)
+    let summary = StubURLProtocol.requests.last { $0.url?.path() == "/api/analytics" }
+    #expect(summary.flatMap { TestData.query(of: $0, "months") } == "12")
+  }
+
+  @Test func anUnusableKeptRangeOpensOnThreeMonths() {
+    for bad: Any in [5, 0, -6, "twelve"] {
+      defaults.set(bad, forKey: AnalyticsRange.key)
+      #expect(store().range == 3, "kept \(bad)")
+    }
+  }
+
+  @Test func aRangeOutsideThePickerIsNotKept() {
+    AnalyticsRange.remember(6, in: defaults)
+    AnalyticsRange.remember(7, in: defaults)
+    #expect(AnalyticsRange.remembered(in: defaults) == 6)
+  }
+
+  @Test func thePickedRangesSummaryShowsAtTheNextLaunch() async {
+    let cache = TestData.cache()
+    let s = store(cache: cache)
+    await s.load(isPro: false)
+    await s.changeRange(6)
+    let next = store(cache: cache, unreachable: true)
+    await next.load(isPro: false)
+    #expect(next.range == 6)
+    #expect(next.summary?.txCount == 4)
+  }
+
+  @Test func aSlowAnswerForTheOldRangeDoesNotReplaceThePickedRangesCopy() async {
+    let cache = TestData.cache()
+    let gate = Gate(Self.isAnalytics)
+    let s = store(cache: cache, gates: [gate])
+    let load = Task { await s.load(isPro: false) }  // 3 months, held
+    await gate.arrival()
+    await s.changeRange(6)  // answered and saved at once
+    gate.open()
+    await load.value
+    let next = store(cache: cache, unreachable: true)
+    await next.load(isPro: false)
+    #expect(next.range == 6)
+    #expect(next.summary != nil, "the 6-month copy survived the late 3-month answer")
+  }
+
+  @Test func aKeptRangeWithNoSavedSummaryWaitsForTheServer() async {
+    let cache = TestData.cache()
+    await saveAnalytics(in: cache)  // saved for 3 months
+    defaults.set(12, forKey: AnalyticsRange.key)
+    let s = store(cache: cache, unreachable: true)
+    await s.load(isPro: false)
+    #expect(s.summary == nil, "another range's numbers are never shown as this one's")
+    #expect(s.cashflow?.count == 1, "cash flow doesn't depend on the range")
+    #expect(s.banner != nil && s.error == nil)
   }
 }

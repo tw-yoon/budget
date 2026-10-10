@@ -153,6 +153,42 @@ extension StubbedNetworkTests {
       #expect(StubURLProtocol.requests.map { "\($0.httpMethod!) \($0.url!.path())" } == ["POST /api/venmo/import", "GET /api/venmo"])
     }
 
+    // MARK: Haptics (SaveFeedback)
+
+    @Test func aSavedCategoryIsASuccess() async {
+      let s = store(.zelle) { r in
+        r.httpMethod == "PATCH" ? (200, Data(#"{"ok":true}"#.utf8)) : (200, Data(feed.utf8))
+      }
+      await s.load()
+      #expect(s.feedback == SaveFeedback(), "a load is not a save")
+      await s.setCategory("v1", to: "Travel")
+      #expect(s.feedback.successes == 1 && s.feedback.failures == 0)
+    }
+
+    @Test func aRefusedCategoryIsAFailure() async {
+      let s = store { r in
+        r.httpMethod == "PATCH" ? (400, Data(#"{"error":"Invalid category"}"#.utf8)) : (200, Data(feed.utf8))
+      }
+      await s.load()
+      await s.setCategory("v1", to: "Nope")
+      #expect(s.feedback.failures == 1 && s.feedback.successes == 0)
+    }
+
+    @Test func anImportIsASuccessAndAFailedOneAFailure() async {
+      let s = store { r in
+        r.httpMethod == "POST"
+          ? (200, Data(#"{"imported":1,"reconciledCashouts":0,"unmatchedCashouts":0,"accountHolder":""}"#.utf8))
+          : (200, Data(feed.utf8))
+      }
+      await s.runImport()
+      #expect(s.feedback.successes == 1 && s.feedback.failures == 0)
+      let failing = store { r in
+        r.httpMethod == "POST" ? (500, Data(#"{"error":"Sample failure"}"#.utf8)) : (200, Data(feed.utf8))
+      }
+      await failing.runImport()
+      #expect(failing.feedback.failures == 1 && failing.feedback.successes == 0)
+    }
+
     @Test func zelleNeverImports() async throws {
       let s = store(.zelle) { _ in (200, Data(feed.utf8)) }
       await s.runImport()

@@ -21,7 +21,8 @@ enum ConnectionWrite: Equatable, Sendable {
 /// What Settings → Connections shows (../src/components/SettingsConnections.tsx):
 /// debit cards and connected banks. Same failure rules as the other stores:
 /// with nothing on screen an error is full-screen; with data showing it
-/// becomes a banner and the data stays.
+/// becomes a banner and the data stays. Opens with the GET /api/accounts
+/// answer saved last time (Accounts' or its own) while the server answers.
 @MainActor
 @Observable
 final class ConnectionsStore {
@@ -53,7 +54,10 @@ final class ConnectionsStore {
       error = .notConfigured
       return
     }
-    if data == nil { error = nil }
+    if data == nil {
+      error = nil
+      data = client.savedConnections()
+    }
     isLoading = true
     defer { if generation == loadGeneration { isLoading = false } }
     do throws(APIError) {

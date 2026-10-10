@@ -16,7 +16,8 @@ enum CategoryWrite: Equatable, Sendable {
 /// What Settings → Categories shows (../src/components/SettingsCategories.tsx),
 /// shared by the list and the detail screen. Same failure rules as the
 /// other stores: with nothing on screen an error is full-screen; with data
-/// showing it becomes a banner and the data stays.
+/// showing it becomes a banner and the data stays. Opens with the list
+/// saved last time while the server answers, as Subscriptions.
 @MainActor
 @Observable
 final class CategoriesStore {
@@ -50,7 +51,10 @@ final class CategoriesStore {
       error = .notConfigured
       return
     }
-    if data == nil { error = nil }
+    if data == nil {
+      error = nil
+      data = client.savedCategories()
+    }
     isLoading = true
     defer { if generation == loadGeneration { isLoading = false } }
     do throws(APIError) {

@@ -23,6 +23,12 @@ struct ResponseCache: Sendable {
     return try? Data(contentsOf: file(name, request: request, owner: owner))
   }
 
+  /// When the saved answer was written, or nil when there is none.
+  func date(_ name: String, request: String, owner: String) -> Date? {
+    let path = file(name, request: request, owner: owner).path
+    return (try? FileManager.default.attributesOfItem(atPath: path))?[.modificationDate] as? Date
+  }
+
   func write(_ data: Data, name: String, request: String, owner: String) {
     let folder = folder(owner)
     let target = file(name, request: request, owner: owner)
