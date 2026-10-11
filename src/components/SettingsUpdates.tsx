@@ -185,7 +185,7 @@ async function fetchPhone(): Promise<PhoneUpdateStatusDTO | null> {
 }
 
 // Update iPhone: the Mac rebuilds the iPhone app and installs it on the
-// paired phone (ios/scripts/phone.sh install). Hidden unless it's set up here.
+// paired phone (ios/scripts/phone.sh install --main). Hidden unless it's set up here.
 function PhoneUpdate() {
   const [status, setStatus] = useState<PhoneUpdateStatusDTO | null>(null);
   const [starting, setStarting] = useState(false);

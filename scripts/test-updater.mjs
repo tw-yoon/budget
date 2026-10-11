@@ -198,5 +198,5 @@ test("a failed Update iPhone reports phone.sh's last line", () => {
 
 test("Update iPhone runs phone.sh and records its exit", () => {
   assert.equal(PHONE_COMMAND,
-    "bash ios/scripts/phone.sh install > ios/build/phone/app-output 2>&1; echo $? > ios/build/phone/app-exit");
+    "bash ios/scripts/phone.sh install --main > ios/build/phone/app-output 2>&1; echo $? > ios/build/phone/app-exit");
 });

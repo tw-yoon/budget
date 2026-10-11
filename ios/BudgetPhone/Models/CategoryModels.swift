@@ -5,7 +5,7 @@ import Foundation
 // `CategoriesResponse`; these carry what Settings → Categories edits.
 
 struct CategoriesAdminResponse: Decodable, Equatable, Sendable {
-  let categories: [AdminCategory]
+  var categories: [AdminCategory]
   let primaries: [String]
   /// Real Plaid primaries in use that no category maps. The web reads it
   /// with `?? []`, so a server without it decodes as empty.
@@ -29,7 +29,7 @@ struct CategoriesAdminResponse: Decodable, Equatable, Sendable {
 
 struct AdminCategory: Decodable, Equatable, Sendable, Identifiable {
   let id: String
-  let name: String
+  var name: String
   let plaidPrimaries: [String]
   let transactionCount: Int
   let ruleCount: Int

@@ -28,7 +28,7 @@ struct AddSplitSheet: View {
   private var left: Double { transaction.splitLeftToAllocate }
 
   private var amount: Double? {
-    guard let v = Double(amountText.trimmingCharacters(in: .whitespaces)), v > 0 else { return nil }
+    guard let v = CardRules.number(amountText), v > 0 else { return nil }
     return v
   }
 

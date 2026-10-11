@@ -43,6 +43,35 @@ final class CategoriesStore {
     data?.categories.first { $0.id == id }
   }
 
+  /// Applies a rename or delete to the list now; returns the category as it
+  /// was, with its place, for `putBack`.
+  private func showInstantly(_ write: CategoryWrite) -> (index: Int, category: AdminCategory)? {
+    let id: String
+    switch write {
+    case .rename(let i, _, _), .delete(let i): id = i
+    default: return nil
+    }
+    guard let index = data?.categories.firstIndex(where: { $0.id == id }),
+      let old = data?.categories[index]
+    else { return nil }
+    switch write {
+    case .rename(_, let name, _): data?.categories[index].name = name
+    default: data?.categories.remove(at: index)
+    }
+    return (index, old)
+  }
+
+  /// Undoes `showInstantly`, unless a reload already replaced the list.
+  private func putBack(_ before: (index: Int, category: AdminCategory)) {
+    guard var list = data?.categories else { return }
+    if let i = list.firstIndex(where: { $0.id == before.category.id }) {
+      list[i] = before.category
+    } else {
+      list.insert(before.category, at: min(before.index, list.count))
+    }
+    data?.categories = list
+  }
+
   func load() async {
     loadGeneration += 1
     let generation = loadGeneration
@@ -87,6 +116,11 @@ final class CategoriesStore {
     banner = nil
     notice = nil
     var ownNotice: String?
+    // A rename or delete shows at once; anything that doesn't go through puts
+    // the category back as it was.
+    let before = showInstantly(write)
+    var keepShown = false
+    defer { if !keepShown, let before { putBack(before) } }
     do throws(APIError) {
       switch write {
       case .create(let name):
@@ -118,6 +152,7 @@ final class CategoriesStore {
       if error != .cancelled { banner = error.message }
       return nil
     }
+    keepShown = true
     writeCount += 1
     await load()
     if let ownNotice { notice = ownNotice }

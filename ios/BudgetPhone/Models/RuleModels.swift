@@ -16,12 +16,12 @@ struct RuleDTO: Decodable, Equatable, Sendable, Identifiable {
   let pattern: String
   let category: String
   let priority: Int
-  let enabled: Bool
+  var enabled: Bool
   let outcome: Outcome?
 }
 
 struct RulesResponse: Decodable, Equatable, Sendable {
-  let rules: [RuleDTO]
+  var rules: [RuleDTO]
 }
 
 /// POST /api/rules — the four fields RuleForm sends.

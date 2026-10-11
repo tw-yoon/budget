@@ -66,7 +66,10 @@ function readStore(): Record<string, string> {
 function writeStore(store: Record<string, string>): void {
   const p = getStorePath();
   fs.mkdirSync(path.dirname(p), { recursive: true });
-  fs.writeFileSync(p, encrypt(JSON.stringify(store)), { mode: 0o600 });
+  // Write beside and rename: a crash mid-write must not corrupt the only copy of every bank's token.
+  const tmp = `${p}.tmp.${process.pid}`;
+  fs.writeFileSync(tmp, encrypt(JSON.stringify(store)), { mode: 0o600 });
+  fs.renameSync(tmp, p);
 }
 
 export function saveAccessToken(itemId: string, accessToken: string): void {

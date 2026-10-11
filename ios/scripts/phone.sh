@@ -8,6 +8,7 @@
 #
 #   bash scripts/phone.sh setup          first-time setup, step by step
 #   bash scripts/phone.sh install        build and install now
+#   bash scripts/phone.sh install --main the same, but only from a clean main
 #   bash scripts/phone.sh schedule on    reinstall automatically (a LaunchAgent)
 #   bash scripts/phone.sh schedule off   stop that
 #
@@ -20,6 +21,7 @@ XCODEBUILD="${XCODEBUILD:-xcodebuild}"
 DEVICECTL="${DEVICECTL:-}"
 OSASCRIPT="${OSASCRIPT:-osascript}"
 LAUNCHCTL="${LAUNCHCTL:-launchctl}"
+GIT="${GIT:-git}"
 LAUNCH_AGENTS_DIR="${LAUNCH_AGENTS_DIR:-$HOME/Library/LaunchAgents}"
 LOCAL_XCCONFIG="${LOCAL_XCCONFIG:-$IOS/Config/Local.xcconfig}"
 SHARED_XCCONFIG="${SHARED_XCCONFIG:-$IOS/Config/Shared.xcconfig}"
@@ -231,17 +233,50 @@ cmd_install() {
   fi
 }
 
+# True when this checkout is main with nothing uncommitted under ios/;
+# otherwise sets NOT_MAIN to why.
+on_clean_main() {
+  local branch
+  branch=$("$GIT" -C "$IOS" branch --show-current 2>/dev/null)
+  if [ "$branch" != main ]; then
+    NOT_MAIN="checkout is ${branch:-not a branch}, not main"
+    return 1
+  fi
+  if [ -n "$("$GIT" -C "$IOS" status --porcelain -- . 2>/dev/null)" ]; then
+    NOT_MAIN="main has uncommitted changes"
+    return 1
+  fi
+}
+
+# `install --main` (the Hub's Update iPhone button): install only a clean main.
+cmd_install_main() {
+  if ! on_clean_main; then
+    say "Not installed: the Budget folder's $NOT_MAIN. Put it back on main with no uncommitted changes, then try again."
+    log "install --main: refused ($NOT_MAIN)"
+    return 1
+  fi
+  cmd_install
+}
+
 # What the schedule runs. Goes by the installed signature's expiry, not the
 # last install: reinstalls once fewer than 5 days are left, which leaves
 # about 5 days to retry. No recorded expiry (an older install) reinstalls now.
+# Builds only a clean main: other work can be checked out here for a while,
+# and it must not reach the phone unasked. A skip counts as a failed run, so
+# the expiry alert still comes; the next run tries again.
 cmd_auto() {
   local expires=""
   [ -f "$STATE_DIR/expires" ] && expires=$(cat "$STATE_DIR/expires")
   if [ -n "$expires" ] && [ $((expires - NOW)) -gt $((5 * DAY)) ]; then
     return 0
   fi
-  log "auto: reinstalling"
-  cmd_install && return 0
+  if ! on_clean_main; then
+    FAILURE=not-main
+    log "auto: skipped ($NOT_MAIN)"
+  else
+    log "auto: reinstalling"
+    cmd_install && return 0
+  fi
   if [ -z "$expires" ] || [ $((expires - NOW)) -le $((2 * DAY)) ]; then
     notify_failed "$expires"
   fi
@@ -260,6 +295,7 @@ notify_failed() {
   fi
   local fix="Unlock your iPhone on home Wi-Fi with the Mac awake."
   [ "${FAILURE:-}" = signed-out ] && fix="Sign in to Xcode: Settings → Accounts."
+  [ "${FAILURE:-}" = not-main ] && fix="Put the Budget folder back on main with no uncommitted changes."
   log "auto: notified ($when)"
   "$OSASCRIPT" -e "display notification \"$fix It stops opening $when.\" with title \"Budget: couldn't update the iPhone app\"" >>"$LOG" 2>&1
 }
@@ -712,13 +748,14 @@ cmd_setup() {
 }
 
 usage() {
-  echo "usage: bash scripts/phone.sh setup | install | schedule on | schedule off" >&2
+  echo "usage: bash scripts/phone.sh setup | install [--main] | schedule on | schedule off" >&2
   return 2
 }
 
 case "${1:-} ${2:-}" in
   "setup ") cmd_setup ;;
   "install ") cmd_install ;;
+  "install --main") cmd_install_main ;;
   "auto ") cmd_auto ;;
   "schedule on") schedule_on ;;
   "schedule off") schedule_off ;;

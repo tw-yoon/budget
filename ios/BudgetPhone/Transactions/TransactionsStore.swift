@@ -157,9 +157,10 @@ final class TransactionsStore {
     if let syncBanner { banner = syncBanner }
   }
 
-  // MARK: - Writes. Each re-reads the page holding the row, so the list and
-  // the detail screen show the server's result. Errors are thrown for the
-  // detail screen to show; nothing is changed locally on failure.
+  // MARK: - Writes. Each shows its change on the row at once, then re-reads
+  // the page holding the row, so the list and the detail screen end on the
+  // server's result. On failure the row goes back to what it was and the
+  // error is thrown for the detail screen to show.
 
   func setCategory(_ id: String, _ update: CategoryUpdate) async throws(APIError) {
     try await write(.category(update), id)
@@ -184,9 +185,11 @@ final class TransactionsStore {
     case deleteSplit(String)
   }
 
-  /// Sends one row write, notes its outcome for the haptic, then re-reads
-  /// the row's page.
+  /// Shows one row write, sends it, notes its outcome for the haptic, then
+  /// re-reads the row's page.
   private func write(_ write: Write, _ id: String) async throws(APIError) {
+    let before = row(id)
+    if let before, let shown = instant(write, before) { replaceRow(shown) }
     do throws(APIError) {
       let client = try requireClient()
       switch write {
@@ -196,11 +199,32 @@ final class TransactionsStore {
       case .deleteSplit(let splitId): try await client.deleteSplit(transactionId: id, splitId: splitId)
       }
     } catch {
+      if let before { replaceRow(before) }
       feedback.record(error)
       throw error
     }
     feedback.record(nil)
     await reloadPage(containing: id)
+  }
+
+  /// The row as the write will leave it, or nil when the row can't tell
+  /// (linking to a purchase that isn't loaded): that waits for the re-read.
+  private func instant(_ write: Write, _ row: TransactionDTO) -> TransactionDTO? {
+    switch write {
+    case .category(let update): return row.withCategory(update)
+    case .link(nil): return row.withLink(nil)
+    case .link(let label?):
+      return pages.lazy.joined().first { $0.label == label }.map { row.withLink($0) }
+    case .addSplit(let split): return row.withSplit(split)
+    case .deleteSplit(let splitId): return row.withoutSplit(splitId)
+    }
+  }
+
+  /// Swaps every loaded copy of a row (a sync can leave one on two pages).
+  private func replaceRow(_ row: TransactionDTO) {
+    for p in pages.indices {
+      for r in pages[p].indices where pages[p][r].id == row.id { pages[p][r] = row }
+    }
   }
 
   func linkCandidates(_ id: String) async throws(APIError) -> [LinkCandidate] {

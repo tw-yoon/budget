@@ -35,6 +35,8 @@ struct CashoutBreakdown: Codable, Equatable, Sendable {
   let priorBalance: Double
 }
 
+/// The fields an instant edit changes on screen (TransactionsStore) are
+/// `var`; the rest stay as the server sent them.
 struct TransactionDTO: Codable, Equatable, Sendable, Identifiable {
   let id: String
   let externalId: String
@@ -45,9 +47,9 @@ struct TransactionDTO: Codable, Equatable, Sendable, Identifiable {
   let date: String
   let name: String
   let merchantName: String?
-  let category: String
-  let categoryDetailed: String?
-  let userCategory: String?
+  var category: String
+  var categoryDetailed: String?
+  var userCategory: String?
   let plaidCategory: String
   let plaidCategoryDetailed: String?
   let logoUrl: String?
@@ -57,11 +59,11 @@ struct TransactionDTO: Codable, Equatable, Sendable, Identifiable {
   let personalNote: String?
   let source: String  // PLAID | VENMO
   let label: Int?
-  let linkedTo: LinkedTargetDTO?
+  var linkedTo: LinkedTargetDTO?
   let refunds: [RefundDTO]
   let netAmount: Double
-  let splits: [SplitPartDTO]
-  let splitRemainder: Double?
+  var splits: [SplitPartDTO]
+  var splitRemainder: Double?
   let breakdown: CashoutBreakdown?
 }
 
@@ -177,5 +179,63 @@ extension TransactionDTO {
     }
     if isFee { b.append(Badge(text: "Fee", tone: .slate)) }
     return b
+  }
+}
+
+// MARK: - Instant edits
+
+/// The row as the server will send it back after a write, so far as the row
+/// itself can tell (route.ts's mapping). TransactionsStore shows it at once,
+/// rolls it back if the write fails, and the page re-read then replaces it.
+extension TransactionDTO {
+  func withCategory(_ update: CategoryUpdate) -> TransactionDTO {
+    var t = self
+    t.userCategory = update.category.map { CategoryPath.join($0, update.subcategory) }
+    return t.withEffectiveCategory()
+  }
+
+  /// Linked to `target`, or unlinked when nil. Linking drops the row's own
+  /// category: the link owns it now (handleLink in route.ts).
+  func withLink(_ target: TransactionDTO?) -> TransactionDTO {
+    var t = self
+    if target != nil { t.userCategory = nil }
+    t.linkedTo = target.map {
+      LinkedTargetDTO(id: $0.id, label: $0.label, name: $0.title,
+                      category: $0.userCategory ?? $0.plaidCategory)
+    }
+    return t.withEffectiveCategory()
+  }
+
+  func withSplit(_ split: NewSplit) -> TransactionDTO {
+    var t = self
+    t.splits.append(SplitPartDTO(
+      id: "pending-\(UUID().uuidString)", amount: split.amount, category: split.category,
+      subcategory: split.subcategory, userCategory: CategoryPath.join(split.category, split.subcategory)))
+    return t.withRemainder()
+  }
+
+  func withoutSplit(_ splitId: String) -> TransactionDTO {
+    var t = self
+    t.splits.removeAll { $0.id == splitId }
+    return t.withRemainder()
+  }
+
+  /// resolveLinkedCategory: the override, else the linked purchase's, else Plaid's.
+  private func withEffectiveCategory() -> TransactionDTO {
+    var t = self
+    if let raw = userCategory ?? linkedTo?.category {
+      (t.category, t.categoryDetailed) = CategoryPath.split(raw)
+    } else {
+      (t.category, t.categoryDetailed) = (plaidCategory, plaidCategoryDetailed)
+    }
+    return t
+  }
+
+  /// remainderOf, shown only for a split row and above float noise.
+  private func withRemainder() -> TransactionDTO {
+    var t = self
+    let left = AccountTotals.round(splits.reduce(amount) { $0 - $1.amount })  // roundToCents
+    t.splitRemainder = !splits.isEmpty && abs(left) >= 0.005 ? left : nil
+    return t
   }
 }

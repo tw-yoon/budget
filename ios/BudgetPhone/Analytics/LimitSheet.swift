@@ -12,7 +12,7 @@ struct LimitSheet: View {
     _text = State(initialValue: Formatters.plainNumber(limit))
   }
 
-  private var value: Double? { Double(text).flatMap { $0.isFinite ? $0 : nil } }
+  private var value: Double? { CardRules.number(text) }
 
   var body: some View {
     NavigationStack {

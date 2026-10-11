@@ -3,13 +3,14 @@ import path from "node:path";
 import type { PhoneUpdateStatusDTO } from "@/types";
 
 // Update iPhone: the Mac rebuilds the iPhone app and installs it on the paired
-// phone, as `bash ios/scripts/phone.sh install` does in Terminal. phone.sh
+// phone, as `bash ios/scripts/phone.sh install --main` does in Terminal: only
+// from a clean main, so a branch checked out here never reaches the phone. phone.sh
 // stays the one place that knows how; this starts it, detached, and reads the
 // files it leaves in ios/build/phone. Process calls are injected for the tests.
 
 export const PHONE_TIMEOUT_MS = 20 * 60 * 1000;
 export const PHONE_COMMAND =
-  "bash ios/scripts/phone.sh install > ios/build/phone/app-output 2>&1; echo $? > ios/build/phone/app-exit";
+  "bash ios/scripts/phone.sh install --main > ios/build/phone/app-output 2>&1; echo $? > ios/build/phone/app-exit";
 
 export interface PhoneUpdaterDeps {
   dir: string;

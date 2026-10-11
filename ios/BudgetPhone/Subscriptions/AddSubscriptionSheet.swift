@@ -15,7 +15,7 @@ struct AddSubscriptionSheet: View {
 
   private var trimmedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
   private var amountValue: Double? {
-    Double(amount).flatMap { $0.isFinite && $0 > 0 ? $0 : nil }
+    CardRules.number(amount).flatMap { $0 > 0 ? $0 : nil }
   }
 
   var body: some View {

@@ -32,6 +32,14 @@ struct AccountPatchTests {
     #expect(form.patch(against: card) == AccountPatch(manualCreditLimit: .set(6000)))
   }
 
+  @Test func aLimitTypedWithADecimalCommaIsAccepted() throws {
+    // The decimal pad types "," on a phone set to a region that writes 12,50.
+    let card = try TestData.accounts().groups[1].accounts[0]
+    var form = AccountEditForm(account: card)
+    form.creditLimitText = " 6000,50 "
+    #expect(form.patch(against: card) == AccountPatch(manualCreditLimit: .set(6000.5)))
+  }
+
   @Test func blankingANameClearsIt() throws {
     let card = try TestData.accounts().groups[1].accounts[0]
     var form = AccountEditForm(account: card)

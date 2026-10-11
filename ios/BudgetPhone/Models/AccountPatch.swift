@@ -77,7 +77,7 @@ struct AccountEditForm: Equatable {
   var creditLimit: LimitInput {
     let t = creditLimitText.trimmingCharacters(in: .whitespaces)
     if t.isEmpty { return .empty }
-    guard let v = Double(t), v.isFinite, v >= 0 else { return .invalid }
+    guard let v = CardRules.number(t), v >= 0 else { return .invalid }
     return .value(v)
   }
 

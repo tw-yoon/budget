@@ -129,9 +129,18 @@ case "$*" in
 esac
 exit "${STUB_CURL_RC:-0}"
 EOF
+# git answers as a clean main unless STUB_BRANCH / STUB_DIRTY say otherwise.
+cat >"$STUBS/git" <<'EOF'
+#!/bin/bash
+echo "git $*" >>"$STUB_CALLS"
+case "$*" in
+  *"branch --show-current"*) echo "${STUB_BRANCH-main}" ;;
+  *"status --porcelain"*) [ -z "${STUB_DIRTY:-}" ] || echo " M BudgetPhone/Sample.swift" ;;
+esac
+EOF
 chmod +x "$STUBS"/*
 export XCODEBUILD="$STUBS/xcodebuild" DEVICECTL="$STUBS/devicectl" \
-       OSASCRIPT="$STUBS/osascript" LAUNCHCTL="$STUBS/launchctl"
+       OSASCRIPT="$STUBS/osascript" LAUNCHCTL="$STUBS/launchctl" GIT="$STUBS/git"
 
 DAY=86400
 NOW=1000000000
@@ -163,7 +172,7 @@ new_case() {
          LOCAL_XCCONFIG="$CASE/Local.xcconfig" SHARED_XCCONFIG="$CASE/Shared.xcconfig" STUB_CALLS="$CASE/calls" \
          STUB_DEVICES="$CASE/devices.json" \
          PHONE_DERIVED_DATA="$CASE/dd" PHONE_PROFILES_DIR="$CASE/profiles"
-  unset STUB_BUILD_RC STUB_BUILD_OUT STUB_INSTALL_RC STUB_SIGNED STUB_NO_PROFILE STUB_BUILD_FAILS STUB_LAUNCH_FAILS STUB_LAUNCH_OUT
+  unset STUB_BRANCH STUB_DIRTY STUB_BUILD_RC STUB_BUILD_OUT STUB_INSTALL_RC STUB_SIGNED STUB_NO_PROFILE STUB_BUILD_FAILS STUB_LAUNCH_FAILS STUB_LAUNCH_OUT
 }
 # A saved Xcode profile for the given app ID, as a bare plist.
 saved_profile() {
@@ -368,6 +377,50 @@ new_case
 echo $((NOW - DAY)) >"$CASE/state/last-success"
 phone auto
 assert_has "$CALLS" "xcodebuild" "an install with no recorded expiry rebuilds, however recent"
+
+new_case
+echo $((NOW + DAY)) >"$CASE/state/expires"
+export STUB_BRANCH=some-feature
+phone auto
+assert_fails "another branch checked out counts as a failed run"
+assert_has "$CALLS" "Put the Budget folder back on main with no uncommitted changes. It stops opening in about 1 day." "a skip near expiry notifies"
+assert_lacks "$CALLS" "xcodebuild" "another branch checked out doesn't build"
+assert_has "$(cat "$CASE/state/log")" "auto: skipped (checkout is some-feature, not main)" "another branch is logged"
+
+new_case
+echo $((NOW + DAY)) >"$CASE/state/expires"
+export STUB_DIRTY=1
+phone auto
+assert_lacks "$CALLS" "xcodebuild" "uncommitted changes on main don't build"
+assert_has "$(cat "$CASE/state/log")" "auto: skipped (main has uncommitted changes)" "uncommitted changes are logged"
+
+new_case
+echo $((NOW + 4 * DAY)) >"$CASE/state/expires"
+export STUB_BRANCH=some-feature
+phone auto
+assert_lacks "$CALLS" "osascript" "a skip with more than 2 days left stays quiet"
+
+new_case
+export STUB_BRANCH=some-feature
+phone install
+assert_has "$CALLS" "xcodebuild" "a manual install builds whatever is checked out"
+
+new_case
+export STUB_BRANCH=some-feature
+phone install --main
+assert_fails "install --main on another branch fails"
+assert_lacks "$CALLS" "xcodebuild" "install --main on another branch doesn't build"
+assert_has "$OUT" "Not installed: the Budget folder's checkout is some-feature, not main." "install --main says why"
+
+new_case
+export STUB_DIRTY=1
+phone install --main
+assert_lacks "$CALLS" "xcodebuild" "install --main with uncommitted changes doesn't build"
+
+new_case
+phone install --main
+assert_eq "$RC" 0 "install --main on a clean main installs"
+assert_has "$CALLS" "xcodebuild" "install --main on a clean main builds"
 
 echo "expiry alert"
 

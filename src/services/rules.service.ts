@@ -131,15 +131,21 @@ export async function applyRulesToExisting(): Promise<{ updated: number; kept: n
     ids.push(row.id);
     changes.set(match, ids);
   }
-  await prisma.$transaction(
+  const written = await prisma.$transaction(
     [...changes].map(([category, ids]) =>
       prisma.transaction.updateMany({
-        where: { id: { in: ids } },
+        // The rows were read above; one set by hand or linked since then is no
+        // longer this pass's to change.
+        where: {
+          id: { in: ids },
+          linkedToId: null,
+          OR: [{ userCategorySource: null }, { userCategorySource: "RULE" }],
+        },
         data: { userCategory: category, userCategorySource: category ? "RULE" : null },
       })
     )
   );
-  const updated = [...changes.values()].reduce((n, ids) => n + ids.length, 0);
+  const updated = written.reduce((n, r) => n + r.count, 0);
 
   const kept = (await unlinkedRows()).filter(
     (row) => isHandSet(row.userCategorySource) && categorizeRow(rules, row) !== null

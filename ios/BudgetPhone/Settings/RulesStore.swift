@@ -87,6 +87,15 @@ final class RulesStore {
     notice = nil
     var ownNotice: String?
     var ownBanner: String?
+    // The switch and Delete show at once; the reload below then settles on
+    // the server's list, which also undoes a write that failed.
+    let before = data
+    switch write {
+    case .setEnabled(let id, let enabled):
+      if let i = data?.rules.firstIndex(where: { $0.id == id }) { data?.rules[i].enabled = enabled }
+    case .delete(let id): data?.rules.removeAll { $0.id == id }
+    case .setCategory, .takeOver: break
+    }
     do throws(APIError) {
       switch write {
       case .setCategory(let id, let category):
@@ -102,6 +111,7 @@ final class RulesStore {
         ownNotice = RuleText.takeOverNotice(pattern: pattern, updated: r.updated)
       }
     } catch {
+      data = before
       if error == .cancelled { return }
       switch write {
       case .setCategory, .setEnabled: ownBanner = RuleText.updateFailed

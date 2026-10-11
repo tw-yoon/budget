@@ -11,6 +11,26 @@ update), so nothing here is a stability promise.
 
 ## Unreleased
 
+## 0.13.0 — 2026-10-11
+
+- iPhone app: edits show at once. Setting a transaction's category, linking
+  or unlinking a refund, adding or removing a split, renaming or deleting a
+  category, and switching a rule on or off change the screen straight away;
+  if the Mac refuses, the old value comes back with the reason.
+- iPhone app: the amount fields for a split, a subscription, a credit limit
+  and a spending limit accept a decimal comma (`12,50`), as the Benefits
+  fields already did. Before, a phone set to a region that writes decimals
+  that way couldn't save them.
+- iPhone app: the automatic reinstall only builds `main` with nothing
+  uncommitted in `ios/`. Otherwise it waits and tries again 3 hours later,
+  and the "about to stop opening" alert says to put the folder back on main.
+  `bash scripts/phone.sh install --main` makes the same check for a one-off
+  install, and Settings → Update iPhone now uses it; plain `install` still
+  builds whatever is checked out.
+- Saving your banks' Plaid keys can no longer leave their file half written
+  if the Mac crashes or the disk fills mid-save. Before, that would have
+  meant linking every bank again.
+
 ## 0.12.4 — 2026-10-10
 
 - iPhone app: `bash scripts/phone.sh setup` puts the app on a new iPhone step
@@ -29,6 +49,19 @@ update), so nothing here is a stability promise.
 - iPhone app: the connection card now sits and curves exactly like the
   system menu a toolbar button opens: top on the dot's circle, 8 points past
   it on the right, with the menu's 32-point corners.
+- Bank transactions show their own date. West of UTC (all of the US) they
+  showed a day early, and a purchase on the 1st counted toward the previous
+  month in Analytics and toward the previous period of a card credit. Fixed
+  on the web and the iPhone app.
+- Syncing several banks at once no longer fails part-way with two
+  transactions given the same number; a Venmo import during a sync can't
+  either.
+- Sync and Venmo import are about 4–5 times faster, and Rules → Apply now
+  is many times faster on a large history. Each also saves all or nothing,
+  so an interrupted one leaves nothing half-done.
+- Venmo, Zelle and the "link a purchase" picker show a bank category under
+  the name it is mapped to in Settings → Categories, as the ledger does.
+- iPhone app: lists with many dates draw faster.
 
 ## 0.12.1 — 2026-10-09
 
