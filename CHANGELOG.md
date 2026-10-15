@@ -11,6 +11,17 @@ update), so nothing here is a stability promise.
 
 ## Unreleased
 
+## 0.14.0 — 2026-10-15
+
+- Settings → Categories has a Map view that draws a line from each Plaid
+  label to the category it lands in. Plaid labels not mapped to any category
+  are offered and highlighted, with example transactions for each.
+- Venmo suggestions use Plaid's own names: rent notes suggest Rent and
+  Utilities instead of Housing, and shopping notes suggest General
+  Merchandise instead of Shopping.
+- iPhone app: on a card's page, Statement Credits now sits right under
+  Credits vs. Annual Fee, above Earning Rates.
+
 ## 0.13.0 — 2026-10-11
 
 - iPhone app: edits show at once. Setting a transaction's category, linking

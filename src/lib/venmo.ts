@@ -19,8 +19,8 @@ export const VENMO_CATEGORIES = [
   "Groceries",
   "Travel",
   "Entertainment",
-  "Housing",
-  "Shopping",
+  "Rent and Utilities",
+  "General Merchandise",
   "Reimbursement",
   "Transfer",
   "Other",
@@ -37,8 +37,8 @@ const RULES: [RegExp, VenmoCategory][] = [
   [/dinner|lunch|brunch|food|pizza|🍕|burger|taco|🌮|sushi|ramen|coffee|boba|bar tab/, "Dining"],
   [/uber|lyft|taxi|flight|airfare|hotel|airbnb|train|gas|parking|trip/, "Travel"],
   [/movie|🎬|museum|concert|🎟|show|game|tickets|karaoke|bowling/, "Entertainment"],
-  [/rent|utilities|electric|water bill|internet|wifi|lease|deposit/, "Housing"],
-  [/amazon|shop|🛍|store|order|target run/, "Shopping"],
+  [/rent|utilities|electric|water bill|internet|wifi|lease|deposit/, "Rent and Utilities"],
+  [/amazon|shop|🛍|store|order|target run/, "General Merchandise"],
 ];
 
 export interface VenmoRow {

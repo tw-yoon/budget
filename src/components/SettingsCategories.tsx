@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { humanizePfc } from "@/lib/format";
+import { CategoryMap } from "@/components/CategoryMap";
 
 interface Category {
   id: string;
@@ -27,6 +28,7 @@ interface Subcategory {
 interface UnmappedPrimary {
   pfcPrimary: string;
   transactionCount: number;
+  examples?: { name: string; amount: number }[];
 }
 
 /** The `editing` key for a subcategory — category ids never contain a colon. */
@@ -48,6 +50,7 @@ export function SettingsCategories() {
   const [primaries, setPrimaries] = useState<string[]>([]);
   const [unmappedPrimaries, setUnmappedPrimaries] = useState<UnmappedPrimary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [view, setView] = useState<"list" | "map">("list");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [adding, setAdding] = useState("");
@@ -259,6 +262,8 @@ export function SettingsCategories() {
     });
   };
 
+  const unmappedSet = new Set(unmappedPrimaries.map((u) => u.pfcPrimary));
+
   return (
     <div className="flex flex-col gap-5">
       <header>
@@ -324,11 +329,35 @@ export function SettingsCategories() {
         >
           Add
         </button>
+        <div className="ml-auto flex rounded-md border border-black/15 text-sm dark:border-white/15">
+          {(["list", "map"] as const).map((v) => (
+            <button
+              key={v}
+              type="button"
+              onClick={() => setView(v)}
+              className={`px-3 py-2 capitalize ${
+                view === v ? "bg-black/[0.08] font-medium dark:bg-white/15" : "text-black/55 dark:text-white/55"
+              }`}
+            >
+              {v}
+            </button>
+          ))}
+        </div>
       </form>
 
       {/* Only the first load blanks the table: a reload after an edit keeps
           the rows (and the scroll position) in place. */}
-      {loading && categories.length === 0 ? (
+      {view === "map" && categories.length > 0 ? (
+        <CategoryMap
+          categories={categories}
+          primaries={primaries}
+          unmapped={unmappedPrimaries}
+          onToggle={(id, p) => {
+            const c = categories.find((x) => x.id === id);
+            if (c) togglePrimary(c, p);
+          }}
+        />
+      ) : loading && categories.length === 0 ? (
         <div className="rounded-lg border border-black/10 px-6 py-16 text-center text-sm text-black/50 dark:border-white/10 dark:text-white/50">
           Loading…
         </div>
@@ -422,14 +451,18 @@ export function SettingsCategories() {
                     <div className="flex flex-wrap gap-1">
                       {primaries.map((p) => {
                         const on = c.plaidPrimaries.includes(p);
+                        const unmapped = unmappedSet.has(p);
                         return (
                           <button
                             key={p}
                             type="button"
                             onClick={() => togglePrimary(c, p)}
+                            title={unmapped ? "Not mapped to any category — click to map it here" : undefined}
                             className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
                               on
                                 ? "bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300"
+                                : unmapped
+                                ? "bg-amber-100 text-amber-800 ring-1 ring-amber-300 hover:bg-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:ring-amber-500/40"
                                 : "bg-black/[0.04] text-black/35 hover:bg-black/[0.08] dark:bg-white/[0.06] dark:text-white/35"
                             }`}
                           >

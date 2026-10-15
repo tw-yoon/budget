@@ -112,7 +112,7 @@ test("each row carries a suggested category", () => {
   const suggested = Object.fromEntries(rows.map((r) => [r.venmoId, r.suggested]));
   assert.deepEqual(suggested, {
     1001: "Dining",
-    1002: "Housing",
+    1002: "Rent and Utilities",
     1003: "Entertainment",
     1004: "Transfer",
     1005: "Dining",

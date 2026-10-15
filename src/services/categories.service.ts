@@ -401,7 +401,7 @@ export async function deleteCategory(id: string, reassignTo?: string): Promise<v
  * the catalog is a seed decision left to the user.
  */
 export async function listUnmappedPrimaries(): Promise<
-  { pfcPrimary: string; transactionCount: number }[]
+  { pfcPrimary: string; transactionCount: number; examples: { name: string; amount: number }[] }[]
 > {
   const mapped = new Set(
     (await prisma.categoryMapping.findMany({ select: { pfcPrimary: true } })).map(
@@ -416,9 +416,24 @@ export async function listUnmappedPrimaries(): Promise<
     where: { userCategory: null },
     _count: { _all: true },
   });
-  return grouped
-    .filter((g) => !mapped.has(g.pfcPrimary))
-    .map((g) => ({ pfcPrimary: g.pfcPrimary, transactionCount: g._count._all }))
+  const unmapped = grouped.filter((g) => !mapped.has(g.pfcPrimary));
+  // A few recent rows per label, so the user can tell what it holds before mapping it.
+  const examples = await Promise.all(
+    unmapped.map((g) =>
+      prisma.transaction.findMany({
+        where: { userCategory: null, pfcPrimary: g.pfcPrimary },
+        select: { name: true, amount: true },
+        orderBy: { date: "desc" },
+        take: 3,
+      })
+    )
+  );
+  return unmapped
+    .map((g, i) => ({
+      pfcPrimary: g.pfcPrimary,
+      transactionCount: g._count._all,
+      examples: examples[i],
+    }))
     .sort((a, b) => b.transactionCount - a.transactionCount);
 }
 

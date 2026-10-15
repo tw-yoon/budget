@@ -14,10 +14,19 @@ import { PFC_PRIMARIES } from "@/lib/rules";
 // therefore resolve to no category — see listUnmappedPrimaries.
 async function handleGET() {
   try {
+    const categories = await listCategories();
+    const unmappedPrimaries = await listUnmappedPrimaries();
+    // Plaid sends primaries outside the catalog (OTHER, LOAN_DISBURSEMENTS…);
+    // offer every one in use, or an unmapped one could never be mapped.
+    const primaries = new Set([
+      ...PFC_PRIMARIES,
+      ...categories.flatMap((c) => c.plaidPrimaries),
+      ...unmappedPrimaries.map((u) => u.pfcPrimary),
+    ]);
     return NextResponse.json({
-      categories: await listCategories(),
-      primaries: [...PFC_PRIMARIES].sort(),
-      unmappedPrimaries: await listUnmappedPrimaries(),
+      categories,
+      primaries: [...primaries].sort(),
+      unmappedPrimaries,
     });
   } catch (err) {
     console.error("[categories GET]", err);

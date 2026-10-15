@@ -2,8 +2,8 @@ import PhotosUI
 import SwiftUI
 
 /// One card (UserCardItem in ../src/components/benefits/UserCardItem.tsx):
-/// its details, credits against the fee, earning rates, points earned and
-/// statement credits. Edit changes the start month, fee and point value;
+/// its details, credits against the fee, statement credits, earning rates and
+/// points earned (the web shows credits last). Edit changes the start month, fee and point value;
 /// tapping the face sets its image from a Wallet screenshot.
 struct CardDetailView: View {
   let id: String
@@ -81,9 +81,9 @@ struct CardDetailView: View {
       }
       details(card)
       fee(card)
+      credits(card)
       rates(card)
       EarningsSection(card: card)
-      credits(card)
       Section {
         Button("Remove Card", role: .destructive) { confirmingRemove = true }
           .disabled(store.isSaving)
