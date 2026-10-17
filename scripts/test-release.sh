@@ -171,7 +171,20 @@ release publish --yes
 assert_eq "$(printf '%s\n' "$OUT" | tail -n 1)" "Stopped: Another release step is running. Try again in a minute." "publish waits for the lock"
 release status --json
 assert_rc 0 "status ignores the lock"
-touch -t "$(date -v-3H +%Y%m%d%H%M)" "$WORKDIR/lock"
+sleep 30 & LIVE=$!
+echo "$LIVE" >"$WORKDIR/lock/pid"
+release prepare minor
+assert_eq "$(printf '%s\n' "$OUT" | tail -n 1)" "Stopped: Another release step is running. Try again in a minute." "a running owner's lock is kept"
+kill "$LIVE" 2>/dev/null; wait "$LIVE" 2>/dev/null
+release prepare minor
+assert_rc 0 "a lock whose owner is gone is broken"
+[ ! -e "$WORKDIR/lock" ] && pass "lock removed after prepare" || fail "lock removed after prepare" "lock left"
+mkdir -p "$WORKDIR/lock"
+touch -t "$(date -v-5M +%Y%m%d%H%M 2>/dev/null || date -d '5 minutes ago' +%Y%m%d%H%M)" "$WORKDIR/lock"
+release prepare minor
+assert_rc 0 "a lock with no owner after a minute is broken"
+mkdir -p "$WORKDIR/lock"
+touch -t "$(date -v-3H +%Y%m%d%H%M 2>/dev/null || date -d '3 hours ago' +%Y%m%d%H%M)" "$WORKDIR/lock"
 release prepare minor
 assert_rc 0 "a lock older than two hours is broken"
 [ ! -e "$WORKDIR/lock" ] && pass "lock removed after prepare" || fail "lock removed after prepare" "lock left"

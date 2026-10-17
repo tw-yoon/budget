@@ -3,7 +3,8 @@
  * src/lib/analytics.ts.
  *
  * Plaid sign convention: amount > 0 is an outflow (spending), amount < 0 is an
- * inflow (income). Transfers, fees, and pending rows are excluded upstream.
+ * inflow (income). Transfers and pending rows are excluded upstream; fees count
+ * as spending (a waiver nets them back out).
  */
 
 import { prisma } from "@/lib/prisma";
@@ -36,7 +37,6 @@ async function fetchTxInputs(start: Date): Promise<TxInput[]> {
   const rows = await prisma.transaction.findMany({
     where: {
       date: { gte: queryStart(start) },
-      isFee: false,
       pending: false,
       AND: [
         // Normal spend (not a transfer), OR any P2P transfer the user has
@@ -78,7 +78,7 @@ async function fetchTxInputs(start: Date): Promise<TxInput[]> {
     const linkedToCategory = r.linkedTo
       ? r.linkedTo.userCategory ?? plaidName(r.linkedTo.pfcPrimary)
       : null;
-    const { raw, isOffset } = resolveLinkedCategory({
+    const { raw } = resolveLinkedCategory({
       amount: r.amount,
       userCategory: r.userCategory,
       linkedToCategory,
@@ -92,6 +92,9 @@ async function fetchTxInputs(start: Date): Promise<TxInput[]> {
     // A user category (Venmo/Zelle/manual/inherited) wins over Plaid's PFC
     // primary, and is what the remainder wears.
     const effective = raw ?? plaidName(r.pfcPrimary);
+    // Money in nets against its category (a refund, a card credit, a payback)
+    // unless it is income: Plaid's own label counts, not just a hand-set one.
+    const isOffset = r.amount < 0 && splitCategory(effective).parent !== "Income";
     // P2P rows use a person as the "merchant" — keep them out of merchant totals.
     const merchant = isP2p(r.source, r.name) ? null : r.merchantName ?? r.name;
 

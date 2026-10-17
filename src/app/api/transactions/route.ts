@@ -5,18 +5,20 @@ import { humanizePfcDetailed } from "@/lib/format";
 import { NOT_TAGGED_TRANSFER, splitCategory } from "@/lib/categories";
 import { getCashoutBreakdowns } from "@/services/venmo.service";
 import {
+  loadPlaidCategoryMap,
   loadPlaidNamer,
   loadPlaidDetailedNames,
 } from "@/services/categories.service";
 import { netAmount, resolveLinkedCategory } from "@/lib/links";
 import { remainderOf } from "@/lib/splits";
+import { ledgerSearchWhere } from "@/lib/ledger-search";
 import type { LinkedTargetDTO, RefundDTO } from "@/types";
 import type { Prisma } from "@prisma/client";
 
 // GET /api/transactions
 //   ?page=1&limit=50
 //   &accountId=<id>
-//   &search=<text>            matches name OR merchantName
+//   &search=<text>            text fields, amount, date or #label (lib/ledger-search)
 //   &from=<ISO>&to=<ISO>      date range (inclusive of the `to` timestamp)
 //   &hideInternal=true        exclude rows flagged isTransfer or isFee
 //   &hideLinked=true          exclude rows linked to a purchase (the children
@@ -47,6 +49,18 @@ async function handleGET(req: NextRequest) {
     if (hideInternal) {
       and.push({ isFee: false });
       and.push(NOT_TAGGED_TRANSFER);
+      // An uncategorized row whose Plaid primary the user mapped to "Transfer"
+      // (e.g. Chase's "Payment Thank You" arrives as LOAN_DISBURSEMENTS).
+      const transferPrimaries = [...(await loadPlaidCategoryMap())]
+        .filter(([, name]) => name === "Transfer")
+        .map(([primary]) => primary);
+      and.push({
+        OR: [
+          { userCategory: { not: null } },
+          { linkedToId: { not: null } },
+          { pfcPrimary: { notIn: transferPrimaries } },
+        ],
+      });
       and.push({
         OR: [
           { isTransfer: false },
@@ -85,14 +99,7 @@ async function handleGET(req: NextRequest) {
     if (to) dateFilter.lte = to;
     if (from || to) and.push({ date: dateFilter });
 
-    if (search) {
-      and.push({
-        OR: [
-          { name: { contains: search } },
-          { merchantName: { contains: search } },
-        ],
-      });
-    }
+    if (search) and.push(ledgerSearchWhere(search));
 
     const where: Prisma.TransactionWhereInput = and.length ? { AND: and } : {};
 

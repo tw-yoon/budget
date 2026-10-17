@@ -93,7 +93,7 @@ struct NewBenefit: Encodable, Equatable, Sendable {
   }
 }
 
-/// PATCH /api/benefits/:id — one of the route's three bodies.
+/// PATCH /api/benefits/:id — one of the route's four bodies.
 enum BenefitPatch: Encodable, Equatable, Sendable {
   /// `{ usedManual }`: log the current period; nil reverts to auto.
   case usedManual(Double?)
@@ -101,8 +101,10 @@ enum BenefitPatch: Encodable, Equatable, Sendable {
   case window(key: String, value: Double?)
   /// `{ perkActive }`: switch a flat-value perk on or off.
   case perkActive(Bool)
+  /// `{ matchText }`: replace the keywords credits match on.
+  case matchText([String])
 
-  private enum CodingKeys: String, CodingKey { case usedManual, periodKey, value, perkActive }
+  private enum CodingKeys: String, CodingKey { case usedManual, periodKey, value, perkActive, matchText }
 
   func encode(to encoder: Encoder) throws {
     var c = encoder.container(keyedBy: CodingKeys.self)
@@ -112,7 +114,72 @@ enum BenefitPatch: Encodable, Equatable, Sendable {
       try c.encode(key, forKey: .periodKey)
       try c.encode(value, forKey: .value)
     case .perkActive(let on): try c.encode(on, forKey: .perkActive)
+    case .matchText(let keywords): try c.encode(keywords, forKey: .matchText)
     }
+  }
+}
+
+/// PUT /api/perk-credits/:id — the three bodies of the route. The server
+/// rejects a missing `benefitId`, so "not a perk" sends an explicit null.
+enum PerkDecision: Encodable, Equatable, Sendable {
+  case yes(benefitId: String)
+  case notThisPerk(benefitId: String)
+  case notAPerk
+
+  private enum CodingKeys: String, CodingKey { case decision, benefitId }
+
+  func encode(to encoder: Encoder) throws {
+    var c = encoder.container(keyedBy: CodingKeys.self)
+    switch self {
+    case .yes(let id):
+      try c.encode("yes", forKey: .decision)
+      try c.encode(id, forKey: .benefitId)
+    case .notThisPerk(let id):
+      try c.encode("no", forKey: .decision)
+      try c.encode(id, forKey: .benefitId)
+    case .notAPerk:
+      try c.encode("no", forKey: .decision)
+      try c.encodeNil(forKey: .benefitId)
+    }
+  }
+}
+
+/// PUT /api/perk-credits/:id/purchase — nil clears the pairing (explicit null).
+struct PerkPurchasePick: Encodable, Equatable, Sendable {
+  let purchaseId: String?
+
+  private enum CodingKeys: String, CodingKey { case purchaseId }
+
+  func encode(to encoder: Encoder) throws {
+    var c = encoder.container(keyedBy: CodingKeys.self)
+    try c.encode(purchaseId, forKey: .purchaseId)
+  }
+}
+
+/// PUT /api/user-cards/:id/rotating/:year/:quarter. All seven keys are
+/// required; `cap` goes out as an explicit null when there is none.
+struct RotatingBonusBody: Encodable, Equatable, Sendable {
+  let multiplier: Double
+  let unit: String
+  let categories: [String]
+  let merchants: [String]
+  let excludeMerchants: [String]
+  let cap: Double?
+  let activated: Bool
+
+  private enum CodingKeys: String, CodingKey {
+    case multiplier, unit, categories, merchants, excludeMerchants, cap, activated
+  }
+
+  func encode(to encoder: Encoder) throws {
+    var c = encoder.container(keyedBy: CodingKeys.self)
+    try c.encode(multiplier, forKey: .multiplier)
+    try c.encode(unit, forKey: .unit)
+    try c.encode(categories, forKey: .categories)
+    try c.encode(merchants, forKey: .merchants)
+    try c.encode(excludeMerchants, forKey: .excludeMerchants)
+    try c.encode(cap, forKey: .cap)
+    try c.encode(activated, forKey: .activated)
   }
 }
 

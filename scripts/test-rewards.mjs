@@ -163,6 +163,8 @@ const txn = (amount, pfcPrimary, pfcDetailed, extra = {}) => ({
   pfcPrimary,
   pfcDetailed,
   userCategory: null,
+  name: "Sample Coffee",
+  merchantName: null,
   splits: [],
   ...extra,
 });
@@ -278,6 +280,11 @@ test("an overridden remainder keeps the row's override", () => {
   assert.equal(c.GROCERIES.spend, 20);
   assert.equal(c.DINING.spend, 80);
   assert.equal(c.OTHER, undefined);
+});
+
+test("every row's key is its category", () => {
+  const e = computeEarnings(gold, [], [store(50), restaurant(100)], start, end);
+  for (const c of e.byCategory) assert.equal(c.key, c.category);
 });
 
 test("amounts are rounded to cents", () => {

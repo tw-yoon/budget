@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { perkDeleteCleanup } from "@/services/perk-credits.service";
+import { parseKeywords } from "@/lib/perk-credits";
 
 // PATCH /api/benefits/:id — update manual usage or the perk switch.
 // Body one of:
 //   { usedManual: number | null }            current-period override (null reverts)
 //   { periodKey: string, value: number|null }per-window override (null clears the key)
 //   { perkActive: boolean }                  switch a flat-value perk on/off
+//   { matchText: string[] }                  replace the keywords credits match on
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -21,6 +24,13 @@ export async function PATCH(
         where: { id },
         data: { perkActiveFrom: body.perkActive ? new Date() : null },
       });
+      return NextResponse.json({ ok: true });
+    }
+
+    if ("matchText" in body) {
+      const keywords = parseKeywords(body.matchText);
+      if (!Array.isArray(keywords)) return bad(keywords.error);
+      await prisma.userBenefit.update({ where: { id }, data: { matchText: JSON.stringify(keywords) } });
       return NextResponse.json({ ok: true });
     }
 
@@ -78,14 +88,18 @@ function bad(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status });
 }
 
-// DELETE /api/benefits/:id
+// DELETE /api/benefits/:id — also clears per-row answers about this perk and
+// undoes the pairings this feature made for it. Owner-made links stay.
 export async function DELETE(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params;
-    await prisma.userBenefit.delete({ where: { id } });
+    await prisma.$transaction([
+      ...(await perkDeleteCleanup([id])),
+      prisma.userBenefit.delete({ where: { id } }),
+    ]);
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("[benefits DELETE]", err);

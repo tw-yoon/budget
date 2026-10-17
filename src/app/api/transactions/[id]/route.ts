@@ -75,7 +75,13 @@ async function handleLink(id: string, label: number | null) {
     if (refund.linkedToId !== null) {
       await prisma.transaction.update({
         where: { id },
-        data: { linkedToId: null, userCategorySource: null },
+        data: {
+          linkedToId: null,
+          userCategorySource: null,
+          // Unlinking is sticky: perk pairing never auto-links this row again.
+          perkPaired: false,
+          noAutoPair: true,
+        },
       });
     }
     return NextResponse.json({ ok: true, linkedTo: null });
@@ -120,6 +126,8 @@ async function handleLink(id: string, label: number | null) {
       // The link owns the category now — drop any of this row's own.
       userCategory: null,
       userCategorySource: "LINK",
+      // An owner-made link: deleting a perk must not undo it.
+      perkPaired: false,
     },
   });
 

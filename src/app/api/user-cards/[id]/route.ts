@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { perkDeleteCleanup } from "@/services/perk-credits.service";
 
 // PATCH /api/user-cards/:id — update editable card fields. Every field is
 // optional; only the ones present in the body are written.
@@ -52,14 +53,19 @@ function bad(message: string) {
   return NextResponse.json({ error: message }, { status: 400 });
 }
 
-// DELETE /api/user-cards/:id — removes the card and cascades its benefits.
+// DELETE /api/user-cards/:id — removes the card and cascades its benefits,
+// first forgetting the perk answers and pairings tied to them.
 export async function DELETE(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params;
-    await prisma.userCard.delete({ where: { id } });
+    const perks = await prisma.userBenefit.findMany({ where: { userCardId: id }, select: { id: true } });
+    await prisma.$transaction([
+      ...(await perkDeleteCleanup(perks.map((b) => b.id))),
+      prisma.userCard.delete({ where: { id } }),
+    ]);
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("[user-cards DELETE]", err);

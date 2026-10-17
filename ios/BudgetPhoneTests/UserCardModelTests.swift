@@ -42,7 +42,42 @@ struct UserCardModelTests {
     #expect(b.yearBreakdown.map(\.key) == ["2026-02", "2026-03", "2026-04"])
     #expect(b.yearBreakdown[1] == BenefitPeriodDTO(
       label: "March 2026", short: "Mar", key: "2026-03", used: 4, target: 10, captured: false,
-      manual: true, future: false))
+      manual: true, future: false,
+      credits: [PerkCreditDTO(
+        id: "t1", date: "2026-03-05", name: "Sample Dining Credit", amount: 4, how: "auto",
+        purchase: PerkPurchaseDTO(id: "t0", date: "2026-03-04", name: "Sample Coffee", amount: 4))]))
+    #expect(b.yearBreakdown[1].credits.first?.purchase?.name == "Sample Coffee")
+    #expect(b.yearBreakdown[0].credits.isEmpty && b.openQuestions == 1)
+  }
+
+  @Test func decodesPerkQuestionsAndToleratesTheirAbsence() throws {
+    let r = try JSONDecoder().decode(UserCardsResponse.self, from: TestData.fixture("user-cards"))
+    #expect(r.perkQuestions.first?.windowFull == true && r.perkQuestions.first?.id == "t2")
+    let old = try JSONDecoder().decode(UserCardsResponse.self, from: Data(#"{"cards":[]}"#.utf8))
+    #expect(old.perkQuestions.isEmpty)
+  }
+
+  @Test func toleratesABenefitWithoutCreditsOrOpenQuestions() throws {
+    let json = #"""
+      {"id":"b9","name":"Sample Credit","notes":null,"amount":5,"period":"MONTHLY","matchCategories":[],
+       "categoryLabels":[],"matchText":[],"perkActiveFrom":null,"used":0,"cappedUsed":0,"pct":0,
+       "periodLabel":"","source":"auto","autoMode":"credits","ytdCaptured":0,"yearTarget":60,
+       "yearBreakdown":[{"label":"March 2026","short":"Mar","key":"2026-03","used":0,"target":5,
+         "captured":false,"manual":false,"future":false}]}
+      """#
+    let b = try JSONDecoder().decode(BenefitDTO.self, from: Data(json.utf8))
+    #expect(b.openQuestions == 0 && b.yearBreakdown[0].credits.isEmpty && b.yearBreakdown[0].key == "2026-03")
+  }
+
+  @Test func decodesRotatingBonusesAndToleratesTheirAbsence() throws {
+    let gold = try TestData.userCards()[0]
+    #expect(gold.hasRotating)
+    let q = try #require(gold.rotating.first)
+    #expect(q.id == "2026-Q4" && q.current && q.activated && q.cap == 1500)
+    #expect(q.categories == ["GAS"] && q.merchants == ["Sample Mart"] && q.excludeMerchants.isEmpty)
+    let plain = try TestData.userCards()[1]
+    #expect(!plain.hasRotating && plain.rotating.isEmpty)
+    #expect(try TestData.userCards()[0].earnings?.byCategory.map(\.id) == ["DINING", "OTHER"])
   }
 
   @Test func decodesEarnings() throws {

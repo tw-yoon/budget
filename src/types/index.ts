@@ -294,6 +294,7 @@ export interface BenefitDTO {
   yearBreakdown: BenefitPeriodDTO[]; // one cell per period window this year
   ytdCaptured: number; // credit value captured so far this year
   yearTarget: number; // max credit value available across the full year
+  openQuestions: number; // perkQuestions suggesting this perk
 }
 
 export interface BenefitPeriodDTO {
@@ -305,6 +306,17 @@ export interface BenefitPeriodDTO {
   captured: boolean; // used >= target
   manual: boolean; // this window has a manual override
   future: boolean; // window hasn't started yet
+  credits: PerkCreditDTO[]; // statement credits placed in this window, date ascending
+}
+
+export interface PerkPurchaseDTO { id: string; date: string; name: string; amount: number }
+export interface PerkCreditDTO {
+  id: string; date: string; name: string; amount: number; // amount positive
+  how: "auto" | "confirmed"; purchase: PerkPurchaseDTO | null;
+}
+export interface PerkQuestionDTO {
+  transactionId: string; date: string; name: string; amount: number; // positive
+  cardId: string; cardName: string; suggestedBenefitId: string | null; windowFull: boolean;
 }
 
 export interface RewardRateDTO {
@@ -330,6 +342,7 @@ export interface EarningsDTO {
 }
 
 export interface EarningsCategoryDTO {
+  key: string; // unique per row: the category, or "ROTATING-2026-Q4" for a quarter's bonus
   category: string;
   categoryLabel: string;
   spend: number;
@@ -339,6 +352,25 @@ export interface EarningsCategoryDTO {
   value: number; // in dollars
   vsBest: number; // value minus the best alternative card's value on this spend
   bestAlternative: string | null; // that card's name
+}
+
+/** A card's rotating bonus for one calendar quarter. */
+export interface RotatingBonusDTO {
+  year: number;
+  quarter: number;
+  key: string; // "2026-Q4"
+  label: string; // "Q4 2026"
+  multiplier: number;
+  unit: string;
+  display: string; // "5%"
+  categories: string[];
+  categoryLabels: string[];
+  merchants: string[];
+  excludeMerchants: string[];
+  cap: number | null;
+  activated: boolean;
+  /** The quarter today falls in (server-local). */
+  current: boolean;
 }
 
 export interface UserCardDTO {
@@ -364,10 +396,15 @@ export interface UserCardDTO {
   rewardRates: RewardRateDTO[];
   earnings: EarningsDTO | null; // null when the card isn't linked to an account
   earningsPeriodLabel: string; // e.g. "Feb 2026 – Jan 2027"
+  /** The card has a ROTATING reward rate. */
+  hasRotating: boolean;
+  /** Bonuses from the last 8 quarters, newest first. */
+  rotating: RotatingBonusDTO[];
 }
 
 export interface UserCardsResponse {
   cards: UserCardDTO[];
+  perkQuestions: PerkQuestionDTO[];
 }
 
 /** GET /api/update — Settings → Updates (web) and About (iPhone). */

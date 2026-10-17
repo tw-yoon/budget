@@ -14,10 +14,16 @@ import { prisma } from "@/lib/prisma";
 import { humanizePfc, localDay } from "@/lib/format";
 import { REWARD_CATEGORY_LABELS, formatRate } from "@/lib/rewards";
 import { computeEarnings } from "@/lib/earnings";
+import { quarterKey, quarterLabel, quarterOf, type RotatingBonusInput } from "@/lib/rotating";
+import { loadPerkPlacement } from "@/services/perk-credits.service";
 import type {
   BenefitDTO,
+  PerkCreditDTO,
+  PerkQuestionDTO,
   RewardRateDTO,
+  RotatingBonusDTO,
   UserCardDTO,
+  UserCardsResponse,
 } from "@/types";
 
 // Display order for a card's earning rates: bonus categories first, base last.
@@ -132,7 +138,7 @@ export function periodsInYear(
   }
 }
 
-function parseCategories(raw: string): string[] {
+export function parseCategories(raw: string): string[] {
   try {
     const p = JSON.parse(raw);
     return Array.isArray(p) ? p.map(String) : [];
@@ -159,15 +165,76 @@ function parseOverrides(raw: string): Record<string, number> {
 
 const round = (n: number) => Math.round(n * 100) / 100;
 
+// Local calendar day as YYYY-MM-DD (dates here are localDay-normalised).
+export const ymd = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
 export async function getUserCardsWithProgress(
   now: Date = new Date()
-): Promise<UserCardDTO[]> {
-  const cards = await prisma.userCard.findMany({
-    include: {
-      benefits: { orderBy: { createdAt: "asc" } },
-      rewardRates: true,
-    },
-    orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+): Promise<UserCardsResponse> {
+  const [cards, { placement, rows }] = await Promise.all([
+    prisma.userCard.findMany({
+      include: {
+        benefits: { orderBy: { createdAt: "asc" } },
+        rewardRates: true,
+        rotatingBonuses: { orderBy: [{ year: "desc" }, { quarter: "desc" }] },
+      },
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+    }),
+    loadPerkPlacement(now),
+  ]);
+
+  // Placed credits per perk and window key, with the purchase each one offsets.
+  const purchaseIds = [...placement.placed.keys()]
+    .map((id) => rows.get(id)?.linkedToId)
+    .filter((x): x is string => !!x);
+  const purchases = purchaseIds.length
+    ? await prisma.transaction.findMany({
+        where: { id: { in: purchaseIds } },
+        select: { id: true, date: true, name: true, merchantName: true, amount: true },
+      })
+    : [];
+  const purchaseById = new Map(
+    purchases.map((p) => [
+      p.id,
+      { id: p.id, date: ymd(localDay(p.date)), name: p.merchantName ?? p.name, amount: p.amount },
+    ])
+  );
+  const creditsByWindow = new Map<string, PerkCreditDTO[]>(); // `${benefitId}|${windowKey}`
+  const confirmedPerks = new Set<string>();
+  const placedRows = [...placement.placed]
+    .map(([id, pl]) => ({ row: rows.get(id)!, pl }))
+    .sort((a, b) => a.row.date.getTime() - b.row.date.getTime());
+  for (const { row, pl } of placedRows) {
+    if (pl.how === "confirmed") confirmedPerks.add(pl.benefitId);
+    const k = `${pl.benefitId}|${pl.windowKey}`;
+    const list = creditsByWindow.get(k) ?? [];
+    list.push({
+      id: row.id,
+      date: ymd(row.date),
+      name: row.name,
+      amount: -row.amount,
+      how: pl.how,
+      purchase: row.linkedToId ? purchaseById.get(row.linkedToId) ?? null : null,
+    });
+    creditsByWindow.set(k, list);
+  }
+
+  const perkQuestions: PerkQuestionDTO[] = placement.questions.flatMap((q) => {
+    const row = rows.get(q.transactionId)!;
+    // The card can vanish between the two parallel reads; skip its question.
+    const card = cards.find((c) => c.accountId === row.accountId);
+    if (!card) return [];
+    return {
+      transactionId: q.transactionId,
+      date: ymd(row.date),
+      name: row.name,
+      amount: -row.amount,
+      cardId: card.id,
+      cardName: card.name ?? card.issuer,
+      suggestedBenefitId: q.suggestedBenefitId,
+      windowFull: q.windowFull,
+    };
   });
 
   const linkedIds = [
@@ -185,13 +252,14 @@ export async function getUserCardsWithProgress(
   const accountDisplayName = new Map(accounts.map((a) => [a.id, a.displayName]));
 
   // Pull this year's transactions for all linked accounts in one query, then
-  // slice per benefit window in memory. Both outflows (category-spending mode)
-  // and inflows (statement-credit reimbursements, matched by name) are needed.
+  // slice per benefit window in memory for category-spending mode and earnings,
+  // which both skip transfers. Statement credits come from loadPerkPlacement.
   const txByAccount = new Map<
     string,
     {
       amount: number;
       date: Date;
+      isTransfer: boolean;
       pfcPrimary: string;
       pfcDetailed: string | null;
       userCategory: string | null;
@@ -207,7 +275,6 @@ export async function getUserCardsWithProgress(
     const txs = await prisma.transaction.findMany({
       where: {
         accountId: { in: linkedIds },
-        isTransfer: false,
         isFee: false,
         pending: false,
         date: { gte: queryStart(yearStart) },
@@ -216,6 +283,7 @@ export async function getUserCardsWithProgress(
         accountId: true,
         amount: true,
         date: true,
+        isTransfer: true,
         pfcPrimary: true,
         pfcDetailed: true,
         userCategory: true,
@@ -229,6 +297,7 @@ export async function getUserCardsWithProgress(
       arr.push({
         amount: t.amount,
         date: localDay(t.date),
+        isTransfer: t.isTransfer,
         pfcPrimary: t.pfcPrimary,
         pfcDetailed: t.pfcDetailed,
         userCategory: t.userCategory,
@@ -240,8 +309,39 @@ export async function getUserCardsWithProgress(
     }
   }
 
-  return cards.map((card) => {
-    const txns = card.accountId ? txByAccount.get(card.accountId) ?? [] : [];
+  // Quarters as one running index, so "last 8" and window overlap are subtraction.
+  const qIndex = (year: number, quarter: number) => year * 4 + quarter - 1;
+  const nowQ = quarterOf(now);
+  const nowIdx = qIndex(nowQ.year, nowQ.quarter);
+
+  const cardDTOs = cards.map((card): UserCardDTO => {
+    const bonuses: RotatingBonusInput[] = card.rotatingBonuses.map((b) => ({
+      year: b.year,
+      quarter: b.quarter,
+      multiplier: b.multiplier,
+      unit: b.unit,
+      categories: parseCategories(b.categories),
+      merchants: parseCategories(b.merchants),
+      excludeMerchants: parseCategories(b.excludeMerchants),
+      cap: b.cap,
+      activated: b.activated,
+    }));
+    const rotating: RotatingBonusDTO[] = bonuses
+      .filter((b) => {
+        const i = qIndex(b.year, b.quarter);
+        return i <= nowIdx && i > nowIdx - 8;
+      })
+      .map((b) => ({
+        ...b,
+        key: quarterKey(b.year, b.quarter),
+        label: quarterLabel(b.year, b.quarter),
+        display: formatRate(b.multiplier, b.unit),
+        categoryLabels: b.categories.map((c) => REWARD_CATEGORY_LABELS[c] ?? c),
+        current: b.year === nowQ.year && b.quarter === nowQ.quarter,
+      }));
+
+    const allTxns = card.accountId ? txByAccount.get(card.accountId) ?? [] : [];
+    const txns = allTxns.filter((t) => !t.isTransfer);
 
     const benefits: BenefitDTO[] = card.benefits.map((b) => {
       const cats = parseCategories(b.matchCategories);
@@ -251,16 +351,18 @@ export async function getUserCardsWithProgress(
       // takes precedence over transaction matching.
       const autoMode: BenefitDTO["autoMode"] = b.perkActiveFrom
         ? "perk"
-        : card.accountId && keywords.length > 0
+        : card.accountId && (keywords.length > 0 || confirmedPerks.has(b.id))
           ? "credits"
           : card.accountId && cats.length > 0
             ? "spending"
             : null;
 
       // Auto-computed usage in an arbitrary window, per the benefit's mode.
-      // Credits reimbursements post as inflows (amount < 0) matched by name;
-      // spending matches positive transactions by category; a perk is flat.
-      const autoUsed = (s: Date, e: Date): number => {
+      // Credits: the statement credits placeCredits put in this window (so a
+      // refused or overflow row never counts); spending matches positive
+      // transactions by category; a perk is flat.
+      const creditsIn = (key: string) => creditsByWindow.get(`${b.id}|${key}`) ?? [];
+      const autoUsed = (s: Date, e: Date, key: string): number => {
         const inWin = (t: { date: Date }) => t.date >= s && t.date < e;
         // An active perk delivers its full value in every window that was still
         // open when it was switched on. Windows that closed earlier stay at $0.
@@ -268,18 +370,7 @@ export async function getUserCardsWithProgress(
           return b.perkActiveFrom && e > b.perkActiveFrom ? b.amount : 0;
         }
         if (autoMode === "credits") {
-          return txns
-            .filter(
-              (t) =>
-                t.amount < 0 &&
-                inWin(t) &&
-                keywords.some(
-                  (k) =>
-                    t.name.toLowerCase().includes(k) ||
-                    (t.merchantName?.toLowerCase().includes(k) ?? false)
-                )
-            )
-            .reduce((sum, t) => sum - t.amount, 0);
+          return creditsIn(key).reduce((sum, c) => sum + c.amount, 0);
         }
         if (autoMode === "spending") {
           return txns
@@ -301,7 +392,7 @@ export async function getUserCardsWithProgress(
       };
 
       const curOverride = overrideFor(cur.key, true);
-      const used = curOverride != null ? curOverride : autoUsed(cur.start, cur.end);
+      const used = curOverride != null ? curOverride : autoUsed(cur.start, cur.end, cur.key);
       const source: BenefitDTO["source"] =
         curOverride != null ? "manual" : autoMode ? "auto" : "none";
       const label = cur.label;
@@ -316,7 +407,7 @@ export async function getUserCardsWithProgress(
       const yearBreakdown = periodsInYear(b.period, year, startMonth).map((w) => {
         const isCurrent = now >= w.start && now < w.end;
         const ov = overrideFor(w.key, isCurrent);
-        const u = ov != null ? ov : autoUsed(w.start, w.end);
+        const u = ov != null ? ov : autoUsed(w.start, w.end, w.key);
         return {
           label: w.label,
           short: w.short,
@@ -326,6 +417,7 @@ export async function getUserCardsWithProgress(
           captured: b.amount > 0 && u >= b.amount,
           manual: ov != null,
           future: w.start > now,
+          credits: creditsIn(w.key),
         };
       });
 
@@ -355,6 +447,7 @@ export async function getUserCardsWithProgress(
         yearBreakdown,
         ytdCaptured,
         yearTarget,
+        openQuestions: perkQuestions.filter((q) => q.suggestedBenefitId === b.id).length,
       };
     });
 
@@ -388,7 +481,14 @@ export async function getUserCardsWithProgress(
           cards.filter((o) => o.id !== card.id),
           txns,
           earnStart,
-          earnEnd
+          earnEnd,
+          // Quarters overlapping the earnings window [earnStart, earnEnd).
+          bonuses.filter((b) => {
+            const i = qIndex(b.year, b.quarter);
+            const s = quarterOf(earnStart);
+            const e = quarterOf(new Date(earnEnd.getTime() - 1));
+            return i >= qIndex(s.year, s.quarter) && i <= qIndex(e.year, e.quarter);
+          })
         )
       : null;
 
@@ -426,6 +526,9 @@ export async function getUserCardsWithProgress(
         earnEnd.getMonth() - 1,
         1
       ).toLocaleString("en-US", { month: "short", year: "numeric" })}`,
+      hasRotating: card.rewardRates.some((r) => r.category === "ROTATING"),
+      rotating,
     };
   });
+  return { cards: cardDTOs, perkQuestions };
 }

@@ -3,6 +3,7 @@ import { syncTransactions } from "@/services/sync.service";
 import { prisma } from "@/lib/prisma";
 import { pickConnectedItems } from "@/lib/plaid-items";
 import { plaidErrorCode } from "@/lib/plaid-errors";
+import { pairPerkCredits } from "@/services/perk-credits.service";
 
 // Plaid error codes that mean "this item has no Transactions product" rather
 // than a real failure — e.g. an investments-only connection (Robinhood, a
@@ -49,6 +50,8 @@ export async function POST(req: NextRequest) {
     const results = await Promise.allSettled(
       syncable.map((item) => syncTransactions(item.itemId))
     );
+    // Never fails the sync.
+    await pairPerkCredits().catch((e) => console.error("[sync] perk pairing", e));
 
     const synced = results.map((r, i) => {
       const base = {

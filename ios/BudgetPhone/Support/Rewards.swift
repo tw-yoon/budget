@@ -57,6 +57,23 @@ enum Rewards {
     return EffectiveRate(multiplier: 1, unit: "X", isBonus: false)
   }
 
+  /// Dollars earned per dollar spent; points at `pointValueCents` each
+  /// (dollarsPer in ../src/lib/rewards.ts).
+  private static func dollarsPer(_ r: EffectiveRate, _ pointValueCents: Double) -> Double {
+    r.unit == "PERCENT" ? r.multiplier / 100 : r.multiplier * pointValueCents / 100
+  }
+
+  /// The card's rate for a category, raised to its current quarter's bonus
+  /// when that covers the category and is worth more in dollars
+  /// (effectiveRateWithBonus / betterOfBonus). Only categories count; a
+  /// merchant bonus needs a purchase to match.
+  static func effectiveRate(_ card: UserCardDTO, _ category: String) -> EffectiveRate {
+    let normal = effectiveRate(card.rewardRates, category)
+    guard let b = card.rotating.first(where: \.current), b.categories.contains(category) else { return normal }
+    let bonus = EffectiveRate(multiplier: b.multiplier, unit: b.unit, isBonus: true)
+    return dollarsPer(bonus, card.pointValueCents) > dollarsPer(normal, card.pointValueCents) ? bonus : normal
+  }
+
   /// formatRate: "4x" or "6%", the number printed as JavaScript prints it.
   static func formatRate(_ multiplier: Double, _ unit: String) -> String {
     let n = Formatters.plainNumber(multiplier)
@@ -81,7 +98,7 @@ enum Rewards {
   static func bestByCategory(_ cards: [UserCardDTO]) -> [CategoryRanking] {
     bonusCategories.map { category in
       let ranked = cards.enumerated()
-        .map { (index: $0.offset, item: RankedCard(card: $0.element, rate: effectiveRate($0.element.rewardRates, category))) }
+        .map { (index: $0.offset, item: RankedCard(card: $0.element, rate: effectiveRate($0.element, category))) }
         .sorted { a, b in
           a.item.rate.multiplier != b.item.rate.multiplier
             ? a.item.rate.multiplier > b.item.rate.multiplier : a.index < b.index

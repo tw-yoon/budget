@@ -21,6 +21,22 @@ struct FeeSummary: Equatable, Sendable {
   let text: String
 }
 
+/// A Cards-tab prompt to enter or activate a card's current rotating quarter.
+struct SetupPrompt: Equatable, Identifiable, Sendable {
+  let cardId: String
+  let title: String
+  let detail: String?
+  var id: String { cardId }
+}
+
+/// A credit that is unused and whose window ends within a week.
+struct EndingSoon: Equatable, Identifiable, Sendable {
+  let cardId: String
+  let benefitId: String
+  let text: String
+  var id: String { benefitId }
+}
+
 /// Ports of the Benefits → Cards rules and wording: ../src/lib/categories.ts
 /// (ISSUERS, MONTH_NAMES, BENEFIT_PERIODS, PERIOD_LABELS,
 /// TRACKABLE_CATEGORIES), ../src/lib/rewards.ts (REWARD_CATEGORIES) and
@@ -57,6 +73,9 @@ enum CardRules {
 
   /// REWARD_CATEGORIES: the bonus categories, then OTHER.
   static let rewardCategories = Rewards.bonusCategories + ["OTHER"]
+
+  /// What a rotating quarter can cover: the bonus categories without ROTATING.
+  static let rotatingCategories = Rewards.bonusCategories.filter { $0 != "ROTATING" }
 
   /// The route's lowest start year (../src/app/api/user-cards/route.ts).
   static let earliestStartYear = 1980
@@ -176,6 +195,108 @@ enum CardRules {
     let elapsed = b.yearBreakdown.filter { !$0.future }
     let captured = elapsed.filter(\.captured).count
     return "\(captured)/\(elapsed.count) captured · \(Formatters.currency(b.ytdCaptured)) of \(Formatters.currency(b.yearTarget))"
+  }
+
+  /// To Review's footer under a question whose suggested perk is already
+  /// full, naming the window the question's date falls in.
+  static func questionNote(_ q: PerkQuestionDTO, perk: BenefitDTO?) -> String? {
+    guard q.windowFull, let perk else { return nil }
+    let parts = q.date.prefix(7).split(separator: "-").compactMap { Int($0) }
+    let key = parts.count == 2 ? windowKey(perk.period, year: parts[0], month: parts[1]) : nil
+    let label = perk.yearBreakdown.first { $0.key == key }?.label ?? perk.periodLabel
+    return "\(perk.name) is already used for \(label). This may be a refund."
+  }
+
+  /// The credit page's windows: the one holding `now` first, then earlier
+  /// ones that have credits, newest first; future windows never. Found by key,
+  /// so a window that began since the data loaded still counts; otherwise the
+  /// last started one.
+  static func creditWindows(_ b: BenefitDTO, now: Date, calendar: Calendar = .current) -> [BenefitPeriodDTO] {
+    let key = windowKey(
+      b.period, year: calendar.component(.year, from: now), month: calendar.component(.month, from: now))
+    let windows = b.yearBreakdown
+    guard let i = windows.firstIndex(where: { $0.key == key }) ?? windows.lastIndex(where: { !$0.future })
+    else { return [] }
+    return [windows[i]] + windows[..<i].reversed().filter { !$0.credits.isEmpty && !$0.future }
+  }
+
+  /// A window's key for a month (periodsInYear's keys in
+  /// ../src/services/benefits.service.ts): "2026-03", "2026-Q1", "2026-H1", "2026".
+  private static func windowKey(_ period: String, year y: Int, month m: Int) -> String {
+    switch period {
+    case "MONTHLY": "\(y)-\(m < 10 ? "0" : "")\(m)"
+    case "QUARTERLY": "\(y)-Q\((m - 1) / 3 + 1)"
+    case "SEMIANNUAL": "\(y)-H\(m <= 6 ? 1 : 2)"
+    default: "\(y)"
+    }
+  }
+
+  /// The calendar quarter `now` falls in.
+  static func currentQuarter(now: Date, calendar: Calendar = .current) -> (year: Int, quarter: Int) {
+    (calendar.component(.year, from: now), (calendar.component(.month, from: now) - 1) / 3 + 1)
+  }
+
+  /// "Q4 2026 · 5% on Gas, Groceries, Sample Mart (not Example Store)", or
+  /// "Q4 2026 · Not set up".
+  static func rotatingSummary(_ b: RotatingBonusDTO?, year: Int, quarter: Int) -> String {
+    let head = "Q\(quarter) \(year) · "
+    guard let b else { return head + "Not set up" }
+    var text = head + "\(b.display) on " + (b.categoryLabels + b.merchants).joined(separator: ", ")
+    if !b.excludeMerchants.isEmpty { text += " (not \(b.excludeMerchants.joined(separator: ", ")))" }
+    return text
+  }
+
+  /// One per rotating card whose current quarter is missing or not activated.
+  static func setupPrompts(_ cards: [UserCardDTO], now: Date, calendar: Calendar) -> [SetupPrompt] {
+    let (year, quarter) = currentQuarter(now: now, calendar: calendar)
+    return cards.filter(\.hasRotating).compactMap { card in
+      let entry = card.rotating.first { $0.year == year && $0.quarter == quarter }
+      if let entry, entry.activated { return nil }
+      return SetupPrompt(
+        cardId: card.id, title: "\(entry == nil ? "Set Up" : "Activate") Q\(quarter) Categories",
+        detail: Rewards.shortLabel(card))
+    }
+  }
+
+  /// Unused credits whose window ends within 7 days, soonest first.
+  static func endingSoon(_ cards: [UserCardDTO], now: Date, calendar: Calendar) -> [EndingSoon] {
+    let shown = DateFormatter()
+    shown.calendar = calendar
+    shown.timeZone = calendar.timeZone
+    shown.locale = Locale(identifier: "en_US")
+    shown.setLocalizedDateFormatFromTemplate("MMMd")
+    let rows: [(end: Date, name: String, row: EndingSoon)] = cards.flatMap { card in
+      card.benefits.compactMap { b in
+        guard b.autoMode != "perk", b.amount > 0, b.cappedUsed < b.amount else { return nil }
+        let end = PerkReminders.windowEnd(period: b.period, now: now, calendar: calendar)
+        guard end > now, end.timeIntervalSince(now) <= 7 * 86400 else { return nil }
+        let last = calendar.date(byAdding: .day, value: -1, to: end)!
+        let text = "\(b.name) · \(Formatters.currency(b.amount - b.cappedUsed)) left · ends \(shown.string(from: last))"
+        return (end, b.name, EndingSoon(cardId: card.id, benefitId: b.id, text: text))
+      }
+    }
+    return rows.sorted { ($0.end, $0.name) < ($1.end, $1.name) }.map(\.row)
+  }
+
+  /// Every entered quarter but `current` ("2026-Q4"), newest first.
+  static func pastQuarters(_ card: UserCardDTO, current: String) -> [RotatingBonusDTO] {
+    card.rotating.filter { $0.key != current }.sorted { $0.key > $1.key }
+  }
+
+  /// The unit every rotating quarter must use: the card's OTHER rate, then its
+  /// ROTATING rate, then "X" (the route's order).
+  static func baseUnit(_ card: UserCardDTO) -> String {
+    func unit(_ c: String) -> String? { card.rewardRates.first { $0.category == c }?.unit }
+    return unit("OTHER") ?? unit("ROTATING") ?? "X"
+  }
+
+  /// A new quarter starts from the card's Rotating rate (else 5%), a $1,500
+  /// cap, not activated.
+  static func newRotatingDefaults(_ card: UserCardDTO) -> RotatingBonusBody {
+    let rate = card.rewardRates.first { $0.category == "ROTATING" }
+    return RotatingBonusBody(
+      multiplier: rate?.multiplier ?? 5, unit: baseUnit(card), categories: [], merchants: [],
+      excludeMerchants: [], cap: 1500, activated: false)
   }
 
   /// `Math.round(n).toLocaleString()`.

@@ -771,7 +771,7 @@ function EarningsSection({
               </thead>
               <tbody className="divide-y divide-black/[0.06] dark:divide-white/[0.06]">
                 {e.byCategory.map((r) => (
-                  <EarningsRow key={r.category} row={r} isPoints={isPoints} />
+                  <EarningsRow key={r.key} row={r} isPoints={isPoints} />
                 ))}
               </tbody>
             </table>

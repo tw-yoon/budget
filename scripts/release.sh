@@ -58,19 +58,32 @@ guard() {
 
 LOCK_HELD=0
 
-# Takes the lock that keeps two release steps from running at once. A lock
-# older than two hours is left over from a step that was killed; it is broken.
+# Takes the lock that keeps two release steps from running at once. The lock
+# folder holds the owner's process id. A lock is left over, and broken, when
+# its owner is gone (the step was killed, or Hub quit mid-step), when it has
+# no owner a minute after it was made, or when it is older than two hours.
 take_lock() {
   mkdir -p "$WORK" || stop "Couldn't make the release folder."
   if ! mkdir "$LOCK" 2>/dev/null; then
-    if [ -n "$(find "$LOCK" -maxdepth 0 -mmin +120 2>/dev/null)" ]; then
-      rm -rf "$LOCK"
-      mkdir "$LOCK" 2>/dev/null || stop "Another release step is running. Try again in a minute."
-    else
-      stop "Another release step is running. Try again in a minute."
-    fi
+    lock_is_stale || stop "Another release step is running. Try again in a minute."
+    rm -rf "$LOCK"
+    mkdir "$LOCK" 2>/dev/null || stop "Another release step is running. Try again in a minute."
   fi
   LOCK_HELD=1
+  echo "$$" >"$LOCK/pid"
+}
+
+# Succeeds when the lock in $LOCK belongs to no running step.
+lock_is_stale() {
+  local pid=""
+  [ -n "$(find "$LOCK" -maxdepth 0 -mmin +120 2>/dev/null)" ] && return 0
+  [ -f "$LOCK/pid" ] && pid=$(tr -dc '0-9' <"$LOCK/pid")
+  if [ -z "$pid" ]; then
+    # Its owner may be between making the folder and writing its id.
+    [ -n "$(find "$LOCK" -maxdepth 0 -mmin +1 2>/dev/null)" ]
+    return
+  fi
+  ! ps -p "$pid" >/dev/null 2>&1
 }
 
 release_lock() {

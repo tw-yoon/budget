@@ -8,8 +8,7 @@ const ISSUERS = new Set(["AMEX", "CHASE", "DISCOVER"]);
 
 async function handleGET() {
   try {
-    const cards = await getUserCardsWithProgress();
-    return NextResponse.json({ cards });
+    return NextResponse.json(await getUserCardsWithProgress());
   } catch (err) {
     console.error("[user-cards GET]", err);
     return NextResponse.json({ error: "Failed to load cards" }, { status: 500 });

@@ -69,6 +69,10 @@ struct CardRequestTests {
     #expect(unpin["value"] is NSNull)
     let perk = try json(BenefitPatch.perkActive(true))
     #expect(Set(perk.keys) == ["perkActive"] && perk["perkActive"] as? Bool == true)
+    let keywords = try json(BenefitPatch.matchText(["Sample Coffee", "Resy"]))
+    #expect(Set(keywords.keys) == ["matchText"] && keywords["matchText"] as? [String] == ["Sample Coffee", "Resy"])
+    let none = try json(BenefitPatch.matchText([]))
+    #expect(none["matchText"] as? [String] == [])
   }
 
   @Test func reorderBody() throws {

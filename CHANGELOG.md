@@ -11,6 +11,35 @@ update), so nothing here is a stability promise.
 
 ## Unreleased
 
+## 0.15.0 — 2026-10-16
+
+- Ledger search (web and iPhone) also finds amounts ("12", "$4.50"), dates
+  ("10/5", "Oct 5", "September"), row numbers ("#42"), notes, categories,
+  Venmo names and account names.
+- iPhone app: a credit page lists the keywords its credits match on. Add,
+  edit or swipe to remove one; words too generic to match, like "credit"
+  alone, are refused.
+- Statement credits that Plaid marks as transfers now count toward their
+  credit. Before, a credit tracked by name could stay at $0 even after the
+  reimbursement posted.
+- iPhone app: perks fill themselves from statement credits. A credit page
+  lists each credit that counted and the purchase it paid back; pick or
+  unlink a purchase, detach a credit, or add one by hand. Pairing a credit
+  with its purchase nets that purchase in spending, like a refund.
+- iPhone app: Benefits → To Review asks about credits the app can't place
+  (or a second credit after a perk is already used for the month). A yes is
+  remembered, so the next one fills in on its own.
+- iPhone app: Settings → Perk Reminders sends a notification a week before
+  a perk's month, quarter or year ends with money left on it.
+- Rotating quarterly rates: enter a quarter's bonus on the iPhone card
+  page (categories, merchants, excluded merchants like "not Walmart", and a
+  cap). Earnings count it only for purchases in that quarter, up to the cap,
+  at whichever is higher of the bonus and the card's normal rate. Best Card
+  uses the current quarter.
+- iPhone app: the top of Benefits → Cards says when a quarter needs setting
+  up or activating, and lists perks ending within a week with money left,
+  no notifications needed.
+
 ## 0.14.0 — 2026-10-15
 
 - Settings → Categories has a Map view that draws a line from each Plaid

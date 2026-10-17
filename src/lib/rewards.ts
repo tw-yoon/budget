@@ -1,3 +1,5 @@
+import type { RotatingBonusInput } from "@/lib/rotating";
+
 export const REWARD_CATEGORIES = [
   "DINING",
   "GROCERIES",
@@ -51,4 +53,39 @@ export function effectiveRate(
   const base = rates.find((r) => r.category === "OTHER");
   if (base) return { multiplier: base.multiplier, unit: base.unit, isBonus: false };
   return { multiplier: 1, unit: "X", isBonus: false };
+}
+
+type Rate = { multiplier: number; unit: string; isBonus: boolean };
+
+// Dollars earned per dollar of spend; points at `pointValueCents` each.
+function dollarsPer(multiplier: number, unit: string, pointValueCents: number): number {
+  return unit === "PERCENT" ? multiplier / 100 : (multiplier * pointValueCents) / 100;
+}
+
+// The better of a normal rate and a rotating bonus, by dollar value. A bonus
+// replaces the normal rate rather than adding to it, so a lower bonus never
+// lowers earnings.
+export function betterOfBonus(
+  normal: Rate,
+  bonus: { multiplier: number; unit: string },
+  pointValueCents = 1
+): Rate {
+  return dollarsPer(bonus.multiplier, bonus.unit, pointValueCents) >
+    dollarsPer(normal.multiplier, normal.unit, pointValueCents)
+    ? { multiplier: bonus.multiplier, unit: bonus.unit, isBonus: true }
+    : normal;
+}
+
+// effectiveRate, raised to the quarter's bonus when the bonus covers the
+// category. Only categories count here: merchants need a purchase to match.
+export function effectiveRateWithBonus(
+  rates: SimpleRate[],
+  category: string,
+  bonus: RotatingBonusInput | null,
+  pointValueCents = 1
+): Rate {
+  const normal = effectiveRate(rates, category);
+  return bonus?.categories.includes(category)
+    ? betterOfBonus(normal, bonus, pointValueCents)
+    : normal;
 }

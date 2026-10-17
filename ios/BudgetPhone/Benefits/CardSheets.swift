@@ -316,7 +316,7 @@ struct AddCreditSheet: View {
 
 /// A sheet's save: spinner on, the write, then dismiss, or the message.
 @MainActor
-private func run(
+func run(
   _ write: CardWrite, saving: Binding<Bool>, error message: Binding<String?>,
   store: BenefitsStore, dismiss: DismissAction
 ) {

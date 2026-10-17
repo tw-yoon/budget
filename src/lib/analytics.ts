@@ -3,7 +3,7 @@
  * node:test can check it without a database. analytics.service.ts loads rows.
  *
  * Plaid sign convention: amount > 0 is an outflow (spending), amount < 0 is an
- * inflow (income). Transfers, fees, and pending rows are excluded upstream.
+ * inflow (income). Transfers and pending rows are excluded upstream.
  */
 
 import { calendarDay } from "@/lib/format";

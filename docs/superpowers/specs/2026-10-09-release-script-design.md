@@ -141,8 +141,9 @@ and the scan's temporary files.
 
 `prepare`, `scan` and `publish` each take the lock (`mkdir lock`, removed on
 exit). If it is held: "Another release step is running. Try again in a
-minute." A lock older than two hours is left from a killed step and is
-broken. `publish` runs the scan under its own lock. `status` takes no lock.
+minute." The lock holds its owner's process id (`lock/pid`). A lock is left
+from a killed step, and broken, when that process is gone, when it still has
+no id a minute after it was made, or when it is older than two hours. `publish` runs the scan under its own lock. `status` takes no lock.
 
 ### Public clone
 

@@ -108,7 +108,17 @@ model Transaction {
   // new ones. docs/superpowers/specs/2026-10-02-reconnect-merges-history-design.md
   priorItemId String?
 
+  // Statement-credit perk tracking. benefitDecision is the owner's answer
+  // ("YES" | "NO"); with YES, benefitId is the perk, with NO the perk refused
+  // (null = not a perk at all). perkPaired: this feature set linkedToId.
+  // noAutoPair: the owner unpaired it, so never auto-pair again.
+  benefitId       String?
+  benefitDecision String?
+  perkPaired      Boolean @default(false)
+  noAutoPair      Boolean @default(false)
+
   account Account @relation(fields: [accountId], references: [id])
+  benefit UserBenefit? @relation(fields: [benefitId], references: [id], onDelete: SetNull)
   linkedTo Transaction?  @relation("TxRefunds", fields: [linkedToId], references: [id], onDelete: SetNull)
   refunds  Transaction[] @relation("TxRefunds")
   splits   TransactionSplit[]
@@ -121,6 +131,7 @@ model Transaction {
   @@index([fundsCashoutId])
   @@index([linkedToId])
   @@index([priorItemId])
+  @@index([benefitId])
 }
 
 // A carve-out: part of one transaction placed under its own category, without
@@ -165,8 +176,9 @@ model UserCard {
   accountId           String?       // auto-linked when last4 matches Account.mask
   createdAt           DateTime      @default(now())
 
-  benefits    UserBenefit[]
-  rewardRates RewardRate[]
+  benefits        UserBenefit[]
+  rewardRates     RewardRate[]
+  rotatingBonuses RotatingBonus[]
 }
 
 // Earning rate (points/cashback multiplier) for a spending category on a card.
@@ -182,6 +194,28 @@ model RewardRate {
   card UserCard @relation(fields: [userCardId], references: [id], onDelete: Cascade)
 
   @@unique([userCardId, category])
+  @@index([userCardId])
+}
+
+// A card's rotating bonus for one calendar quarter, e.g. 5% on gas up to
+// $1,500 of spend. Replaces the normal rate for matching spend when higher.
+model RotatingBonus {
+  id         String   @id @default(cuid())
+  userCardId String
+  year       Int
+  quarter    Int      // 1-4
+  multiplier Float
+  unit       String   // "X" or "PERCENT", the card's base unit
+  categories String   // JSON array of reward categories
+  merchants  String   // JSON array of merchant names
+  excludeMerchants String @default("[]") // JSON array; these never earn the bonus
+  cap        Float?   // spend cap per quarter; null = no cap
+  activated  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  card UserCard @relation(fields: [userCardId], references: [id], onDelete: Cascade)
+
+  @@unique([userCardId, year, quarter])
   @@index([userCardId])
 }
 
@@ -206,9 +240,12 @@ model UserBenefit {
   usedManual      Float?   // legacy single current-period override (still honored)
   manualOverrides String   @default("{}") // JSON map of periodKey -> amount; per-window
                                            // override of any month/period in the yearly view
+  // JSON array of purchase merchants the owner paired with this perk's credits.
+  pairedMerchants String   @default("[]")
   createdAt       DateTime @default(now())
 
-  card UserCard @relation(fields: [userCardId], references: [id], onDelete: Cascade)
+  card         UserCard      @relation(fields: [userCardId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
 
   @@index([userCardId])
 }

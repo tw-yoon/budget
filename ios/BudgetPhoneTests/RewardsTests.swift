@@ -58,6 +58,33 @@ struct RewardsTests {
     #expect(groceries.ranked.map(\.card.id) == ["c", "b", "a"])
   }
 
+  func rotating(_ id: String, _ rates: [(String, Double, String)], _ m: Double, _ unit: String,
+                current: Bool = true, pointValueCents: Double = 1) -> UserCardDTO {
+    UserCardDTO(
+      id: id, issuer: "AMEX", name: nil, last4: "0001",
+      rewardRates: rates.map { RewardRateDTO(category: $0.0, multiplier: $0.1, unit: $0.2) },
+      pointValueCents: pointValueCents,
+      rotating: [RotatingBonusDTO(
+        year: 2026, quarter: 4, multiplier: m, unit: unit, categories: ["GAS"], merchants: ["Sample Mart"],
+        cap: nil, activated: true, current: current)])
+  }
+
+  @Test func aCurrentBonusRanksAndANormalRateStaysWhenHigher() throws {
+    let a = rotating("a", [("OTHER", 1, "PERCENT")], 5, "PERCENT")
+    let b = card("b", [("GAS", 3, "PERCENT")])
+    let gas = try #require(Rewards.bestByCategory([b, a]).first { $0.category == "GAS" })
+    #expect(gas.ranked.map(\.card.id) == ["a", "b"] && gas.ranked[0].rate.isBonus)
+    // A 5% bonus never lowers a card's own 6%.
+    let six = rotating("s", [("GAS", 6, "PERCENT")], 5, "PERCENT")
+    #expect(Rewards.effectiveRate(six, "GAS") == EffectiveRate(multiplier: 6, unit: "PERCENT", isBonus: true))
+    // Not current, or another category: ignored.
+    #expect(!Rewards.effectiveRate(rotating("n", [("OTHER", 1, "PERCENT")], 5, "PERCENT", current: false), "GAS").isBonus)
+    #expect(Rewards.effectiveRate(a, "DINING").multiplier == 1)
+    // Units differ: compared in dollars by point value.
+    let pts = rotating("p", [("GAS", 3, "X")], 4, "PERCENT", pointValueCents: 2)  // 3x at 2c = 6% beats 4%
+    #expect(Rewards.effectiveRate(pts, "GAS") == EffectiveRate(multiplier: 3, unit: "X", isBonus: true))
+  }
+
   @Test func tiesKeepServerOrder() throws {
     let a = card("a", [("OTHER", 3, "PERCENT")])
     let b = card("b", [("OTHER", 3, "X")])

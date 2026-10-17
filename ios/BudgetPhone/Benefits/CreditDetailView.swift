@@ -1,8 +1,9 @@
 import SwiftUI
 
 /// One statement credit (BenefitRow and YearStrip in
-/// ../src/components/benefits/UserCardItem.tsx): its progress, the perk
-/// switch, a logged amount, the year's windows, and Delete.
+/// ../src/components/benefits/UserCardItem.tsx): its progress, the credits
+/// placed in each window with the purchase each paid back, the perk switch, a
+/// logged amount, the keywords credits match on, the year's windows, and Delete.
 struct CreditDetailView: View {
   let cardId: String
   let id: String
@@ -12,6 +13,11 @@ struct CreditDetailView: View {
   @State private var usedText = ""
   @State private var confirmingDelete = false
   @State private var saveError: String?
+  @State private var picking: PerkPickerSheet.Kind?
+  /// The keyword alert: open, which row it edits (nil adds one), and its text.
+  @State private var keywordAlert = false
+  @State private var keywordIndex: Int?
+  @State private var keywordText = ""
   @FocusState private var usedFocused: Bool
 
   private var benefit: BenefitDTO? {
@@ -40,6 +46,17 @@ struct CreditDetailView: View {
   private func list(_ benefit: BenefitDTO) -> some View {
     List {
       Section { CreditProgress(benefit: benefit) }
+
+      let windows = CardRules.creditWindows(benefit, now: .now)
+      ForEach(windows) { window in
+        Section {
+          ForEach(window.credits) { credit in creditRows(credit, benefit: benefit) }
+          if window.id == windows.last?.id { addTransaction(benefit) }
+        } header: {
+          Text(window.label)
+        }
+      }
+      if windows.isEmpty { Section { addTransaction(benefit) } }
 
       Section {
         Toggle("Perk", isOn: Binding(
@@ -71,6 +88,24 @@ struct CreditDetailView: View {
         }
       }
 
+      Section {
+        ForEach(Array(benefit.matchText.enumerated()), id: \.offset) { i, keyword in
+          Button(keyword) { editKeyword(i, keyword) }
+            .foregroundStyle(.primary)
+            .disabled(store.isSaving)
+        }
+        .onDelete { offsets in
+          var list = benefit.matchText
+          list.remove(atOffsets: offsets)
+          write(.updateBenefit(id: benefit.id, .matchText(list)))
+        }
+        .deleteDisabled(store.isSaving)
+        Button("Add Keyword…") { editKeyword(nil, "") }
+          .disabled(store.isSaving)
+      } header: {
+        Text("Keywords")
+      }
+
       if benefit.yearBreakdown.count > 1 {
         Section {
           ForEach(benefit.yearBreakdown) { window in
@@ -100,13 +135,76 @@ struct CreditDetailView: View {
     .tabBarScrollTracking()
     .navigationTitle(benefit.name)
     .navigationBarTitleDisplayMode(.inline)
+    .sheet(item: $picking) { PerkPickerSheet(kind: $0, store: store) }
     .onAppear {
       if usedText.isEmpty && benefit.source == "manual" { usedText = Formatters.plainNumber(benefit.used) }
+    }
+    .alert(keywordIndex == nil ? "Add Keyword" : "Edit Keyword", isPresented: $keywordAlert) {
+      TextField("Keyword", text: $keywordText)
+      Button("Save") { saveKeyword(benefit) }
+      Button("Cancel", role: .cancel) {}
     }
     .alert(CardRules.deleteCreditPrompt(benefit), isPresented: $confirmingDelete) {
       Button("Delete", role: .destructive) { write(.deleteBenefit(id: benefit.id), thenDismiss: true) }
       Button("Cancel", role: .cancel) {}
     }
+  }
+
+  /// A credit, then the purchase it paid back or a way to pick one.
+  @ViewBuilder private func creditRows(_ credit: PerkCreditDTO, benefit: BenefitDTO) -> some View {
+    PerkRow(
+      name: credit.name,
+      detail: "\(Formatters.day(credit.date)) · \(credit.how == "auto" ? "Matched" : "Confirmed")",
+      amount: Ledger.signedAmount(-credit.amount).text)
+    .swipeActions {
+      Button("Detach") { write(.decidePerk(transactionId: credit.id, .notThisPerk(benefitId: benefit.id))) }
+        .tint(.orange)
+        .disabled(store.isSaving)
+    }
+    if let p = credit.purchase {
+      HStack(alignment: .firstTextBaseline) {
+        Image(systemName: "arrow.turn.down.right").foregroundStyle(.secondary).accessibilityHidden(true)
+        PairRow(fixed: true) {
+          Text("\(p.name) · \(Formatters.day(p.date))")
+        } value: {
+          AmountText(Formatters.currency(p.amount)).monospacedDigit()
+        }
+      }
+      .font(.subheadline)
+      .swipeActions {
+        Button("Unlink") { write(.pickPurchase(creditId: credit.id, purchaseId: nil)) }.tint(.orange)
+          .disabled(store.isSaving)
+      }
+    } else {
+      Button("Pick Purchase") { picking = .purchase(creditId: credit.id) }
+        .font(.subheadline)
+        .disabled(store.isSaving)
+    }
+  }
+
+  private func editKeyword(_ index: Int?, _ text: String) {
+    keywordIndex = index
+    keywordText = text
+    keywordAlert = true
+  }
+
+  /// Sends the whole list; the server trims, dedupes and refuses generic words.
+  private func saveKeyword(_ benefit: BenefitDTO) {
+    let keyword = keywordText.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !keyword.isEmpty else { return }
+    var list = benefit.matchText
+    if let i = keywordIndex {
+      guard list.indices.contains(i) else { return }
+      list[i] = keyword
+    } else {
+      list.append(keyword)
+    }
+    write(.updateBenefit(id: benefit.id, .matchText(list)))
+  }
+
+  private func addTransaction(_ benefit: BenefitDTO) -> some View {
+    Button("Add Transaction…") { picking = .credit(benefitId: benefit.id) }
+      .disabled(store.isSaving)
   }
 
   private func write(_ write: CardWrite, thenDismiss: Bool = false) {

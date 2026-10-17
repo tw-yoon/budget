@@ -57,6 +57,19 @@ extension APIClient {
     _ = try await send("DELETE", "api/rewards/\(id)", timeout: 15)
   }
 
+  /// PUT /api/user-cards/:id/rotating/:year/:quarter — set one quarter's bonus.
+  func saveRotating(
+    cardId: String, year: Int, quarter: Int, _ body: RotatingBonusBody
+  ) async throws(APIError) {
+    _ = try await send(
+      "PUT", "api/user-cards/\(cardId)/rotating/\(year)/\(quarter)", body: encode(body), timeout: 15)
+  }
+
+  /// DELETE /api/user-cards/:id/rotating/:year/:quarter.
+  func deleteRotating(cardId: String, year: Int, quarter: Int) async throws(APIError) {
+    _ = try await send("DELETE", "api/user-cards/\(cardId)/rotating/\(year)/\(quarter)", timeout: 15)
+  }
+
   /// POST /api/benefits — a statement credit on a card.
   func addBenefit(_ benefit: NewBenefit) async throws(APIError) {
     _ = try await send("POST", "api/benefits", body: encode(benefit), timeout: 15)
@@ -70,5 +83,26 @@ extension APIClient {
   /// DELETE /api/benefits/:id.
   func deleteBenefit(id: String) async throws(APIError) {
     _ = try await send("DELETE", "api/benefits/\(id)", timeout: 15)
+  }
+
+  /// PUT /api/perk-credits/:id — answer a perk question about a transaction.
+  func decidePerk(transactionId: String, _ decision: PerkDecision) async throws(APIError) {
+    _ = try await send("PUT", "api/perk-credits/\(transactionId)", body: encode(decision), timeout: 15)
+  }
+
+  /// PUT /api/perk-credits/:id/purchase — pair a credit with its purchase, or clear it.
+  func pickPerkPurchase(creditId: String, purchaseId: String?) async throws(APIError) {
+    _ = try await send(
+      "PUT", "api/perk-credits/\(creditId)/purchase",
+      body: encode(PerkPurchasePick(purchaseId: purchaseId)), timeout: 15)
+  }
+
+  private struct Candidates: Decodable { let candidates: [PerkPurchaseDTO] }
+
+  /// GET /api/perk-credits/candidates?benefitId= — purchases a credit could offset.
+  func perkCandidates(benefitId: String) async throws(APIError) -> [PerkPurchaseDTO] {
+    let r: Candidates = try await get(
+      "api/perk-credits/candidates", query: [URLQueryItem(name: "benefitId", value: benefitId)], timeout: 15)
+    return r.candidates
   }
 }

@@ -8,10 +8,17 @@ struct CardsView: View {
   @AppStorage(ServerAddress.storageKey) private var server = ""
   @State private var adding = false
   @State private var removing: UserCardDTO?
+  @State private var settingUp: SetupPrompt?
 
   var body: some View {
     content
       .sheet(isPresented: $adding) { AddCardSheet(store: store) }
+      .sheet(item: $settingUp) { prompt in
+        if let card = store.card(id: prompt.cardId) {
+          let (y, q) = CardRules.currentQuarter(now: .now)
+          RotatingSheet(card: card, year: y, quarter: q, store: store)
+        }
+      }
       .alert(
         removing.map(CardRules.removeCardPrompt) ?? "",
         isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } }),
@@ -33,7 +40,34 @@ struct CardsView: View {
   }
 
   private func list(_ cards: [UserCardDTO]) -> some View {
-    List {
+    let setups = CardRules.setupPrompts(cards, now: .now, calendar: .current)
+    let ending = CardRules.endingSoon(cards, now: .now, calendar: .current)
+    return List {
+      if !setups.isEmpty || !ending.isEmpty {
+        Section {
+          ForEach(setups) { prompt in
+            Button { settingUp = prompt } label: {
+              VStack(alignment: .leading, spacing: 2) {
+                Text(prompt.title)
+                if let detail = prompt.detail {
+                  Text(detail).font(.footnote).foregroundStyle(.secondary)
+                }
+              }
+            }
+            .foregroundStyle(.primary)
+          }
+          ForEach(ending) { item in
+            NavigationLink(value: CreditRoute(cardId: item.cardId, id: item.benefitId)) { Text(item.text) }
+          }
+        }
+      }
+      if !store.questions.isEmpty {
+        Section {
+          NavigationLink { PerkReviewView(store: store) } label: {
+            LabeledContent("To Review", value: "\(store.questions.count)")
+          }
+        }
+      }
       if !cards.isEmpty {
         Section {
           ForEach(cards) { card in

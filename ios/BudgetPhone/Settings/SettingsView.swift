@@ -1,4 +1,5 @@
 import SwiftUI
+import UserNotifications
 
 struct SettingsView: View {
   let proMode: ProMode
@@ -13,6 +14,7 @@ struct SettingsView: View {
   @State private var confirmingInstall = false
   /// Kept on this iPhone only; the web has no tab bar.
   @AppStorage(AppTabBar.labelsKey) private var showsTabLabels = false
+  @AppStorage(PerkReminders.storageKey) private var perkReminders = false
 
   /// Where the phone differs from the web on purpose: the web keeps a failed
   /// save in one browser's localStorage, but the phone's next read would
@@ -46,6 +48,9 @@ struct SettingsView: View {
         Section("Accessibility") {
           Toggle("Tab Bar Labels", isOn: $showsTabLabels)
         }
+        Section {
+          Toggle("Perk Reminders", isOn: $perkReminders)
+        }
         ServerForm()
         Section {
           LabeledContent("Version", value: version)
@@ -78,6 +83,16 @@ struct SettingsView: View {
     .onChange(of: categories.writeCount) {
       changes.categoriesChanged()
       Task { await catalog.load() }
+    }
+    .onChange(of: perkReminders) { _, on in
+      guard on else {
+        Task { await PerkReminderScheduler.removeAll() }
+        return
+      }
+      Task {
+        let granted = (try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound])) ?? false
+        if !granted { perkReminders = false }
+      }
     }
     .onChange(of: rules.recategorizeCount) { changes.categoriesChanged() }
     // A disconnected bank's accounts and transactions are gone.

@@ -69,6 +69,7 @@ struct BenefitsView: View {
       if phase == .active { Task { await store.load() } }
     }
     .onChange(of: server) { Task { await store.load() } }
+    .onChange(of: store.cards) { Task { await PerkReminderScheduler.reschedule(cards: store.cards ?? []) } }
   }
 }
 

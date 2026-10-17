@@ -12,8 +12,12 @@ enum CardWrite: Equatable, Sendable {
   case addBenefit(NewBenefit)
   case updateBenefit(id: String, BenefitPatch)
   case deleteBenefit(id: String)
+  case saveRotating(cardId: String, year: Int, quarter: Int, RotatingBonusBody)
+  case deleteRotating(cardId: String, year: Int, quarter: Int)
   case putArt(id: String, png: Data)
   case deleteArt(id: String)
+  case decidePerk(transactionId: String, PerkDecision)
+  case pickPurchase(creditId: String, purchaseId: String?)
 }
 
 /// The cards Benefits shows (useUserCards in
@@ -25,6 +29,8 @@ enum CardWrite: Equatable, Sendable {
 @Observable
 final class BenefitsStore {
   private(set) var cards: [UserCardDTO]?
+  /// Credit-like transactions waiting for a yes or no.
+  private(set) var questions: [PerkQuestionDTO] = []
   /// Set only while there is no data to show.
   private(set) var error: APIError?
   private(set) var isLoading = false
@@ -46,14 +52,16 @@ final class BenefitsStore {
     let generation = loadGeneration
     guard let client = client() else {
       cards = nil
+      questions = []
       error = .notConfigured
       return
     }
     if cards == nil {
       error = nil
-      if let saved = client.savedUserCards()?.cards {
-        cards = saved
-        art.load(saved.compactMap { $0.artUrl.map(client.cardArtURL) })
+      if let saved = client.savedUserCards() {
+        cards = saved.cards
+        questions = saved.perkQuestions
+        art.load(saved.cards.compactMap { $0.artUrl.map(client.cardArtURL) })
       }
     }
     isLoading = true
@@ -62,6 +70,7 @@ final class BenefitsStore {
       let result = try await client.userCards()
       guard generation == loadGeneration else { return }
       cards = result.cards
+      questions = result.perkQuestions
       error = nil
       banner = nil
       // Fetch every face now, not as rows scroll into view.
@@ -71,6 +80,18 @@ final class BenefitsStore {
       if error == .cancelled { return }
       if cards == nil { self.error = error } else { banner = error.loadBanner }
     }
+  }
+
+  /// Purchases a credit may pay back (the ledger's link candidates).
+  func purchaseCandidates(_ creditId: String) async throws(APIError) -> [LinkCandidate] {
+    guard let client = client() else { throw .notConfigured }
+    return try await client.linkCandidates(transactionId: creditId)
+  }
+
+  /// Credits on the perk's card that could be attached to it by hand.
+  func perkCandidates(_ benefitId: String) async throws(APIError) -> [PerkPurchaseDTO] {
+    guard let client = client() else { throw .notConfigured }
+    return try await client.perkCandidates(benefitId: benefitId)
   }
 
   /// A card image's full URL on the current server.
@@ -104,12 +125,19 @@ final class BenefitsStore {
     case .addBenefit(let benefit): try await client.addBenefit(benefit)
     case .updateBenefit(let id, let patch): try await client.updateBenefit(id: id, patch: patch)
     case .deleteBenefit(let id): try await client.deleteBenefit(id: id)
+    case .saveRotating(let id, let year, let quarter, let body):
+      try await client.saveRotating(cardId: id, year: year, quarter: quarter, body)
+    case .deleteRotating(let id, let year, let quarter):
+      try await client.deleteRotating(cardId: id, year: year, quarter: quarter)
     case .putArt(let id, let png):
       try await client.putCardArt(id: id, png: png)
       forgetArt(id, client)
     case .deleteArt(let id):
       try await client.deleteCardArt(id: id)
       forgetArt(id, client)
+    case .decidePerk(let id, let decision): try await client.decidePerk(transactionId: id, decision)
+    case .pickPurchase(let id, let purchaseId):
+      try await client.pickPerkPurchase(creditId: id, purchaseId: purchaseId)
     }
     await load()
   }

@@ -22,12 +22,14 @@ struct CardDetailView: View {
     case rate(RewardRateDTO?)
     case credit
     case art(CardCrop.Cut)
+    case rotating(year: Int, quarter: Int)
     var id: String {
       switch self {
       case .edit: "edit"
       case .rate(let r): "rate-\(r?.id ?? "")"
       case .credit: "credit"
       case .art: "art"
+      case .rotating(let y, let q): "rotating-\(y)-\(q)"
       }
     }
   }
@@ -49,6 +51,7 @@ struct CardDetailView: View {
         case .rate(let rate): RateSheet(card: card, rate: rate, store: store)
         case .credit: AddCreditSheet(card: card, store: store)
         case .art(let cut): CardArtSheet(card: card, cut: cut, store: store)
+        case .rotating(let y, let q): RotatingSheet(card: card, year: y, quarter: q, store: store)
         }
       }
     }
@@ -161,6 +164,17 @@ struct CardDetailView: View {
           }
         }
       }
+      if card.hasRotating {
+        let (y, q) = CardRules.currentQuarter(now: .now)
+        Button { sheet = .rotating(year: y, quarter: q) } label: {
+          RotatingRow(bonus: card.rotating.first { $0.year == y && $0.quarter == q }, year: y, quarter: q)
+        }
+        .foregroundStyle(.primary)
+        let current = "\(y)-Q\(q)"
+        if !CardRules.pastQuarters(card, current: current).isEmpty {
+          NavigationLink("Past Quarters") { PastQuartersView(id: card.id, store: store, current: current) }
+        }
+      }
       Button("Add Rate") { sheet = .rate(nil) }
     } header: {
       Text("Earning Rates")
@@ -175,7 +189,13 @@ struct CardDetailView: View {
     Section {
       ForEach(card.benefits) { benefit in
         NavigationLink(value: CreditRoute(cardId: card.id, id: benefit.id)) {
-          CreditProgress(benefit: benefit)
+          HStack {
+            CreditProgress(benefit: benefit)
+            if benefit.openQuestions > 0 {
+              Image(systemName: "questionmark.circle.fill").foregroundStyle(.orange)
+                .accessibilityLabel("Needs review")
+            }
+          }
         }
       }
       Button("Add Credit") { sheet = .credit }

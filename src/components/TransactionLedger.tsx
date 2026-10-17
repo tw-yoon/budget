@@ -148,7 +148,7 @@ export function TransactionLedger() {
           type="search"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search description or merchant…"
+          placeholder="Search name, amount, date, note…"
           className="w-full max-w-xs rounded-md border border-black/15 bg-transparent px-3 py-2 text-sm outline-none placeholder:text-black/40 focus:border-black/40 dark:border-white/15 dark:placeholder:text-white/40 dark:focus:border-white/40"
         />
         <select

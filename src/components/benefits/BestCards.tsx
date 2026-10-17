@@ -4,7 +4,7 @@ import type { UserCardDTO } from "@/types";
 import {
   BONUS_CATEGORIES,
   REWARD_CATEGORY_LABELS,
-  effectiveRate,
+  effectiveRateWithBonus,
   formatRate,
 } from "@/lib/rewards";
 import { ISSUER_LABELS } from "@/lib/categories";
@@ -35,7 +35,15 @@ export function BestCards({ cards }: { cards: UserCardDTO[] }) {
 
   const rows = BONUS_CATEGORIES.map((category) => {
     const ranked = cards
-      .map((c) => ({ card: c, ...effectiveRate(c.rewardRates, category) }))
+      .map((c) => ({
+        card: c,
+        ...effectiveRateWithBonus(
+          c.rewardRates,
+          category,
+          c.rotating.find((r) => r.current) ?? null,
+          c.pointValueCents
+        ),
+      }))
       .sort((a, b) => b.multiplier - a.multiplier);
     return { category, ranked };
   });

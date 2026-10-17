@@ -56,6 +56,12 @@ extension StubbedNetworkTests {
         (.addBenefit(NewBenefit(userCardId: "c1", name: "Sample", amount: 5, period: "ANNUAL", category: nil)), "POST", "/api/benefits"),
         (.updateBenefit(id: "b1", .perkActive(false)), "PATCH", "/api/benefits/b1"),
         (.deleteBenefit(id: "b1"), "DELETE", "/api/benefits/b1"),
+        (.saveRotating(cardId: "c1", year: 2026, quarter: 4, RotatingBonusBody(
+          multiplier: 5, unit: "PERCENT", categories: ["GAS"], merchants: [], excludeMerchants: [], cap: nil,
+          activated: true)), "PUT", "/api/user-cards/c1/rotating/2026/4"),
+        (.deleteRotating(cardId: "c1", year: 2026, quarter: 4), "DELETE", "/api/user-cards/c1/rotating/2026/4"),
+        (.decidePerk(transactionId: "t1", .yes(benefitId: "b1")), "PUT", "/api/perk-credits/t1"),
+        (.pickPurchase(creditId: "t1", purchaseId: nil), "PUT", "/api/perk-credits/t1/purchase"),
       ]
       for (write, method, path) in cases {
         try await s.perform(write)
@@ -82,6 +88,51 @@ extension StubbedNetworkTests {
       let add = try body(#require(writes().last))
       #expect(add["issuer"] as? String == "AMEX" && add["name"] is NSNull && add["membershipStartMonth"] as? Int == 4)
       #expect(writes().last?.value(forHTTPHeaderField: "Content-Type") == "application/json")
+    }
+
+    @Test func rotatingBodyHasSevenKeysAndAnExplicitNullCap() async throws {
+      let s = await store()
+      try await s.perform(.saveRotating(cardId: "c1", year: 2026, quarter: 4, RotatingBonusBody(
+        multiplier: 5, unit: "PERCENT", categories: ["GAS"], merchants: ["Sample Mart"], excludeMerchants: ["Sample Gas"],
+        cap: nil, activated: false)))
+      let none = try body(#require(writes().last))
+      #expect(Set(none.keys) == ["multiplier", "unit", "categories", "merchants", "excludeMerchants", "cap", "activated"])
+      #expect(none["cap"] is NSNull && none["activated"] as? Bool == false)
+      #expect(none["merchants"] as? [String] == ["Sample Mart"] && none["excludeMerchants"] as? [String] == ["Sample Gas"])
+      try await s.perform(.saveRotating(cardId: "c1", year: 2026, quarter: 4, RotatingBonusBody(
+        multiplier: 5, unit: "PERCENT", categories: [], merchants: [], excludeMerchants: [], cap: 1500, activated: true)))
+      let capped = try body(#require(writes().last))
+      #expect(capped.count == 7 && capped["cap"] as? Double == 1500 && capped["multiplier"] as? Double == 5)
+    }
+
+    @Test func perkBodies() async throws {
+      let s = await store()
+      try await s.perform(.decidePerk(transactionId: "t1", .yes(benefitId: "b1")))
+      let yes = try body(#require(writes().last))
+      #expect(yes as NSDictionary == ["decision": "yes", "benefitId": "b1"] as NSDictionary)
+      try await s.perform(.decidePerk(transactionId: "t1", .notThisPerk(benefitId: "b1")))
+      let no = try body(#require(writes().last))
+      #expect(no as NSDictionary == ["decision": "no", "benefitId": "b1"] as NSDictionary)
+      try await s.perform(.decidePerk(transactionId: "t1", .notAPerk))
+      let none = try body(#require(writes().last))
+      #expect(none["decision"] as? String == "no" && none["benefitId"] is NSNull && none.count == 2)
+      try await s.perform(.pickPurchase(creditId: "t1", purchaseId: nil))
+      let clear = try body(#require(writes().last))
+      #expect(clear.count == 1 && clear["purchaseId"] is NSNull)
+      try await s.perform(.pickPurchase(creditId: "t1", purchaseId: "t9"))
+      let pick = try body(#require(writes().last))
+      #expect(pick as NSDictionary == ["purchaseId": "t9"] as NSDictionary)
+    }
+
+    @Test func candidatesAreAGetWithTheBenefitId() async throws {
+      let c = APIClient(baseURL: base, session: StubURLProtocol.session { _ in
+        (200, Data(#"{"candidates":[{"id":"t0","date":"2026-03-04","name":"Sample Coffee","amount":4}]}"#.utf8))
+      })
+      let list = try await c.perkCandidates(benefitId: "b1")
+      #expect(list.map(\.name) == ["Sample Coffee"])
+      let r = try #require(StubURLProtocol.requests.first)
+      #expect(r.httpMethod == "GET" && r.url?.path() == "/api/perk-credits/candidates")
+      #expect(r.url?.query == "benefitId=b1")
     }
 
     @Test func artIsTheRawPNGAndRemovingItHasNoBody() async throws {
