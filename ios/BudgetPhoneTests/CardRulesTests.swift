@@ -232,8 +232,18 @@ struct CardRulesTests {
     #expect(CardRules.baseUnit(card([("GAS", "PERCENT")])) == "X")
   }
 
-  @Test func rotatingCategoriesLeaveOutOtherAndRotating() {
-    #expect(CardRules.rotatingCategories == Rewards.bonusCategories.filter { $0 != "ROTATING" })
+  @Test func rotatingCategoriesAreRewardCategoriesThenExtras() {
+    let list = CardRules.rotatingCategories
+    #expect(Array(list.prefix(8)) == Rewards.bonusCategories.filter { $0 != "ROTATING" })
+    #expect(!list.contains("ROTATING") && !list.contains("OTHER"))
+    #expect(list.firstIndex(of: "UTILITIES") == list.firstIndex(of: "DRUGSTORES")! + 1)
+    #expect(CardRules.rotatingLabel(for: "UTILITIES") == "Utilities")
+    #expect(CardRules.rotatingLabel(for: "GAS") == "Gas")
+  }
+
+  @Test func rotatingSummaryNamesExtraCategories() {
+    let b = RotatingBonusDTO(year: 2026, quarter: 4, multiplier: 5, unit: "PERCENT", categories: ["UTILITIES"])
+    #expect(CardRules.rotatingSummary(b, year: 2026, quarter: 4) == "Q4 2026 · 5% on Utilities")
   }
 
   @Test func pastQuartersLeaveOutTheCurrentOneNewestFirst() {

@@ -74,8 +74,23 @@ enum CardRules {
   /// REWARD_CATEGORIES: the bonus categories, then OTHER.
   static let rewardCategories = Rewards.bonusCategories + ["OTHER"]
 
-  /// What a rotating quarter can cover: the bonus categories without ROTATING.
-  static let rotatingCategories = Rewards.bonusCategories.filter { $0 != "ROTATING" }
+  /// BONUS_EXTRA_CATEGORIES (../src/lib/rotating.ts): rotating-only
+  /// categories the server matches on Plaid's codes.
+  static let bonusExtraCategories: [(key: String, label: String)] = [
+    ("UTILITIES", "Utilities"), ("HOME_IMPROVEMENT", "Home Improvement"), ("SUPERSTORES", "Superstores"),
+    ("ONLINE_MARKETPLACES", "Online Marketplaces"), ("FITNESS", "Fitness Clubs"), ("HOTELS", "Hotels"),
+    ("MOVIES", "Movies & Streaming TV"),
+  ]
+
+  /// What a rotating quarter can cover (ALLOWED in ../src/lib/rotating-body.ts):
+  /// the bonus categories without ROTATING, then the extras.
+  static let rotatingCategories =
+    Rewards.bonusCategories.filter { $0 != "ROTATING" } + bonusExtraCategories.map(\.key)
+
+  /// bonusCategoryLabel (../src/lib/rotating.ts).
+  static func rotatingLabel(for key: String) -> String {
+    bonusExtraCategories.first { $0.key == key }?.label ?? Rewards.label(for: key)
+  }
 
   /// The route's lowest start year (../src/app/api/user-cards/route.ts).
   static let earliestStartYear = 1980

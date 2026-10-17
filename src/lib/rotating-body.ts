@@ -1,6 +1,10 @@
 import { REWARD_CATEGORIES, REWARD_UNITS } from "@/lib/rewards";
+import { BONUS_EXTRA_CATEGORIES } from "@/lib/rotating";
 
-const ALLOWED = REWARD_CATEGORIES.filter((c) => c !== "OTHER" && c !== "ROTATING") as string[];
+const ALLOWED = [
+  ...REWARD_CATEGORIES.filter((c) => c !== "OTHER" && c !== "ROTATING"),
+  ...BONUS_EXTRA_CATEGORIES.map((e) => e.key),
+] as string[];
 
 export interface RotatingBody {
   multiplier: number;

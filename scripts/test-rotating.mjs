@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  bonusCategoryLabel,
   bonusFor,
   bonusMatches,
   quarterKey,
@@ -80,6 +81,29 @@ test("an excluded merchant blocks a category or merchant match", () => {
   assert.ok(!bonusMatches(b, "GROCERIES", "SAMPLE MART SUPERCENTER", null));
   assert.ok(!bonusMatches(b, "OTHER", "POS 4411", "Sample Mart"));
   assert.ok(bonusMatches(b, "GROCERIES", "Example Grocer", null));
+});
+
+test("extra categories match on Plaid's codes", () => {
+  const hotels = bonus({ categories: ["HOTELS"], merchants: [] });
+  const lodging = { pfcPrimary: "TRAVEL", pfcDetailed: "TRAVEL_LODGING" };
+  assert.ok(bonusMatches(hotels, "TRAVEL", "Sample Inn", null, lodging));
+  assert.ok(!bonusMatches(hotels, "TRAVEL", "Sample Air", null, { pfcPrimary: "TRAVEL", pfcDetailed: "TRAVEL_FLIGHTS" }));
+  assert.ok(!bonusMatches(hotels, "TRAVEL", "Sample Inn", null, null));
+  const home = bonus({ categories: ["HOME_IMPROVEMENT"], merchants: [] });
+  assert.ok(bonusMatches(home, "OTHER", "Example Hardware", null, { pfcPrimary: "HOME_IMPROVEMENT", pfcDetailed: null }));
+});
+
+test("an excluded merchant beats an extra-category match", () => {
+  const b = bonus({ categories: ["SUPERSTORES"], merchants: [], excludeMerchants: ["Sample Mart"] });
+  const superstore = { pfcPrimary: "GENERAL_MERCHANDISE", pfcDetailed: "GENERAL_MERCHANDISE_SUPERSTORES" };
+  assert.ok(!bonusMatches(b, "OTHER", "SAMPLE MART #12", null, superstore));
+  assert.ok(bonusMatches(b, "OTHER", "Example Superstore", null, superstore));
+});
+
+test("extra categories have labels", () => {
+  assert.equal(bonusCategoryLabel("UTILITIES"), "Utilities");
+  assert.equal(bonusCategoryLabel("MOVIES"), "Movies & Streaming TV");
+  assert.equal(bonusCategoryLabel("GAS"), "Gas");
 });
 
 // ── effectiveRateWithBonus ───────────────────────────────────────────────
@@ -191,6 +215,21 @@ test("groceries at an excluded merchant earn the normal rate", () => {
   const elsewhere = at("Example Grocer");
   assert.equal(elsewhere["ROTATING-2026-Q4"].spend, 100);
   assert.equal(elsewhere.GROCERIES, undefined);
+});
+
+test("an electric bill earns a Utilities bonus; rent and overridden rows don't", () => {
+  const b = bonus({ categories: ["UTILITIES"], merchants: [] });
+  const bill = (pfcDetailed, extra = {}) =>
+    gas(100, new Date(2026, 9, 4), {
+      pfcPrimary: "RENT_AND_UTILITIES",
+      pfcDetailed,
+      name: "Example Power Co",
+      ...extra,
+    });
+  const at = (t) => rows(computeEarnings(card, [], [t], start, end, [b]))["ROTATING-2026-Q4"];
+  assert.equal(at(bill("RENT_AND_UTILITIES_GAS_AND_ELECTRICITY")).earned, 5);
+  assert.equal(at(bill("RENT_AND_UTILITIES_RENT")), undefined);
+  assert.equal(at(bill("RENT_AND_UTILITIES_GAS_AND_ELECTRICITY", { userCategory: "Shopping" })), undefined);
 });
 
 test("a $40 gas purchase earns $2.00 at the bonus", () => {
@@ -350,6 +389,12 @@ test("bad bodies are refused", () => {
     assert.equal(typeof r.error, "string");
   }
   assert.equal(parseRotatingBody(null, "X").ok, false);
+});
+
+test("extra categories are allowed in a body", () => {
+  const r = parseRotatingBody(body({ categories: ["UTILITIES", "HOTELS"] }), "PERCENT");
+  assert.equal(r.ok, true);
+  assert.deepEqual(r.value.categories, ["UTILITIES", "HOTELS"]);
 });
 
 test("a bonus in another unit than the card's base is refused", () => {

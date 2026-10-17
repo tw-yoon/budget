@@ -185,7 +185,7 @@ struct RotatingBonusDTO: Decodable, Equatable, Identifiable, Sendable {
     self.unit = unit
     self.display = Rewards.formatRate(multiplier, unit)
     self.categories = categories
-    self.categoryLabels = categories.map(Rewards.label(for:))
+    self.categoryLabels = categories.map(CardRules.rotatingLabel(for:))
     self.merchants = merchants
     self.excludeMerchants = excludeMerchants
     self.cap = cap

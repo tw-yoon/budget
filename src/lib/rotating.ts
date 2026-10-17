@@ -4,6 +4,8 @@
  * quarters in local time.
  */
 
+import { REWARD_CATEGORY_LABELS } from "@/lib/rewards";
+
 export interface RotatingBonusInput {
   year: number;
   quarter: number;
@@ -29,14 +31,55 @@ export function quarterLabel(year: number, quarter: number): string {
   return `Q${quarter} ${year}`;
 }
 
+export interface PlaidCategory {
+  pfcPrimary: string;
+  pfcDetailed: string | null;
+}
+
+// Bonus categories rotating cards use that aren't reward categories, matched
+// on Plaid's personal-finance categories.
+export const BONUS_EXTRA_CATEGORIES: {
+  key: string;
+  label: string;
+  matches: (p: PlaidCategory) => boolean;
+}[] = [
+  {
+    key: "UTILITIES",
+    label: "Utilities",
+    matches: (p) =>
+      !!p.pfcDetailed?.startsWith("RENT_AND_UTILITIES_") && p.pfcDetailed !== "RENT_AND_UTILITIES_RENT",
+  },
+  {
+    key: "HOME_IMPROVEMENT",
+    label: "Home Improvement",
+    matches: (p) => p.pfcPrimary === "HOME_IMPROVEMENT" || !!p.pfcDetailed?.startsWith("HOME_IMPROVEMENT_"),
+  },
+  { key: "SUPERSTORES", label: "Superstores", matches: (p) => p.pfcDetailed === "GENERAL_MERCHANDISE_SUPERSTORES" },
+  {
+    key: "ONLINE_MARKETPLACES",
+    label: "Online Marketplaces",
+    matches: (p) => p.pfcDetailed === "GENERAL_MERCHANDISE_ONLINE_MARKETPLACES",
+  },
+  { key: "FITNESS", label: "Fitness Clubs", matches: (p) => p.pfcDetailed === "PERSONAL_CARE_GYMS_AND_FITNESS_CENTERS" },
+  { key: "HOTELS", label: "Hotels", matches: (p) => p.pfcDetailed === "TRAVEL_LODGING" },
+  { key: "MOVIES", label: "Movies & Streaming TV", matches: (p) => p.pfcDetailed === "ENTERTAINMENT_TV_AND_MOVIES" },
+];
+
+export function bonusCategoryLabel(key: string): string {
+  return REWARD_CATEGORY_LABELS[key] ?? BONUS_EXTRA_CATEGORIES.find((e) => e.key === key)?.label ?? key;
+}
+
 // A purchase earns the bonus when its reward category is one of the bonus's
-// categories, or its name or merchant name contains one of the merchants,
-// unless the name or merchant name contains an excluded merchant.
+// categories, its Plaid codes match one of the bonus's extra categories, or
+// its name or merchant name contains one of the merchants, unless the name or
+// merchant name contains an excluded merchant. `plaid` is null when the user
+// overrode the category: then only the reward category counts, as in earnings.
 export function bonusMatches(
   b: RotatingBonusInput,
   rewardCategory: string,
   name: string,
-  merchantName: string | null
+  merchantName: string | null,
+  plaid: PlaidCategory | null = null
 ): boolean {
   const hay = [name, merchantName ?? ""].map((s) => s.toLowerCase());
   const named = (list: string[]) =>
@@ -45,7 +88,9 @@ export function bonusMatches(
       return needle !== "" && hay.some((h) => h.includes(needle));
     });
   if (named(b.excludeMerchants)) return false;
-  return b.categories.includes(rewardCategory) || named(b.merchants);
+  const extra = (e: (typeof BONUS_EXTRA_CATEGORIES)[number]) =>
+    plaid !== null && b.categories.includes(e.key) && e.matches(plaid);
+  return b.categories.includes(rewardCategory) || BONUS_EXTRA_CATEGORIES.some(extra) || named(b.merchants);
 }
 
 // The bonus for a purchase date's quarter. Activation doesn't gate the math:

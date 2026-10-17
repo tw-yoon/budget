@@ -14,7 +14,7 @@ import { prisma } from "@/lib/prisma";
 import { humanizePfc, localDay } from "@/lib/format";
 import { REWARD_CATEGORY_LABELS, formatRate } from "@/lib/rewards";
 import { computeEarnings } from "@/lib/earnings";
-import { quarterKey, quarterLabel, quarterOf, type RotatingBonusInput } from "@/lib/rotating";
+import { bonusCategoryLabel, quarterKey, quarterLabel, quarterOf, type RotatingBonusInput } from "@/lib/rotating";
 import { loadPerkPlacement } from "@/services/perk-credits.service";
 import type {
   BenefitDTO,
@@ -336,7 +336,7 @@ export async function getUserCardsWithProgress(
         key: quarterKey(b.year, b.quarter),
         label: quarterLabel(b.year, b.quarter),
         display: formatRate(b.multiplier, b.unit),
-        categoryLabels: b.categories.map((c) => REWARD_CATEGORY_LABELS[c] ?? c),
+        categoryLabels: b.categories.map(bonusCategoryLabel),
         current: b.year === nowQ.year && b.quarter === nowQ.quarter,
       }));
 

@@ -131,7 +131,7 @@ struct RotatingSheet: View {
               if on { categories.remove(category) } else { categories.insert(category) }
             } label: {
               HStack {
-                Text(Rewards.label(for: category))
+                Text(CardRules.rotatingLabel(for: category))
                 Spacer()
                 if on { Image(systemName: "checkmark").foregroundStyle(.tint) }
               }

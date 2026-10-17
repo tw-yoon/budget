@@ -11,6 +11,11 @@ update), so nothing here is a stability promise.
 
 ## Unreleased
 
+## 0.15.1 — 2026-10-16
+
+- Rotating quarters can also cover Utilities, Home Improvement, Superstores,
+  Online Marketplaces, Fitness Clubs, Hotels and Movies & Streaming TV.
+
 ## 0.15.0 — 2026-10-16
 
 - Ledger search (web and iPhone) also finds amounts ("12", "$4.50"), dates

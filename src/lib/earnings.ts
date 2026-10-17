@@ -96,7 +96,7 @@ export function computeEarnings(
       // betterOfBonus returns the very same object when the normal rate wins.
       const normalRate = effectiveRate(card.rewardRates, c);
       const bonusRate = bonus ? betterOfBonus(normalRate, bonus, card.pointValueCents) : normalRate;
-      if (bonus && bonusRate !== normalRate && bonusMatches(bonus, c, t.name, t.merchantName)) {
+      if (bonus && bonusRate !== normalRate && bonusMatches(bonus, c, t.name, t.merchantName, slice.userCategory ? null : t)) {
         const key = quarterKey(bonus.year, bonus.quarter);
         const bucket = bonusBuckets.get(key) ?? {
           bonus,
