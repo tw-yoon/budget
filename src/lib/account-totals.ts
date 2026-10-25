@@ -53,3 +53,21 @@ export function summarizeAccounts(accounts: AccountDTO[]): {
     },
   };
 }
+
+/**
+ * What a BalanceSnapshot stores: every live account's balance, liabilities
+ * negative so the balances add up to net worth. Same input, same string, so
+ * an unchanged snapshot can be skipped by comparing it to the last one.
+ */
+export function snapshotAccounts(accounts: AccountDTO[]): string {
+  return JSON.stringify(
+    accounts
+      .filter((a) => !a.disconnected)
+      .map((a) => ({
+        name: a.displayName ?? a.name,
+        mask: a.mask,
+        institution: a.institution,
+        balance: round(a.isLiability ? -a.currentBalance : a.currentBalance),
+      }))
+  );
+}

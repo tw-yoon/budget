@@ -10,6 +10,7 @@ export interface CreditRow {
   pending: boolean; isFee: boolean;
   decision: "YES" | "NO" | null; // owner's answer
   benefitId: string | null;      // YES: the perk; NO: the perk refused (null = not a perk at all)
+  spentOn?: Date | null;         // date of the linked purchase; the credit counts toward that window
 }
 export interface PerkInput {
   id: string; accountId: string; amount: number; period: string; keywords: string[];
@@ -39,7 +40,7 @@ export function isCreditCandidate(
 export function placeCredits(
   perks: PerkInput[],
   rows: CreditRow[],
-  windowKey: (period: string, date: Date) => string,
+  windowKeyOf: (period: string, date: Date) => string,
   askSince: Date,
 ): Placement {
   const placed = new Map<string, Placed>();
@@ -52,9 +53,11 @@ export function placeCredits(
   const ordered = [...rows].sort((a, b) => a.date.getTime() - b.date.getTime());
   for (const r of ordered) {
     const value = -r.amount;
+    // A credit posting on 9/1 for an 8/31 purchase is August's credit.
+    const windowKey = (period: string) => windowKeyOf(period, r.spentOn ?? r.date);
     const confirmed = r.decision === "YES" && r.benefitId ? byId.get(r.benefitId) : undefined;
     if (confirmed) {
-      const wk = windowKey(confirmed.period, r.date);
+      const wk = windowKey(confirmed.period);
       placed.set(r.id, { benefitId: confirmed.id, how: "confirmed", windowKey: wk });
       add(confirmed, wk, value);
       continue;
@@ -68,7 +71,7 @@ export function placeCredits(
 
     if (matches.length === 1) {
       const p = matches[0];
-      const wk = windowKey(p.period, r.date);
+      const wk = windowKey(p.period);
       if (p.amount - sumOf(p, wk) > CENT) {
         placed.set(r.id, { benefitId: p.id, how: "auto", windowKey: wk });
         add(p, wk, value);
@@ -85,7 +88,7 @@ export function placeCredits(
       transactionId: r.id,
       suggestedBenefitId: suggested?.id ?? null,
       windowFull:
-        matches.length > 0 && matches[0].amount - sumOf(matches[0], windowKey(matches[0].period, r.date)) <= CENT,
+        matches.length > 0 && matches[0].amount - sumOf(matches[0], windowKey(matches[0].period)) <= CENT,
     });
   }
   return { placed, questions };
@@ -172,6 +175,17 @@ export function parseKeywords(value: unknown): string[] | { error: string } {
   }
   if (list.length > MAX_KEYWORDS) return { error: `At most ${MAX_KEYWORDS} keywords` };
   return list;
+}
+
+export const MAX_NOTES_LENGTH = 1000;
+
+/** `notes` of PATCH /api/benefits/:id: trimmed text, null to clear, or an error message. */
+export function parseNotes(value: unknown): string | null | { error: string } {
+  if (value === null) return null;
+  if (typeof value !== "string") return { error: "notes must be text" };
+  const v = value.trim();
+  if (v.length > MAX_NOTES_LENGTH) return { error: `Notes must be ${MAX_NOTES_LENGTH} characters or fewer` };
+  return v === "" ? null : v;
 }
 
 /** Body of PUT /api/perk-credits/:id, or null when malformed. */

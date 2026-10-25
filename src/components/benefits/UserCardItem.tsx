@@ -470,6 +470,7 @@ function BenefitRow({
     benefit.source === "manual" ? String(benefit.used) : ""
   );
   const [busy, setBusy] = useState(false);
+  const [notes, setNotes] = useState(benefit.notes ?? "");
 
   const complete = benefit.pct >= 1;
   const pctWidth = Math.round(benefit.pct * 100);
@@ -485,6 +486,18 @@ function BenefitRow({
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ usedManual }),
+    });
+    setBusy(false);
+    onChanged();
+  }
+
+  async function saveNotes() {
+    if (notes.trim() === (benefit.notes ?? "")) return;
+    setBusy(true);
+    await fetch(`/api/benefits/${benefit.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ notes }),
     });
     setBusy(false);
     onChanged();
@@ -621,6 +634,17 @@ function BenefitRow({
           </button>
         </div>
       </div>
+
+      <textarea
+        value={notes}
+        onChange={(e) => setNotes(e.target.value)}
+        onBlur={saveNotes}
+        maxLength={1000}
+        rows={notes.includes("\n") ? 3 : 1}
+        placeholder="Notes — where to use this credit"
+        aria-label={`Notes for ${benefit.name}`}
+        className="mt-2 w-full resize-y rounded border border-black/10 bg-transparent px-2 py-1 text-xs outline-none placeholder:text-black/35 focus:border-black/40 dark:border-white/10 dark:placeholder:text-white/35 dark:focus:border-white/40"
+      />
 
       <YearStrip benefit={benefit} onChanged={onChanged} />
     </div>

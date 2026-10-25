@@ -1,7 +1,7 @@
 import { withServerTiming } from "@/lib/server-timing";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { LIABILITY_TYPES, summarizeAccounts } from "@/lib/account-totals";
+import { LIABILITY_TYPES, snapshotAccounts, summarizeAccounts } from "@/lib/account-totals";
 import { mergeLinks } from "@/lib/reconnect-merge";
 import type { AccountDTO } from "@/types";
 
@@ -36,6 +36,13 @@ async function handleGET() {
 
     // A disconnected bank's accounts stay listed but count toward no total.
     const { groups, summary } = summarizeAccounts(accounts);
+
+    // Balance history: save one whenever balances changed since the last.
+    const snapshot = snapshotAccounts(accounts);
+    const last = await prisma.balanceSnapshot.findFirst({ orderBy: { takenAt: "desc" } });
+    if (last?.accounts !== snapshot) {
+      await prisma.balanceSnapshot.create({ data: { netWorth: summary.netWorth, accounts: snapshot } });
+    }
 
     const items = await prisma.plaidItem.findMany({
       include: { _count: { select: { accounts: true } } },

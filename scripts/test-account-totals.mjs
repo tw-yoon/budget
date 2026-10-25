@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { summarizeAccounts } from "../src/lib/account-totals.ts";
+import { snapshotAccounts, summarizeAccounts } from "../src/lib/account-totals.ts";
 import { deleteConfirm, disconnectConfirm } from "../src/lib/bank-actions.ts";
 
 function account(id, type, currentBalance, { disconnected = false, at = "2026-05-01T10:00:00.000Z" } = {}) {
@@ -86,4 +86,12 @@ test("the Delete History confirm on a disconnected bank", () => {
   assert.doesNotMatch(message, /disconnects/);
   assert.match(message, /1 account and 40 transactions/);
   assert.match(message, /cannot be undone/);
+});
+
+test("a snapshot's balances add up to net worth and skip disconnected banks", () => {
+  const rows = JSON.parse(snapshotAccounts(accounts));
+  const total = rows.reduce((s, r) => s + r.balance, 0);
+  assert.equal(Math.round(total * 100) / 100, summarizeAccounts(accounts).summary.netWorth);
+  assert.equal(rows.length, accounts.filter((a) => !a.disconnected).length);
+  assert.equal(snapshotAccounts(accounts), snapshotAccounts(accounts));
 });

@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   isCreditCandidate, placeCredits, learnKeyword, rankPurchases, pickAutoPair,
-  matchesKeyword, appendUnique, parsePerkAnswer, parsePurchasePick, canAutoPair, openPurchases, parseKeywords,
+  matchesKeyword, appendUnique, parsePerkAnswer, parsePurchasePick, canAutoPair, openPurchases, parseKeywords, parseNotes,
 } from "../src/lib/perk-credits.ts";
 
 const key = (p, d) => `${d.getFullYear()}-${d.getMonth() + 1}`;
@@ -229,4 +229,21 @@ test("parseKeywords trims, dedupes and refuses bad keywords", () => {
   assert.ok("error" in parseKeywords(["x".repeat(61)]));
   assert.ok("error" in parseKeywords(Array.from({ length: 21 }, (_, i) => `Sample Shop ${i}`)));
   assert.equal(parseKeywords(Array.from({ length: 20 }, (_, i) => `Sample Shop ${i}`)).length, 20);
+});
+
+test("a credit counts toward its linked purchase's window, not its posting date", () => {
+  const aug = row({ date: new Date(2026, 8, 1), spentOn: new Date(2026, 7, 31) });
+  const sep = row({ date: new Date(2026, 8, 20) });
+  const out = run([coffee], [aug, sep]);
+  assert.equal(out.placed.get(aug.id).windowKey, "2026-8");
+  assert.equal(out.placed.get(sep.id).windowKey, "2026-9");
+  assert.deepEqual(out.questions, []);
+});
+
+test("parseNotes trims, clears on empty or null, and rejects non-text or too long", () => {
+  assert.equal(parseNotes("  Sample Bistro  "), "Sample Bistro");
+  assert.equal(parseNotes("   "), null);
+  assert.equal(parseNotes(null), null);
+  assert.ok(parseNotes(5).error);
+  assert.ok(parseNotes("x".repeat(1001)).error);
 });

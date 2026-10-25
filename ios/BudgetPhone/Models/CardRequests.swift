@@ -93,7 +93,7 @@ struct NewBenefit: Encodable, Equatable, Sendable {
   }
 }
 
-/// PATCH /api/benefits/:id — one of the route's four bodies.
+/// PATCH /api/benefits/:id — one of the route's five bodies.
 enum BenefitPatch: Encodable, Equatable, Sendable {
   /// `{ usedManual }`: log the current period; nil reverts to auto.
   case usedManual(Double?)
@@ -103,8 +103,10 @@ enum BenefitPatch: Encodable, Equatable, Sendable {
   case perkActive(Bool)
   /// `{ matchText }`: replace the keywords credits match on.
   case matchText([String])
+  /// `{ notes }`: the owner's memo; nil clears it.
+  case notes(String?)
 
-  private enum CodingKeys: String, CodingKey { case usedManual, periodKey, value, perkActive, matchText }
+  private enum CodingKeys: String, CodingKey { case usedManual, periodKey, value, perkActive, matchText, notes }
 
   func encode(to encoder: Encoder) throws {
     var c = encoder.container(keyedBy: CodingKeys.self)
@@ -115,6 +117,7 @@ enum BenefitPatch: Encodable, Equatable, Sendable {
       try c.encode(value, forKey: .value)
     case .perkActive(let on): try c.encode(on, forKey: .perkActive)
     case .matchText(let keywords): try c.encode(keywords, forKey: .matchText)
+    case .notes(let text): try c.encode(text, forKey: .notes)
     }
   }
 }

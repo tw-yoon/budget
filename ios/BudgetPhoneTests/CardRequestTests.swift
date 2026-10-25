@@ -73,6 +73,10 @@ struct CardRequestTests {
     #expect(Set(keywords.keys) == ["matchText"] && keywords["matchText"] as? [String] == ["Sample Coffee", "Resy"])
     let none = try json(BenefitPatch.matchText([]))
     #expect(none["matchText"] as? [String] == [])
+    let notes = try json(BenefitPatch.notes("Sample Bistro"))
+    #expect(Set(notes.keys) == ["notes"] && notes["notes"] as? String == "Sample Bistro")
+    let cleared = try json(BenefitPatch.notes(nil))
+    #expect(cleared["notes"] is NSNull)
   }
 
   @Test func reorderBody() throws {

@@ -70,15 +70,16 @@ export async function loadPerkPlacement(now: Date = new Date()): Promise<{
       select: {
         id: true, accountId: true, date: true, amount: true, name: true, merchantName: true,
         pfcDetailed: true, pending: true, isFee: true, benefitDecision: true, benefitId: true,
-        linkedToId: true, noAutoPair: true, userCategorySource: true,
+        linkedToId: true, noAutoPair: true, userCategorySource: true, linkedTo: { select: { date: true } },
       },
     });
     for (const t of txs) {
       if (!isCreditCandidate(t)) continue;
-      const { benefitDecision, ...rest } = t;
+      const { benefitDecision, linkedTo, ...rest } = t;
       rows.set(t.id, {
         ...rest,
         date: localDay(t.date),
+        spentOn: linkedTo ? localDay(linkedTo.date) : null,
         decision: benefitDecision === "YES" || benefitDecision === "NO" ? benefitDecision : null,
       });
     }

@@ -11,6 +11,13 @@ update), so nothing here is a stability promise.
 
 ## Unreleased
 
+## 0.15.2 — 2026-10-24
+
+- A statement credit counts toward the month of the purchase it paid back,
+  not the day it posted: a purchase on the 31st refunded on the 1st now fills
+  the earlier month, leaving the next month's credit open.
+- Notes on each credit (web and iPhone), for memos on where to use it.
+
 ## 0.15.1 — 2026-10-16
 
 - Rotating quarters can also cover Utilities, Home Improvement, Superstores,

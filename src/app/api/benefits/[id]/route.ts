@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { perkDeleteCleanup } from "@/services/perk-credits.service";
-import { parseKeywords } from "@/lib/perk-credits";
+import { parseKeywords, parseNotes } from "@/lib/perk-credits";
 
 // PATCH /api/benefits/:id — update manual usage or the perk switch.
 // Body one of:
@@ -9,6 +9,7 @@ import { parseKeywords } from "@/lib/perk-credits";
 //   { periodKey: string, value: number|null }per-window override (null clears the key)
 //   { perkActive: boolean }                  switch a flat-value perk on/off
 //   { matchText: string[] }                  replace the keywords credits match on
+//   { notes: string | null }                 the owner's memo (null or "" clears)
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -31,6 +32,13 @@ export async function PATCH(
       const keywords = parseKeywords(body.matchText);
       if (!Array.isArray(keywords)) return bad(keywords.error);
       await prisma.userBenefit.update({ where: { id }, data: { matchText: JSON.stringify(keywords) } });
+      return NextResponse.json({ ok: true });
+    }
+
+    if ("notes" in body) {
+      const notes = parseNotes(body.notes);
+      if (typeof notes === "object" && notes !== null) return bad(notes.error);
+      await prisma.userBenefit.update({ where: { id }, data: { notes } });
       return NextResponse.json({ ok: true });
     }
 

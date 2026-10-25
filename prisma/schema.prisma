@@ -388,3 +388,14 @@ model SyncLog {
 
   @@index([itemId, syncedAt])
 }
+
+// Net worth and every live balance, saved by GET /api/accounts whenever they
+// differ from the last snapshot, so a drop can be traced to an account and day.
+model BalanceSnapshot {
+  id       String   @id @default(cuid())
+  takenAt  DateTime @default(now())
+  netWorth Float
+  accounts String // JSON [{ name, mask, institution, balance }]; liabilities negative
+
+  @@index([takenAt])
+}

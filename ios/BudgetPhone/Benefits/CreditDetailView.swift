@@ -3,7 +3,7 @@ import SwiftUI
 /// One statement credit (BenefitRow and YearStrip in
 /// ../src/components/benefits/UserCardItem.tsx): its progress, the credits
 /// placed in each window with the purchase each paid back, the perk switch, a
-/// logged amount, the keywords credits match on, the year's windows, and Delete.
+/// logged amount, the keywords credits match on, notes, the year's windows, and Delete.
 struct CreditDetailView: View {
   let cardId: String
   let id: String
@@ -19,6 +19,8 @@ struct CreditDetailView: View {
   @State private var keywordIndex: Int?
   @State private var keywordText = ""
   @FocusState private var usedFocused: Bool
+  @State private var notesText = ""
+  @FocusState private var notesFocused: Bool
 
   private var benefit: BenefitDTO? {
     store.card(id: cardId)?.benefits.first { $0.id == id }
@@ -106,6 +108,15 @@ struct CreditDetailView: View {
         Text("Keywords")
       }
 
+      Section {
+        TextField("Where to use this credit", text: $notesText, axis: .vertical)
+          .focused($notesFocused)
+          .onChange(of: notesFocused) { _, focused in if !focused { saveNotes(benefit) } }
+          .onDisappear { if notesFocused { saveNotes(benefit) } }
+      } header: {
+        Text("Notes")
+      }
+
       if benefit.yearBreakdown.count > 1 {
         Section {
           ForEach(benefit.yearBreakdown) { window in
@@ -132,12 +143,14 @@ struct CreditDetailView: View {
       }
     }
     .listStyle(.insetGrouped)
+    .scrollDismissesKeyboard(.interactively)
     .tabBarScrollTracking()
     .navigationTitle(benefit.name)
     .navigationBarTitleDisplayMode(.inline)
     .sheet(item: $picking) { PerkPickerSheet(kind: $0, store: store) }
     .onAppear {
       if usedText.isEmpty && benefit.source == "manual" { usedText = Formatters.plainNumber(benefit.used) }
+      notesText = benefit.notes ?? ""
     }
     .alert(keywordIndex == nil ? "Add Keyword" : "Edit Keyword", isPresented: $keywordAlert) {
       TextField("Keyword", text: $keywordText)
@@ -200,6 +213,13 @@ struct CreditDetailView: View {
       list.append(keyword)
     }
     write(.updateBenefit(id: benefit.id, .matchText(list)))
+  }
+
+  /// Saves when the field loses focus, only if it changed; empty clears.
+  private func saveNotes(_ benefit: BenefitDTO) {
+    let text = notesText.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard text != (benefit.notes ?? "") else { return }
+    write(.updateBenefit(id: benefit.id, .notes(text.isEmpty ? nil : text)))
   }
 
   private func addTransaction(_ benefit: BenefitDTO) -> some View {
