@@ -11,6 +11,12 @@ update), so nothing here is a stability promise.
 
 ## Unreleased
 
+## 0.15.3 — 2026-10-25
+
+- "Transfer In" and "Transfer Out" are merged into one "Transfer"
+  category. Money tagged "Transfer In" (a Venmo from family, say) no longer
+  counts against spending like a refund and pulls the spending graph down.
+
 ## 0.15.2 — 2026-10-24
 
 - A statement credit counts toward the month of the purchase it paid back,
