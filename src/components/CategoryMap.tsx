@@ -29,13 +29,13 @@ export function CategoryMap({ categories, primaries, unmapped, onToggle }: Props
 
   return (
     <div className="flex flex-col gap-3">
-      <p className="text-xs text-black/50 dark:text-white/50">
+      <p className="text-xs text-muted2">
         {selected
           ? `Now click the category for ${humanizePfc(selected)} (click its current one to disconnect, or the label again to cancel).`
           : "Click a Plaid label, then the category it belongs to. Amber labels aren't connected yet."}
       </p>
       {picked?.examples && picked.examples.length > 0 && (
-        <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
+        <div className="group-panel px-3 py-2 text-xs text-warn">
           <span className="font-medium">
             {humanizePfc(picked.pfcPrimary)} · {picked.transactionCount} tx, e.g.{" "}
           </span>
@@ -57,10 +57,10 @@ export function CategoryMap({ categories, primaries, unmapped, onToggle }: Props
                     onClick={() => setSelected(isSel ? null : p)}
                     className={`truncate rounded px-2 py-0.5 text-xs ${
                       isSel
-                        ? "bg-black text-white dark:bg-white dark:text-black"
+                        ? "bg-foreground text-background"
                         : u
-                        ? "bg-amber-100 text-amber-800 ring-1 ring-amber-300 hover:bg-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:ring-amber-500/40"
-                        : "text-black/70 hover:bg-black/[0.06] dark:text-white/70 dark:hover:bg-white/10"
+                        ? "bg-panel2 text-warn ring-1 ring-warn"
+                        : "text-muted2 hover:bg-panel2"
                     }`}
                   >
                     {humanizePfc(p)}
@@ -81,7 +81,7 @@ export function CategoryMap({ categories, primaries, unmapped, onToggle }: Props
                   d={`M6 ${y(i)} C${GAP / 2} ${y(i)}, ${GAP / 2} ${y(ci)}, ${GAP - 6} ${y(ci)}`}
                   fill="none"
                   strokeWidth={active ? 2.5 : 1.25}
-                  className={active ? "stroke-black dark:stroke-white" : "stroke-sky-500/60"}
+                  className={active ? "stroke-foreground" : "stroke-accent/60"}
                 />
               );
             })}
@@ -91,7 +91,7 @@ export function CategoryMap({ categories, primaries, unmapped, onToggle }: Props
                 cx={6}
                 cy={y(i)}
                 r={4}
-                className={unmappedBy.has(p) ? "fill-amber-500" : owner.has(p) ? "fill-sky-500" : "fill-black/25 dark:fill-white/25"}
+                className={unmappedBy.has(p) ? "fill-warn" : owner.has(p) ? "fill-accent" : "fill-dim2"}
               />
             ))}
             {categories.map((c, i) => (
@@ -100,7 +100,7 @@ export function CategoryMap({ categories, primaries, unmapped, onToggle }: Props
                 cx={GAP - 6}
                 cy={y(i)}
                 r={4}
-                className={c.plaidPrimaries.length ? "fill-sky-500" : "fill-black/25 dark:fill-white/25"}
+                className={c.plaidPrimaries.length ? "fill-accent" : "fill-dim2"}
               />
             ))}
           </svg>
@@ -118,9 +118,9 @@ export function CategoryMap({ categories, primaries, unmapped, onToggle }: Props
                   className={`truncate rounded px-2 py-0.5 text-xs ${
                     selected
                       ? owner.get(selected) === c.id
-                        ? "bg-sky-100 text-sky-700 hover:bg-red-100 hover:text-red-700 dark:bg-sky-500/15 dark:text-sky-300"
-                        : "text-black/80 ring-1 ring-black/15 hover:bg-sky-100 dark:text-white/80 dark:ring-white/20 dark:hover:bg-sky-500/15"
-                      : "text-black/70 dark:text-white/70"
+                        ? "bg-panel2 text-accent hover:text-neg"
+                        : "text-foreground ring-1 ring-line hover:bg-panel2"
+                      : "text-muted2"
                   }`}
                 >
                   {c.name}

@@ -20,8 +20,8 @@ const MODES: { value: ProMode; label: string; blurb: string }[] = [
 ];
 
 const THEMES: { value: Theme; label: string; blurb: string }[] = [
-  { value: "light", label: "Light", blurb: "Always the paper palette." },
-  { value: "dark", label: "Dark", blurb: "Always the terminal palette." },
+  { value: "light", label: "Light", blurb: "Always light." },
+  { value: "dark", label: "Dark", blurb: "Always dark." },
   {
     value: "system",
     label: "System",
@@ -36,69 +36,65 @@ export function SettingsMode() {
   return (
     <div className="flex flex-col gap-5">
       <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Mode</h1>
-        <p className="text-sm text-black/55 dark:text-white/55">
+        <h1>Mode</h1>
+        <p className="text-sm text-muted2">
           How much detail the app shows, and how it looks.
         </p>
       </header>
 
-      <div className="flex flex-col gap-3">
+      <div className="group-panel">
         {MODES.map((m) => (
           <button
             key={m.value}
             type="button"
             onClick={() => choose(m.value)}
             aria-pressed={mode === m.value}
-            className={`rounded-lg border px-4 py-3 text-left transition-colors ${
-              mode === m.value
-                ? "border-foreground bg-black/[0.03] dark:bg-white/[0.06]"
-                : "border-black/10 hover:border-black/30 dark:border-white/10 dark:hover:border-white/30"
+            className={`group-row block w-full text-left transition-colors hover:bg-panel2 ${
+              mode === m.value ? "bg-panel2" : ""
             }`}
           >
             <span className="flex items-center gap-2 text-sm font-medium">
               {m.label}
               {mode === m.value && (
-                <span className="rounded bg-foreground px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-background">
+                <span className="chip">
                   Current
                 </span>
               )}
             </span>
-            <span className="mt-1 block text-sm text-black/55 dark:text-white/55">
+            <span className="mt-1 block text-sm text-muted2">
               {m.blurb}
             </span>
           </button>
         ))}
       </div>
 
-      <section className="flex flex-col gap-3 border-t border-black/10 pt-5 dark:border-white/10">
+      <section className="flex flex-col gap-3">
         <div>
-          <h2 className="text-sm font-medium">Appearance</h2>
-          <p className="text-sm text-black/55 dark:text-white/55">
+          <h2>Appearance</h2>
+          <p className="text-sm text-muted2">
             This follows you between browsers, like the rest of your settings.
           </p>
         </div>
-        <div className="flex flex-col gap-3">
+        <div className="group-panel">
           {THEMES.map((t) => (
             <button
               key={t.value}
               type="button"
               onClick={() => chooseTheme(t.value)}
               aria-pressed={theme === t.value}
-              className={`rounded-lg border px-4 py-3 text-left transition-colors ${
-                theme === t.value
-                  ? "border-foreground bg-black/[0.03] dark:bg-white/[0.06]"
-                  : "border-black/10 hover:border-black/30 dark:border-white/10 dark:hover:border-white/30"
+              className={`group-row block w-full text-left transition-colors hover:bg-panel2 ${
+                theme === t.value ? "bg-panel2" : ""
               }`}
             >
               <span className="flex items-center gap-2 text-sm font-medium">
                 {t.label}
                 {theme === t.value && (
-                  <span className="rounded bg-foreground px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-background">
+                  <span className="chip">
                     Current
                   </span>
                 )}
               </span>
-              <span className="mt-1 block text-sm text-black/55 dark:text-white/55">
+              <span className="mt-1 block text-sm text-muted2">
                 {t.blurb}
               </span>
             </button>

@@ -34,7 +34,7 @@ export function CardArt({
   const { from, to } = cardArtColors(issuer, `${issuer}-${name ?? ""}-${last4}`);
 
   // 1.586:1 — the ISO/IEC 7810 ID-1 ratio every bank card is cut to.
-  const shell = "relative aspect-[1.586] shrink-0 overflow-hidden rounded-md";
+  const shell = "relative aspect-[1.586] shrink-0 overflow-hidden rounded-[10px]";
 
   if (src) {
     // A local file of unknown dimensions, and this app has no image loader to
@@ -71,10 +71,10 @@ export function CardArt({
       />
       {!small && (
         <>
-          <span className="absolute left-2 top-1.5 text-[9px] font-semibold uppercase tracking-wider text-white/80">
+          <span className="absolute left-2 top-1.5 text-[9px] font-semibold text-white/80">
             {ISSUER_LABELS[issuer] ?? issuer}
           </span>
-          <span className="absolute bottom-1.5 left-2 font-mono text-[10px] tabular-nums text-white/70">
+          <span className="absolute bottom-1.5 left-2 text-[10px] tabular-nums text-white/70">
             ··{last4}
           </span>
         </>

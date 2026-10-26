@@ -49,10 +49,10 @@ export function BestCards({ cards }: { cards: UserCardDTO[] }) {
   });
 
   return (
-    <div className="rounded-xl border border-black/10 p-4 dark:border-white/10">
+    <div className="group-panel p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold">Best card by category</h2>
-        <span className="text-xs text-black/45 dark:text-white/45">
+        <h2>Best card by category</h2>
+        <span className="text-xs text-muted2">
           ranked by raw rate · points and cashback aren&apos;t directly comparable
         </span>
       </div>
@@ -66,9 +66,9 @@ export function BestCards({ cards }: { cards: UserCardDTO[] }) {
             // and rate beside the image's top edge and the runners-up under that.
             <div
               key={category}
-              className="rounded-lg border border-black/10 px-3 py-2 dark:border-white/10"
+              className="rounded-lg bg-background px-3 py-2"
             >
-              <div className="text-[11px] uppercase tracking-wide text-black/45 dark:text-white/45">
+              <div className="section-caption">
                 {REWARD_CATEGORY_LABELS[category]}
               </div>
               <div className="mt-1.5 flex gap-3">
@@ -78,19 +78,19 @@ export function BestCards({ cards }: { cards: UserCardDTO[] }) {
                     <span className="truncate text-sm font-medium" title={shortLabel(best.card)}>
                       {shortLabel(best.card)}
                     </span>
-                    <span className="shrink-0 font-mono text-sm tabular-nums">
+                    <span className="shrink-0 text-sm tabular-nums">
                       {formatRate(best.multiplier, best.unit)}
                       {!best.isBonus && (
-                        <span className="text-black/40 dark:text-white/40"> base</span>
+                        <span className="text-dim2"> base</span>
                       )}
                     </span>
                   </div>
                   {runners.length > 0 && (
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-black/45 dark:text-white/45">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted2">
                       {runners.map((r) => (
                         <span key={r.card.id} className="flex items-center gap-1.5">
                           <Face card={r.card} width={28} />
-                          <span className="font-mono tabular-nums">
+                          <span className="tabular-nums">
                             {formatRate(r.multiplier, r.unit)}
                           </span>
                         </span>

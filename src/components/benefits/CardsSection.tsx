@@ -7,9 +7,6 @@ import { UserCardItem } from "./UserCardItem";
 import { RatesNote } from "./RatesNote";
 import { useUserCards } from "./useUserCards";
 
-const inputClass =
-  "rounded-md border border-black/15 bg-transparent px-2.5 py-1.5 text-sm outline-none placeholder:text-black/40 focus:border-black/40 dark:border-white/15 dark:placeholder:text-white/40 dark:focus:border-white/40";
-
 // Expand a 1–2 digit year ("26" -> 2026) to a full year. Values at or before the
 // current 2-digit year map to 20xx; later ones to 19xx (e.g. "98" -> 1998).
 // A 4-digit input is used as-is.
@@ -32,15 +29,15 @@ export function CardsSection() {
       <AddCardForm onAdded={load} />
 
       {error ? (
-        <div className="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-400">
+        <div className="rounded-xl bg-neg/10 px-4 py-3 text-sm text-neg">
           {error}
         </div>
       ) : loading && cards.length === 0 ? (
-        <div className="rounded-lg border border-black/10 px-6 py-12 text-center text-sm text-black/50 dark:border-white/10 dark:text-white/50">
+        <div className="group-panel px-6 py-12 text-center text-sm text-muted2">
           Loading…
         </div>
       ) : cards.length === 0 ? (
-        <div className="rounded-lg border border-black/10 px-6 py-12 text-center text-sm text-black/50 dark:border-white/10 dark:text-white/50">
+        <div className="group-panel px-6 py-12 text-center text-sm text-muted2">
           No cards yet. Add one above to start tracking its benefits.
         </div>
       ) : (
@@ -108,14 +105,14 @@ function AddCardForm({ onAdded }: { onAdded: () => void }) {
   return (
     <form
       onSubmit={submit}
-      className="rounded-xl border border-black/10 p-4 dark:border-white/10"
+      className="group-panel p-4"
     >
       <div className="text-sm font-medium">Add a card</div>
 
       <select
         value={presetSlug}
         onChange={(e) => setPresetSlug(e.target.value)}
-        className={`mt-3 w-full ${inputClass}`}
+        className="mt-3 w-full field"
       >
         <option value="">Custom card (enter rates yourself)</option>
         {ISSUERS.map((iss) => (
@@ -137,11 +134,7 @@ function AddCardForm({ onAdded }: { onAdded: () => void }) {
                 type="button"
                 key={i}
                 onClick={() => setIssuer(i)}
-                className={`rounded-md px-3 py-1.5 text-sm transition-colors ${
-                  issuer === i
-                    ? "bg-foreground text-background"
-                    : "border border-black/15 text-black/70 hover:bg-black/[0.03] dark:border-white/15 dark:text-white/70 dark:hover:bg-white/[0.04]"
-                }`}
+                className={`btn ${issuer === i ? "btn-primary" : ""}`}
               >
                 {ISSUER_LABELS[i]}
               </button>
@@ -151,7 +144,7 @@ function AddCardForm({ onAdded }: { onAdded: () => void }) {
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Card name (optional, e.g. Platinum)"
-            className={`mt-2 w-full ${inputClass}`}
+            className="mt-2 w-full field"
           />
         </>
       )}
@@ -163,14 +156,14 @@ function AddCardForm({ onAdded }: { onAdded: () => void }) {
           placeholder="Last 4 digits"
           inputMode="numeric"
           required
-          className={inputClass}
+          className="field"
         />
         <div className="flex items-center gap-1">
           <select
             value={month}
             onChange={(e) => setMonth(e.target.value)}
             aria-label="Membership start month"
-            className={`flex-1 ${inputClass}`}
+            className="flex-1 field"
           >
             <option value="">Month…</option>
             {MONTH_NAMES.map((m, i) => (
@@ -187,19 +180,19 @@ function AddCardForm({ onAdded }: { onAdded: () => void }) {
             inputMode="numeric"
             maxLength={2}
             required
-            className={`w-16 ${inputClass}`}
+            className="w-16 field px-2"
           />
         </div>
       </div>
 
       {error && (
-        <p className="mt-2 text-sm text-red-600 dark:text-red-400">{error}</p>
+        <p className="mt-2 text-sm text-neg">{error}</p>
       )}
 
       <button
         type="submit"
         disabled={busy}
-        className="mt-3 rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background hover:opacity-90 disabled:opacity-50"
+        className="btn btn-primary mt-3"
       >
         {busy ? "Adding…" : "Add card"}
       </button>

@@ -10,6 +10,7 @@ import {
 import { SyncButton } from "./SyncButton";
 
 const PAGE_SIZE = 50;
+const VIEW_KEY = "ledger-view";
 
 export function TransactionLedger() {
   const [data, setData] = useState<TransactionsResponse | null>(null);
@@ -31,6 +32,22 @@ export function TransactionLedger() {
   const [categories, setCategories] = useState<string[]>([]);
   // Category name -> its subcategories, declared or in use.
   const [subcategories, setSubcategories] = useState<Map<string, string[]>>(new Map());
+  // Compact by default; this browser's last choice overrides on mount.
+  const [view, setView] = useState<"compact" | "detailed">("compact");
+
+  useEffect(() => {
+    try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      if (localStorage.getItem(VIEW_KEY) === "detailed") setView("detailed");
+    } catch {}
+  }, []);
+
+  const chooseView = (v: "compact" | "detailed") => {
+    setView(v);
+    try {
+      localStorage.setItem(VIEW_KEY, v);
+    } catch {}
+  };
 
   // Load accounts once for the payment-account filter. If it fails the
   // dropdown just stays on "All accounts".
@@ -132,8 +149,8 @@ export function TransactionLedger() {
     <div className="flex flex-col gap-5">
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Transactions</h1>
-          <p className="text-sm text-black/55 dark:text-white/55">
+          <h1>Transactions</h1>
+          <p className="text-sm text-muted2">
             {total} {total === 1 ? "entry" : "entries"}
             {selectedAccount && ` · ${selectedAccount.displayName ?? selectedAccount.name}`}
             {hideInternal && " · transfers & fees hidden"}
@@ -149,7 +166,7 @@ export function TransactionLedger() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search name, amount, date, note…"
-          className="w-full max-w-xs rounded-md border border-black/15 bg-transparent px-3 py-2 text-sm outline-none placeholder:text-black/40 focus:border-black/40 dark:border-white/15 dark:placeholder:text-white/40 dark:focus:border-white/40"
+          className="field w-full max-w-xs"
         />
         <select
           value={accountId}
@@ -157,7 +174,7 @@ export function TransactionLedger() {
             setAccountId(e.target.value);
             setPage(1);
           }}
-          className="max-w-56 rounded-md border border-black/15 bg-transparent px-3 py-2 text-sm outline-none focus:border-black/40 dark:border-white/15 dark:bg-transparent dark:focus:border-white/40 [&>*]:bg-white dark:[&>*]:bg-neutral-900"
+          className="field max-w-56"
         >
           <option value="">All accounts</option>
           {accountGroups.map((g) => (
@@ -171,7 +188,7 @@ export function TransactionLedger() {
             </optgroup>
           ))}
         </select>
-        <label className="flex cursor-pointer select-none items-center gap-2 text-sm text-black/70 dark:text-white/70">
+        <label className="flex cursor-pointer select-none items-center gap-2 text-sm text-muted2">
           <input
             type="checkbox"
             checked={hideInternal}
@@ -183,7 +200,7 @@ export function TransactionLedger() {
           />
           Hide transfers &amp; fees
         </label>
-        <label className="flex cursor-pointer select-none items-center gap-2 text-sm text-black/70 dark:text-white/70">
+        <label className="flex cursor-pointer select-none items-center gap-2 text-sm text-muted2">
           <input
             type="checkbox"
             checked={showLinked}
@@ -195,14 +212,29 @@ export function TransactionLedger() {
           />
           Show connected payments
         </label>
+        <div className="ml-auto flex rounded-lg bg-panel2 p-0.5 text-sm">
+          {(["compact", "detailed"] as const).map((v) => (
+            <button
+              key={v}
+              type="button"
+              onClick={() => chooseView(v)}
+              aria-pressed={view === v}
+              className={`rounded-md px-3 py-1.5 capitalize ${
+                view === v ? "bg-panel font-medium shadow-sm" : "text-muted2"
+              }`}
+            >
+              {v}
+            </button>
+          ))}
+        </div>
       </div>
 
       {error ? (
-        <div className="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-400">
+        <div className="group-panel px-4 py-3 text-sm text-neg">
           {error}
         </div>
       ) : loading && !data ? (
-        <div className="rounded-lg border border-black/10 px-6 py-16 text-center text-sm text-black/50 dark:border-white/10 dark:text-white/50">
+        <div className="group-panel px-6 py-16 text-center text-sm text-muted2">
           Loading…
         </div>
       ) : (
@@ -213,6 +245,7 @@ export function TransactionLedger() {
               onChanged={load}
               categories={categories}
               subcategories={subcategories}
+              detailed={view === "detailed"}
               sort={sort}
               dir={dir}
               onSort={handleSort}
@@ -228,26 +261,26 @@ export function TransactionLedger() {
                   onClick={() => setPage(1)}
                   disabled={page <= 1}
                   aria-label="First page"
-                  className="whitespace-nowrap rounded-md border border-black/15 px-3 py-1.5 disabled:opacity-40 dark:border-white/15"
+                  className="btn whitespace-nowrap disabled:opacity-40"
                 >
                   «<span className="hidden sm:inline"> First</span>
                 </button>
                 <button
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   disabled={page <= 1}
-                  className="whitespace-nowrap rounded-md border border-black/15 px-3 py-1.5 disabled:opacity-40 dark:border-white/15"
+                  className="btn whitespace-nowrap disabled:opacity-40"
                 >
                   ← Previous
                 </button>
               </div>
-              <span className="text-center text-black/55 dark:text-white/55">
+              <span className="text-center text-muted2">
                 Page {page} of {totalPages}
               </span>
               <div className="flex gap-2">
                 <button
                   onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                   disabled={page >= totalPages}
-                  className="whitespace-nowrap rounded-md border border-black/15 px-3 py-1.5 disabled:opacity-40 dark:border-white/15"
+                  className="btn whitespace-nowrap disabled:opacity-40"
                 >
                   Next →
                 </button>
@@ -255,7 +288,7 @@ export function TransactionLedger() {
                   onClick={() => setPage(totalPages)}
                   disabled={page >= totalPages}
                   aria-label="Last page"
-                  className="whitespace-nowrap rounded-md border border-black/15 px-3 py-1.5 disabled:opacity-40 dark:border-white/15"
+                  className="btn whitespace-nowrap disabled:opacity-40"
                 >
                   <span className="hidden sm:inline">Last </span>»
                 </button>

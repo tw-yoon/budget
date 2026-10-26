@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import type { TransactionDTO } from "@/types";
-import { formatSignedAmount, formatDate, formatCurrency } from "@/lib/format";
+import { formatSignedAmount, formatDate, formatWeekday, formatCurrency } from "@/lib/format";
 import { splitCategory } from "@/lib/categories";
 import { remainderOf } from "@/lib/splits";
 import { isZelleName } from "@/lib/zelle";
@@ -62,10 +62,8 @@ function SortableTh({
       <button
         type="button"
         onClick={() => onSort(column)}
-        className={`group/th flex items-center gap-1 uppercase tracking-wide ${
-          active
-            ? "text-black/80 dark:text-white/80"
-            : "hover:text-black/70 dark:hover:text-white/70"
+        className={`group/th flex items-center gap-1 ${
+          active ? "text-foreground" : "hover:text-foreground"
         }`}
         title={`Sort by ${column === "label" ? "number" : "date"}`}
       >
@@ -78,11 +76,37 @@ function SortableTh({
   );
 }
 
+// Plaid's merchant logo, or the name's first letter in a gray circle.
+function MerchantLogo({ transaction }: { transaction: TransactionDTO }) {
+  const [broken, setBroken] = useState(false);
+  const name = transaction.merchantName ?? transaction.name;
+  if (transaction.logoUrl && !broken) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={transaction.logoUrl}
+        alt=""
+        onError={() => setBroken(true)}
+        className="h-9 w-9 shrink-0 rounded-full bg-panel2 object-cover"
+      />
+    );
+  }
+  return (
+    <span
+      aria-hidden
+      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-panel2 text-sm font-medium text-muted2"
+    >
+      {name.trim().charAt(0).toUpperCase() || "?"}
+    </span>
+  );
+}
+
 export function TransactionTable({
   transactions,
   onChanged,
   categories,
   subcategories,
+  detailed = false,
   sort,
   dir,
   onSort,
@@ -91,6 +115,8 @@ export function TransactionTable({
   onChanged: () => void;
   categories: string[];
   subcategories: Map<string, string[]>;
+  // Bigger rows with the logo, the bank's own description and your note.
+  detailed?: boolean;
   sort: SortColumn;
   dir: SortDir;
   onSort: (column: SortColumn) => void;
@@ -125,12 +151,14 @@ export function TransactionTable({
 
   if (transactions.length === 0) {
     return (
-      <div className="rounded-lg border border-black/10 px-6 py-16 text-center text-sm text-black/50 dark:border-white/10 dark:text-white/50">
+      <div className="group-panel px-6 py-16 text-center text-sm text-muted2">
         No transactions found. Connect an account and hit{" "}
         <span className="font-medium">Sync transactions</span>.
       </div>
     );
   }
+
+  const padY = detailed ? "py-4" : "py-3";
 
   const toggle = (id: string) =>
     setExpanded((prev) => {
@@ -141,10 +169,10 @@ export function TransactionTable({
     });
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-black/10 dark:border-white/10">
+    <div className="group-panel overflow-x-auto">
       <table className="w-full border-collapse text-sm">
         <thead>
-          <tr className="border-b border-black/10 text-left text-xs uppercase tracking-wide text-black/50 dark:border-white/10 dark:text-white/50">
+          <tr className="section-caption border-b border-line text-left">
             <SortableTh column="label" label="#" sort={sort} dir={dir} onSort={onSort} />
             <SortableTh column="date" label="Date" sort={sort} dir={dir} onSort={onSort} />
             <th className="px-4 py-3 font-medium">Description</th>
@@ -188,37 +216,38 @@ export function TransactionTable({
             return (
               <FragmentRow key={t.id}>
                 <tr
-                  className={`border-b border-black/[0.06] last:border-0 dark:border-white/[0.06] ${
-                    isExpandable
-                      ? "cursor-pointer hover:bg-black/[0.03] dark:hover:bg-white/[0.04]"
-                      : "hover:bg-black/[0.02] dark:hover:bg-white/[0.03]"
+                  className={`border-b border-line last:border-0 hover:bg-panel2 ${
+                    isExpandable ? "cursor-pointer" : ""
                   }`}
                   onClick={isExpandable ? () => toggle(t.id) : undefined}
                 >
-                  <td className="whitespace-nowrap px-4 py-3 font-mono text-xs tabular-nums text-black/35 dark:text-white/35">
+                  <td className={`whitespace-nowrap px-4 ${padY} text-xs tabular-nums text-dim2`}>
                     {t.label ?? "—"}
                   </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-black/60 dark:text-white/60">
+                  <td className={`whitespace-nowrap px-4 ${padY} text-muted2`}>
                     {formatDate(t.date)}
+                    {detailed && (
+                      <div className="text-xs text-dim2">{formatWeekday(t.date)}</div>
+                    )}
                   </td>
-                  <td className="px-4 py-3">
+                  <td className={`w-full min-w-40 max-w-0 px-4 ${padY}`}>
                     {/* flex-wrap, so a narrow viewport stacks the badges onto
                         their own lines instead of squeezing every flex item —
                         description text included — down to one character per
                         row. */}
+                    <div className={detailed ? "flex items-start gap-3" : undefined}>
+                    {detailed && <MerchantLogo transaction={t} />}
+                    <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       {isExpandable && (
-                        <span className="text-black/40 dark:text-white/40">
+                        <span className="text-dim2">
                           {isOpen ? "▾" : "▸"}
                         </span>
                       )}
-                      {/* wrap-anywhere, not break-words: bank transfer memos
-                          carry unbreakable 35-character reference tokens, and
-                          only `overflow-wrap: anywhere` lowers the cell's
-                          intrinsic minimum width. `break-word` wraps the text
-                          but leaves the minimum intact, so the table would
-                          still force the page into a horizontal scroll. */}
-                      <span className="wrap-anywhere font-medium">
+                      {/* wrap-anywhere, not break-words: transfer memos carry unbreakable
+                          reference tokens, and only overflow-wrap:anywhere lowers the cell's
+                          minimum width (min-w-40 keeps it readable). */}
+                      <span className={`wrap-anywhere font-medium ${detailed ? "text-base" : ""}`}>
                         {t.merchantName ?? t.name}
                       </span>
                       {t.source === "VENMO" && <Badge tone="violet">Venmo</Badge>}
@@ -228,7 +257,7 @@ export function TransactionTable({
                       {t.linkedTo && (
                         <span
                           title={`Linked to #${t.linkedTo.label ?? "?"} ${t.linkedTo.name}`}
-                          className="shrink-0 whitespace-nowrap rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300"
+                          className="chip shrink-0 whitespace-nowrap text-pos"
                         >
                           → #{t.linkedTo.label ?? "?"}
                         </span>
@@ -262,6 +291,12 @@ export function TransactionTable({
                       )}
                       {t.isFee && <Badge tone="slate">Fee</Badge>}
                     </div>
+                    {detailed && t.merchantName && t.merchantName !== t.name && (
+                      <div className="wrap-anywhere mt-0.5 text-xs text-dim2">{t.name}</div>
+                    )}
+                    {detailed && t.personalNote && (
+                      <div className="wrap-anywhere mt-0.5 text-xs">{t.personalNote}</div>
+                    )}
                     {isEditing ? (
                       <CategoryEditor
                         transaction={t}
@@ -312,7 +347,7 @@ export function TransactionTable({
                         // text-left because a <button> centres its text by
                         // default, which only shows once the category name is
                         // long enough to wrap.
-                        className="group/cat mt-0.5 flex items-center gap-1 text-left text-xs text-black/45 hover:text-black/70 dark:text-white/45 dark:hover:text-white/70"
+                        className="group/cat mt-0.5 flex items-center gap-1 text-left text-xs text-muted2 hover:text-foreground"
                         title="Edit category"
                       >
                         <span>
@@ -323,7 +358,7 @@ export function TransactionTable({
                             : categoryDetailed ?? category}
                         </span>
                         {rawOverride !== null && (
-                          <span className="shrink-0 whitespace-nowrap rounded bg-sky-100 px-1 text-[9px] font-medium uppercase tracking-wide text-sky-700 dark:bg-sky-500/15 dark:text-sky-300">
+                          <span className="chip shrink-0 whitespace-nowrap">
                             custom
                           </span>
                         )}
@@ -332,33 +367,37 @@ export function TransactionTable({
                         </span>
                       </button>
                     )}
+                    </div>
+                    </div>
                   </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-black/60 dark:text-white/60">
+                  <td className={`whitespace-nowrap px-4 ${padY} text-muted2`}>
                     {t.accountName}
                     {t.accountMask && (
-                      <span className="text-black/40 dark:text-white/40">
+                      <span className="text-dim2">
                         {" "}
                         ··{t.accountMask}
                       </span>
                     )}
                   </td>
                   <td
-                    className={`whitespace-nowrap px-4 py-3 text-right font-mono tabular-nums ${
+                    className={`whitespace-nowrap px-4 ${padY} text-right tabular-nums ${
+                      detailed ? "text-base font-medium" : ""
+                    } ${
                       isOutflow
-                        ? "text-black/80 dark:text-white/80"
-                        : "text-green-600 dark:text-green-400"
+                        ? "text-foreground"
+                        : "text-pos"
                     }`}
                   >
                     {text}
                     {hasRefunds && (
-                      <div className="text-xs font-normal text-green-600 dark:text-green-400">
+                      <div className="text-xs font-normal text-pos">
                         net {formatCurrency(t.netAmount)}
                       </div>
                     )}
                   </td>
                 </tr>
                 {isExpandable && isOpen && (
-                  <tr className="border-b border-black/[0.06] bg-black/[0.015] dark:border-white/[0.06] dark:bg-white/[0.02]">
+                  <tr className="border-b border-line bg-panel2">
                     <td colSpan={5} className="px-4 py-3">
                       {hasBreakdown && <BreakdownPanel breakdown={t.breakdown!} />}
                       {hasRefunds && <RefundPanel refunds={t.refunds} />}
@@ -391,7 +430,7 @@ function BreakdownPanel({
 }) {
   return (
     <div className="pl-6">
-      <p className="mb-2 text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
+      <p className="section-caption mb-2">
         Pooled from these Venmo payments
       </p>
       <ul className="space-y-1">
@@ -400,16 +439,16 @@ function BreakdownPanel({
             key={s.category}
             className="flex items-center justify-between gap-4 text-sm"
           >
-            <span className="text-black/70 dark:text-white/70">{s.category}</span>
-            <span className="font-mono tabular-nums">
+            <span className="text-muted2">{s.category}</span>
+            <span className="tabular-nums">
               {formatCurrency(s.amount)}
             </span>
           </li>
         ))}
         {breakdown.priorBalance > 0 && (
-          <li className="flex items-center justify-between gap-4 text-sm text-black/45 dark:text-white/45">
+          <li className="flex items-center justify-between gap-4 text-sm text-muted2">
             <span>Prior balance (uncategorized)</span>
-            <span className="font-mono tabular-nums">
+            <span className="tabular-nums">
               {formatCurrency(breakdown.priorBalance)}
             </span>
           </li>
@@ -422,19 +461,19 @@ function BreakdownPanel({
 function RefundPanel({ refunds }: { refunds: TransactionDTO["refunds"] }) {
   return (
     <div className="pl-6">
-      <p className="mb-2 text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
+      <p className="section-caption mb-2">
         Paid back by
       </p>
       <ul className="space-y-1">
         {refunds.map((r) => (
           <li key={r.id} className="flex items-center justify-between gap-4 text-sm">
-            <span className="text-black/70 dark:text-white/70">
-              <span className="font-mono text-xs text-black/35 dark:text-white/35">
+            <span className="text-muted2">
+              <span className="text-xs text-dim2">
                 #{r.label ?? "—"}
               </span>{" "}
               {formatDate(r.date)} · {r.name}
             </span>
-            <span className="font-mono tabular-nums text-green-600 dark:text-green-400">
+            <span className="tabular-nums text-pos">
               {formatCurrency(Math.abs(r.amount))}
             </span>
           </li>
@@ -499,17 +538,17 @@ function SplitPanel({
 
   return (
     <div className="pl-6">
-      <p className="mb-2 text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
+      <p className="section-caption mb-2">
         Split across categories
       </p>
       <ul className="space-y-1">
         {t.splits.map((s) => (
           <li key={s.id} className="flex items-center justify-between gap-4 text-sm">
-            <span className="text-black/70 dark:text-white/70">
+            <span className="text-muted2">
               {s.subcategory ? `${s.category} › ${s.subcategory}` : s.category}
             </span>
             <span className="flex items-center gap-3">
-              <span className="font-mono tabular-nums">{formatCurrency(s.amount)}</span>
+              <span className="tabular-nums">{formatCurrency(s.amount)}</span>
               {isPro && (
                 <button
                   type="button"
@@ -523,7 +562,7 @@ function SplitPanel({
                   aria-label={`Remove the ${formatCurrency(s.amount)} split under ${
                     s.subcategory ? `${s.category}, ${s.subcategory}` : s.category
                   }`}
-                  className="text-xs text-black/40 hover:text-red-600 disabled:opacity-40 dark:text-white/40 dark:hover:text-red-400"
+                  className="text-xs text-dim2 hover:text-neg disabled:opacity-40"
                 >
                   ✕
                 </button>
@@ -532,7 +571,7 @@ function SplitPanel({
           </li>
         ))}
         {t.splitRemainder !== null && (
-          <li className="flex items-center justify-between gap-4 text-sm text-black/45 dark:text-white/45">
+          <li className="flex items-center justify-between gap-4 text-sm text-muted2">
             {/* The leftover is a part among equals, distinguished only by being
                 the one you cannot remove — it is derived, not stored. Full
                 effective category (parent + sub when there is one), matching
@@ -542,8 +581,8 @@ function SplitPanel({
               (rest)
             </span>
             <span
-              className={`font-mono tabular-nums ${
-                t.splitRemainder < 0 ? "text-red-600 dark:text-red-400" : ""
+              className={`tabular-nums ${
+                t.splitRemainder < 0 ? "text-neg" : ""
               }`}
             >
               {formatCurrency(t.splitRemainder)}
@@ -553,14 +592,14 @@ function SplitPanel({
       </ul>
 
       {t.splitRemainder !== null && t.splitRemainder < 0 && (
-        <p className="mt-2 text-xs text-red-600 dark:text-red-400">
+        <p className="mt-2 text-xs text-neg">
           This transaction&rsquo;s amount changed and is now smaller than its
           splits. Remove or re-add a split to fix it.
         </p>
       )}
 
       {error && (
-        <p className="mt-2 text-xs text-red-600 dark:text-red-400">{error}</p>
+        <p className="mt-2 text-xs text-neg">{error}</p>
       )}
 
       {/* Neither branch renders while the mode is still being read: the hook
@@ -580,7 +619,7 @@ function SplitPanel({
       )}
 
       {!loading && !isPro && (
-        <p className="mt-2 text-xs text-black/45 dark:text-white/45">
+        <p className="mt-2 text-xs text-muted2">
           Splits still count toward your totals in Normal mode —{" "}
           <Link href="/settings/mode" className="underline underline-offset-2 hover:text-foreground">
             switch to Pro in Settings
@@ -674,7 +713,7 @@ function AddSplitForm({
         value={amount}
         onChange={(e) => setAmount(e.target.value)}
         aria-label="Split amount"
-        className="w-24 rounded border border-black/15 px-2 py-1 text-sm dark:border-white/15 dark:bg-transparent"
+        className="field w-24"
       />
       <select
         value={cat}
@@ -683,7 +722,7 @@ function AddSplitForm({
           setSub("");
         }}
         aria-label="Split category"
-        className="rounded border border-black/15 px-2 py-1 text-sm dark:border-white/15 dark:bg-transparent"
+        className="field"
       >
         {options.map((c) => (
           <option key={c} value={c}>
@@ -698,7 +737,7 @@ function AddSplitForm({
         placeholder="Subcategory (optional)"
         list={datalistId}
         aria-label="Split subcategory"
-        className="w-44 rounded border border-black/15 px-2 py-1 text-sm dark:border-white/15 dark:bg-transparent"
+        className="field w-44"
       />
       <datalist id={datalistId}>
         {subs.map((s) => (
@@ -709,11 +748,11 @@ function AddSplitForm({
         type="button"
         onClick={() => void submit()}
         disabled={busy || amount === ""}
-        className="rounded bg-black px-3 py-1 text-sm text-white disabled:opacity-40 dark:bg-white dark:text-black"
+        className="btn btn-primary disabled:opacity-40"
       >
         Add split
       </button>
-      {error && <span className="text-xs text-red-600 dark:text-red-400">{error}</span>}
+      {error && <span className="text-xs text-neg">{error}</span>}
     </div>
   );
 }
@@ -811,7 +850,7 @@ function CategoryEditor({
           setSub("");
         }}
         disabled={saving || locked}
-        className="rounded border border-black/15 bg-white px-1.5 py-1 dark:border-white/20 dark:bg-neutral-900"
+        className="field"
       >
         {options.map((c) => (
           <option key={c} value={c}>
@@ -830,7 +869,7 @@ function CategoryEditor({
           if (e.key === "Enter") patch({ category: cat, subcategory: sub });
           if (e.key === "Escape") onDone();
         }}
-        className="w-44 rounded border border-black/15 bg-white px-1.5 py-1 dark:border-white/20 dark:bg-neutral-900"
+        className="field w-44"
       />
       <datalist id={datalistId}>
         {subs.map((s) => (
@@ -846,7 +885,7 @@ function CategoryEditor({
             ? "This row's category comes from the purchase it's connected to — disconnect first to set one manually"
             : undefined
         }
-        className="rounded bg-black px-2 py-1 font-medium text-white hover:bg-black/80 disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-white/85"
+        className="btn btn-primary disabled:opacity-50"
       >
         {saving ? "Saving…" : "Save"}
       </button>
@@ -855,7 +894,7 @@ function CategoryEditor({
           type="button"
           disabled={saving}
           onClick={() => patch({ category: null })}
-          className="rounded border border-black/15 px-2 py-1 text-black/60 hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/20 dark:text-white/60 dark:hover:bg-white/[0.06]"
+          className="btn disabled:opacity-50"
           title="Remove override and use Plaid's category"
         >
           Reset
@@ -865,15 +904,15 @@ function CategoryEditor({
         type="button"
         disabled={saving}
         onClick={() => onDone()}
-        className="rounded px-2 py-1 text-black/50 hover:bg-black/[0.04] dark:text-white/50 dark:hover:bg-white/[0.06]"
+        className="btn"
       >
         Cancel
       </button>
       {error && (
-        <span className="text-red-600 dark:text-red-400">Failed to save</span>
+        <span className="text-neg">Failed to save</span>
       )}
       {transaction.amount < 0 && (
-        <div className="mt-1 w-full border-t border-black/[0.06] pt-1.5 dark:border-white/[0.06]">
+        <div className="mt-1 w-full border-t border-line pt-1.5">
           <TransactionLinkPicker
             transactionId={transaction.id}
             linkedTo={linkedTo}
@@ -882,7 +921,7 @@ function CategoryEditor({
         </div>
       )}
       {canSplit && (
-        <div className="mt-1 w-full border-t border-black/[0.06] pt-1.5 dark:border-white/[0.06]">
+        <div className="mt-1 w-full border-t border-line pt-1.5">
           {splitting ? (
             <AddSplitForm
               transaction={transaction}
@@ -896,7 +935,7 @@ function CategoryEditor({
               type="button"
               onClick={() => setSplitting(true)}
               title="Put part of this transaction under its own category"
-              className="rounded border border-black/15 px-2 py-1 text-black/60 hover:bg-black/[0.04] dark:border-white/20 dark:text-white/60 dark:hover:bg-white/[0.06]"
+              className="btn"
             >
               Split this
             </button>
@@ -918,16 +957,16 @@ function Badge({
 }) {
   const tones = {
     amber:
-      "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400",
+      "text-warn",
     slate:
-      "bg-black/[0.06] text-black/55 dark:bg-white/10 dark:text-white/55",
+      "",
     violet:
-      "bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300",
+      "",
   };
   return (
     <span
       title={title}
-      className={`shrink-0 whitespace-nowrap rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide ${tones[tone]}`}
+      className={`chip shrink-0 whitespace-nowrap ${tones[tone]}`}
     >
       {children}
     </span>

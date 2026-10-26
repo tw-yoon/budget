@@ -17,9 +17,9 @@ export function WindowNav({
   canZoomOut?: boolean;
 }) {
   const btn =
-    "px-2 py-1 text-sm text-black/60 hover:text-foreground disabled:opacity-30 dark:text-white/60";
-  const group = "flex items-center rounded-md border border-black/15 dark:border-white/15";
-  const divider = "w-px self-stretch bg-black/15 dark:bg-white/15";
+    "px-2 py-1 text-sm text-accent disabled:opacity-30";
+  const group = "flex items-center rounded-lg bg-panel2";
+  const divider = "w-px self-stretch bg-line";
 
   return (
     <div className="flex items-center gap-2">

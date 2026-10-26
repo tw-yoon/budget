@@ -64,11 +64,11 @@ function pct(n: number, total: number) {
 
 function Row({ label, value, sub, warn }: { label: string; value: string; sub?: string; warn?: boolean }) {
   return (
-    <div className={`flex items-baseline justify-between py-1.5 border-b border-black/5 dark:border-white/5 last:border-0 ${warn ? "text-amber-600 dark:text-amber-400" : ""}`}>
+    <div className={`flex items-baseline justify-between py-1.5 border-b border-line last:border-0 ${warn ? "text-warn" : ""}`}>
       <span className="text-sm">{label}</span>
-      <span className="font-mono text-sm font-medium tabular-nums">
+      <span className="text-sm font-medium tabular-nums">
         {value}
-        {sub && <span className="ml-1.5 text-xs text-black/40 dark:text-white/40">{sub}</span>}
+        {sub && <span className="ml-1.5 text-xs text-dim2">{sub}</span>}
       </span>
     </div>
   );
@@ -94,13 +94,13 @@ function MoneyInput({
       : null;
   return (
     <div className="flex flex-col gap-0.5">
-      <label className="text-xs text-black/50 dark:text-white/50">{label}</label>
+      <label className="text-xs text-muted2">{label}</label>
       <div className="flex items-center gap-1">
         <button
           type="button"
           onClick={() => onModeChange(isPct ? "$" : "%")}
           title="Toggle between dollar amount and percent of gross income"
-          className="w-6 shrink-0 rounded border border-black/10 dark:border-white/10 py-1 text-sm font-medium text-black/50 hover:text-foreground dark:text-white/50"
+          className="btn w-6 shrink-0 px-0! py-1!"
         >
           {isPct ? "%" : "$"}
         </button>
@@ -115,11 +115,11 @@ function MoneyInput({
             onChange(isPct ? (base > 0 ? (raw / 100) * base : 0) : raw);
           }}
           placeholder="0"
-          className="w-full rounded border border-black/10 dark:border-white/10 bg-transparent px-2 py-1 text-sm font-mono tabular-nums focus:outline-none focus:ring-1 focus:ring-black/20 dark:focus:ring-white/20"
+          className="field w-full text-sm tabular-nums"
         />
       </div>
       {(hint || equiv) && (
-        <span className="text-xs text-black/35 dark:text-white/35">
+        <span className="text-xs text-dim2">
           {hint}
           {hint && equiv && " · "}
           {equiv}
@@ -161,9 +161,9 @@ function MonthStrip({ periods, year }: { periods: IncomePeriod[]; year: number }
             title={`${name} · ${label}${doubled.has(m) ? " (+ overlapping period)" : ""}`}
             className={`flex-1 rounded-sm py-0.5 text-center text-[10px] font-medium ${
               idx === undefined
-                ? "bg-black/[0.06] text-black/30 dark:bg-white/[0.08] dark:text-white/30"
+                ? "bg-panel2 text-dim2"
                 : `${PERIOD_TINTS[idx % PERIOD_TINTS.length]} text-white`
-            } ${doubled.has(m) ? "ring-1 ring-amber-500" : ""}`}
+            } ${doubled.has(m) ? "ring-1 ring-warn" : ""}`}
           >
             {name}
           </div>
@@ -176,21 +176,21 @@ function MonthStrip({ periods, year }: { periods: IncomePeriod[]; year: number }
 function Section({ title, info, children }: { title: string; info?: React.ReactNode; children: React.ReactNode }) {
   const [showInfo, setShowInfo] = useState(false);
   return (
-    <div className="rounded-lg border border-black/10 dark:border-white/10 p-4">
+    <div className="group-panel p-4">
       <div className="mb-3 flex items-baseline justify-between gap-2">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-black/40 dark:text-white/40">{title}</h2>
+        <h2 className="section-caption">{title}</h2>
         {info && (
           <button
             type="button"
             onClick={() => setShowInfo((v) => !v)}
-            className="shrink-0 text-xs font-medium text-blue-600 hover:underline dark:text-blue-400"
+            className="shrink-0 text-xs font-medium text-accent hover:underline"
           >
             {showInfo ? "Hide" : "What's this?"}
           </button>
         )}
       </div>
       {info && showInfo && (
-        <div className="mb-3 rounded-md border border-black/10 bg-black/[0.02] p-3 text-xs leading-relaxed text-black/60 dark:border-white/10 dark:bg-white/[0.03] dark:text-white/60">
+        <div className="mb-3 rounded-lg bg-background p-3 text-xs leading-relaxed text-muted2">
           {info}
         </div>
       )}
@@ -203,7 +203,7 @@ function Section({ title, info, children }: { title: string; info?: React.ReactN
 function InfoItem({ term, children }: { term: string; children: React.ReactNode }) {
   return (
     <p className="mb-1.5 last:mb-0">
-      <strong className="text-black/75 dark:text-white/75">{term}:</strong> {children}
+      <strong className="text-foreground">{term}:</strong> {children}
     </p>
   );
 }
@@ -236,7 +236,7 @@ function StateBracketsInfo({ code, year }: { code: string; year: number }) {
       </p>
       <table className="w-full tabular-nums">
         <thead>
-          <tr className="text-black/40 dark:text-white/40">
+          <tr className="section-caption">
             <th className="py-0.5 text-left font-medium">Taxable income</th>
             <th className="py-0.5 text-right font-medium">Rate</th>
           </tr>
@@ -250,7 +250,7 @@ function StateBracketsInfo({ code, year }: { code: string; year: number }) {
                 ? `Up to ${dollars(b.upTo)}`
                 : `${dollars(prev)} – ${dollars(b.upTo)}`;
             return (
-              <tr key={i} className="border-t border-black/5 dark:border-white/5">
+              <tr key={i} className="border-t border-line">
                 <td className="py-0.5 text-left">{range}</td>
                 <td className="py-0.5 text-right font-medium">{(b.rate * 100).toFixed(2)}%</td>
               </tr>
@@ -270,9 +270,9 @@ function NumberInput({
 }) {
   return (
     <div className="flex flex-col gap-0.5">
-      <label className="text-xs text-black/50 dark:text-white/50">{label}</label>
+      <label className="text-xs text-muted2">{label}</label>
       <div className="flex items-center gap-1">
-        {prefix && <span className="text-sm text-black/40 dark:text-white/40">{prefix}</span>}
+        {prefix && <span className="text-sm text-dim2">{prefix}</span>}
         <input
           type="number"
           min={min ?? 0}
@@ -281,11 +281,11 @@ function NumberInput({
           value={value || ""}
           onChange={(e) => onChange(Number(e.target.value) || 0)}
           placeholder="0"
-          className="w-full rounded border border-black/10 dark:border-white/10 bg-transparent px-2 py-1 text-sm font-mono tabular-nums focus:outline-none focus:ring-1 focus:ring-black/20 dark:focus:ring-white/20"
+          className="field w-full text-sm tabular-nums"
         />
-        {suffix && <span className="text-sm text-black/40 dark:text-white/40">{suffix}</span>}
+        {suffix && <span className="text-sm text-dim2">{suffix}</span>}
       </div>
-      {hint && <span className="text-xs text-black/35 dark:text-white/35">{hint}</span>}
+      {hint && <span className="text-xs text-dim2">{hint}</span>}
     </div>
   );
 }
@@ -574,13 +574,13 @@ function IncomeOrganizer() {
   return (
     <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">
       <div className="mb-6 flex flex-wrap items-center gap-3">
-        <h1 className="text-2xl font-semibold tracking-tight">Income Organizer</h1>
+        <h1>Income Organizer</h1>
         <div className="flex items-center gap-2">
-          <label className="text-sm text-black/50 dark:text-white/50">Year</label>
+          <label className="text-sm text-muted2">Year</label>
           <select
             value={store.activeYear}
             onChange={(e) => switchYear(Number(e.target.value))}
-            className="rounded border border-black/10 dark:border-white/10 bg-transparent px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-black/20 dark:focus:ring-white/20"
+            className="field text-sm"
           >
             {sortedYears.map((y) => (
               <option key={y} value={y}>{y}</option>
@@ -588,7 +588,7 @@ function IncomeOrganizer() {
           </select>
           <button
             onClick={addYear}
-            className="rounded border border-black/10 dark:border-white/10 px-2 py-1 text-sm text-black/60 hover:text-foreground dark:text-white/60"
+            className="btn"
             title="Add next year (copies current settings)"
           >
             + Year
@@ -596,23 +596,23 @@ function IncomeOrganizer() {
         </div>
         <button
           onClick={saveSnapshot}
-          className="rounded-md bg-foreground px-3 py-1.5 text-sm font-medium text-background transition-opacity hover:opacity-90"
+          className="btn btn-primary"
         >
           Save {store.activeYear} to log
         </button>
-        <span className="ml-auto text-xs text-black/40 dark:text-white/40">
+        <span className="ml-auto text-xs text-dim2">
           {fedStale ? `using ${fed.dataYear} IRS tables for ${store.activeYear}` : `${fed.dataYear} IRS limits`} · saved locally
         </span>
       </div>
 
       {violations.length > 0 && (
-        <div className="mb-6 rounded-lg border border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/40 p-4">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-red-600 dark:text-red-400">Violations</p>
+        <div className="mb-6 rounded-xl bg-neg/10 p-4">
+          <p className="mb-2 text-xs font-semibold text-neg">Violations</p>
           <ul className="space-y-1">
             {violations.map((v, i) => (
-              <li key={i} className={`text-sm ${v.severity === "error" ? "text-red-700 dark:text-red-300" : "text-amber-700 dark:text-amber-300"}`}>
+              <li key={i} className={`text-sm ${v.severity === "error" ? "text-neg" : "text-warn"}`}>
                 <span className="font-medium">{v.label}</span>
-                <span className="ml-2 text-black/50 dark:text-white/40">{v.detail}</span>
+                <span className="ml-2 text-muted2">{v.detail}</span>
               </li>
             ))}
           </ul>
@@ -663,21 +663,21 @@ function IncomeOrganizer() {
                 const earned = periodSalary(p, year) + (p.bonus || 0);
                 const perCheck = sched ? p.annualRate / perYearFor(p.cadence) : 0;
                 return (
-                  <div key={i} className="rounded-md border border-black/10 dark:border-white/10 p-2.5">
+                  <div key={i} className="rounded-xl bg-background p-2.5">
                     <div className="flex items-center gap-2">
                       <input
                         value={p.label}
                         onChange={(e) => updPeriod(i, { label: e.target.value })}
                         placeholder={`e.g. ${i === 0 ? "Old job" : "New job"}`}
-                        className="min-w-0 flex-1 rounded border border-black/10 dark:border-white/10 bg-transparent px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-black/20 dark:focus:ring-white/20"
+                        className="field min-w-0 flex-1 text-sm"
                       />
-                      <span className="shrink-0 font-mono text-xs tabular-nums text-black/40 dark:text-white/40">
+                      <span className="shrink-0 text-xs tabular-nums text-dim2">
                         {sched ? `${dates.length} checks` : `${periodMonths(p)} mo`} · {fmt(earned)}
                       </span>
                       <button
                         onClick={() => upd({ periods: s.periods.filter((_, j) => j !== i) })}
                         disabled={s.periods.length === 1}
-                        className="w-4 shrink-0 text-lg leading-none text-black/30 hover:text-red-500 dark:text-white/30 disabled:opacity-20"
+                        className="w-4 shrink-0 text-lg leading-none text-neg/70 hover:text-neg disabled:opacity-20"
                         title="Remove period"
                       >
                         ×
@@ -692,11 +692,11 @@ function IncomeOrganizer() {
                         step={1000}
                       />
                       <div className="flex flex-col gap-0.5">
-                        <label className="text-xs text-black/50 dark:text-white/50">Paid</label>
+                        <label className="text-xs text-muted2">Paid</label>
                         <select
                           value={p.cadence}
                           onChange={(e) => updPeriod(i, { cadence: e.target.value as PayCadence })}
-                          className="rounded border border-black/10 dark:border-white/10 bg-transparent px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-black/20 dark:focus:ring-white/20"
+                          className="field text-sm"
                         >
                           {CADENCES.map((c) => (
                             <option key={c.value} value={c.value}>{c.label}</option>
@@ -706,33 +706,33 @@ function IncomeOrganizer() {
                       {sched ? (
                         <>
                           <div className="flex flex-col gap-0.5">
-                            <label className="text-xs text-black/50 dark:text-white/50">First payday</label>
+                            <label className="text-xs text-muted2">First payday</label>
                             <input
                               type="date"
                               value={p.firstPayDate}
                               onChange={(e) => updPeriod(i, { firstPayDate: e.target.value })}
-                              className="rounded border border-black/10 dark:border-white/10 bg-transparent px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-black/20 dark:focus:ring-white/20"
+                              className="field text-sm"
                             />
                           </div>
                           <div className="flex flex-col gap-0.5">
-                            <label className="text-xs text-black/50 dark:text-white/50">Last payday</label>
+                            <label className="text-xs text-muted2">Last payday</label>
                             <input
                               type="date"
                               value={p.lastPayDate}
                               onChange={(e) => updPeriod(i, { lastPayDate: e.target.value })}
-                              className="rounded border border-black/10 dark:border-white/10 bg-transparent px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-black/20 dark:focus:ring-white/20"
+                              className="field text-sm"
                             />
-                            <span className="text-xs text-black/35 dark:text-white/35">blank = ongoing</span>
+                            <span className="text-xs text-dim2">blank = ongoing</span>
                           </div>
                         </>
                       ) : (
                         <>
                           <div className="flex flex-col gap-0.5">
-                            <label className="text-xs text-black/50 dark:text-white/50">From</label>
+                            <label className="text-xs text-muted2">From</label>
                             <select
                               value={p.startMonth}
                               onChange={(e) => updPeriod(i, { startMonth: Number(e.target.value) })}
-                              className="rounded border border-black/10 dark:border-white/10 bg-transparent px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-black/20 dark:focus:ring-white/20"
+                              className="field text-sm"
                             >
                               {MONTH_NAMES.map((m, mi) => (
                                 <option key={m} value={mi + 1}>{m}</option>
@@ -740,11 +740,11 @@ function IncomeOrganizer() {
                             </select>
                           </div>
                           <div className="flex flex-col gap-0.5">
-                            <label className="text-xs text-black/50 dark:text-white/50">To</label>
+                            <label className="text-xs text-muted2">To</label>
                             <select
                               value={p.endMonth}
                               onChange={(e) => updPeriod(i, { endMonth: Number(e.target.value) })}
-                              className="rounded border border-black/10 dark:border-white/10 bg-transparent px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-black/20 dark:focus:ring-white/20"
+                              className="field text-sm"
                             >
                               {MONTH_NAMES.map((m, mi) => (
                                 <option key={m} value={mi + 1}>{m}</option>
@@ -762,7 +762,7 @@ function IncomeOrganizer() {
                       />
                     </div>
                     {sched && dates.length > 0 && (
-                      <p className="mt-1.5 text-xs text-black/40 dark:text-white/40">
+                      <p className="mt-1.5 text-xs text-dim2">
                         {fmtCents(perCheck)} gross per paycheck · {dates.length} in {year} ·{" "}
                         {fmtDate(dates[0])} → {fmtDate(dates[dates.length - 1])}
                       </p>
@@ -773,18 +773,18 @@ function IncomeOrganizer() {
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <button
                   onClick={addPeriod}
-                  className="text-xs text-black/40 hover:text-black dark:text-white/40 dark:hover:text-white"
+                  className="text-xs text-dim2 hover:text-foreground"
                 >
                   + add period (new job, raise, or gap)
                 </button>
-                <span className="text-xs text-black/40 dark:text-white/40">
+                <span className="text-xs text-dim2">
                   {monthsWorked}/12 mo
                   {hasSchedule && ` · ${paychecksThisYear} paychecks`} · salary {fmt(salaryTotal)}
                   {bonusTotal > 0 && ` + bonus ${fmt(bonusTotal)}`}
                 </span>
               </div>
               {gapMonths.length > 0 && (
-                <p className="text-xs text-black/40 dark:text-white/40">
+                <p className="text-xs text-dim2">
                   No income in {fmtMonths(gapMonths)} — {12 - monthsWorked} month
                   {12 - monthsWorked === 1 ? "" : "s"} of this year earn nothing.
                 </p>
@@ -799,13 +799,13 @@ function IncomeOrganizer() {
                 hint="not tied to a period"
               />
             </div>
-            <div className="mt-3 flex gap-4 text-xs text-black/50 dark:text-white/50 flex-wrap">
+            <div className="mt-3 flex gap-4 text-xs text-muted2 flex-wrap">
               <label className="flex items-center gap-1.5 cursor-pointer">
                 Filing:
                 <select
                   value={s.filing}
                   onChange={(e) => upd({ filing: e.target.value as "single" | "mfj" })}
-                  className="ml-1 rounded border border-black/10 dark:border-white/10 bg-transparent px-1.5 py-0.5 text-xs focus:outline-none"
+                  className="field ml-1 text-xs"
                 >
                   <option value="single">Single</option>
                   <option value="mfj">Married (MFJ)</option>
@@ -816,7 +816,7 @@ function IncomeOrganizer() {
                 <select
                   value={s.ageBand}
                   onChange={(e) => upd({ ageBand: e.target.value as AgeBand })}
-                  className="ml-1 rounded border border-black/10 dark:border-white/10 bg-transparent px-1.5 py-0.5 text-xs focus:outline-none"
+                  className="field ml-1 text-xs"
                 >
                   {AGE_BANDS.map((b) => (
                     <option key={b.value} value={b.value}>{b.label}</option>
@@ -824,7 +824,7 @@ function IncomeOrganizer() {
                 </select>
               </label>
             </div>
-            <label className="mt-3 flex items-start gap-2 text-xs text-black/50 dark:text-white/50 cursor-pointer">
+            <label className="mt-3 flex items-start gap-2 text-xs text-muted2 cursor-pointer">
               <input
                 type="checkbox"
                 checked={s.ficaExempt}
@@ -833,7 +833,7 @@ function IncomeOrganizer() {
               />
               <span>
                 International student (nonresident alien)
-                <span className="block text-black/35 dark:text-white/35">
+                <span className="block text-dim2">
                   Exempt from Social Security &amp; Medicare on F-1/J-1/M-1/Q visa wages (IRC §3121(b)(19))
                 </span>
               </span>
@@ -895,10 +895,10 @@ function IncomeOrganizer() {
                 hint={`counts toward ${fmt(k401TotalLimit)} total limit`}
               />
               <div className="flex flex-col justify-end pb-1 text-xs">
-                <span className={k401Elective > k401Limit ? "text-amber-600 dark:text-amber-400" : "text-black/40 dark:text-white/40"}>
+                <span className={k401Elective > k401Limit ? "text-warn" : "text-dim2"}>
                   Elective: {fmt(k401Elective)} / {fmt(k401Limit)}
                 </span>
-                <span className="text-black/35 dark:text-white/35">Trad + Roth share this limit</span>
+                <span className="text-dim2">Trad + Roth share this limit</span>
               </div>
             </div>
           </Section>
@@ -946,11 +946,11 @@ function IncomeOrganizer() {
                 hint="post-tax"
               />
               <div className="col-span-2 text-xs">
-                <span className={iraTotal > iraLimit ? "text-amber-600 dark:text-amber-400" : "text-black/40 dark:text-white/40"}>
+                <span className={iraTotal > iraLimit ? "text-warn" : "text-dim2"}>
                   IRA total: {fmt(iraTotal)} / {fmt(iraLimit)} combined limit
                 </span>
                 {effectiveRothLimit < rothLimit && (
-                  <span className="ml-2 text-amber-600 dark:text-amber-400">
+                  <span className="ml-2 text-warn">
                     · Roth capped at {fmt(Math.round(effectiveRothLimit))} (income phase-out)
                   </span>
                 )}
@@ -992,7 +992,7 @@ function IncomeOrganizer() {
                   onModeChange={(m) => setMode("hsaContrib", m)}
                   hint={`${fmt(hsaLimit)} limit`}
                 />
-                <div className="mt-1 flex gap-2 text-xs text-black/50 dark:text-white/50">
+                <div className="mt-1 flex gap-2 text-xs text-muted2">
                   <label className="flex items-center gap-1 cursor-pointer">
                     <input type="radio" name="hsaCov" value="single" checked={s.hsaCoverage === "single"} onChange={() => upd({ hsaCoverage: "single" })} />
                     Self
@@ -1029,11 +1029,11 @@ function IncomeOrganizer() {
             info={<StateBracketsInfo code={s.stateCode} year={store.activeYear} />}
           >
             <div className="flex flex-col gap-0.5">
-              <label className="text-xs text-black/50 dark:text-white/50">State</label>
+              <label className="text-xs text-muted2">State</label>
               <select
                 value={s.stateCode}
                 onChange={(e) => upd({ stateCode: e.target.value })}
-                className="rounded border border-black/10 dark:border-white/10 bg-transparent px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-black/20 dark:focus:ring-white/20"
+                className="field text-sm"
               >
                 <option value="">None / not set</option>
                 {Object.entries(stateData.states).map(([code, info]) => (
@@ -1041,7 +1041,7 @@ function IncomeOrganizer() {
                 ))}
               </select>
               {stateStale && (
-                <span className="mt-1 text-xs text-black/40 dark:text-white/40">
+                <span className="mt-1 text-xs text-dim2">
                   *Using {stateData.dataYear} brackets — {store.activeYear} not yet published.
                 </span>
               )}
@@ -1051,7 +1051,7 @@ function IncomeOrganizer() {
           <Section title="Take-Home Allocation (Monthly)">
             {monthsWorked < 12 && (
               <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
-                <span className="text-black/50 dark:text-white/50">Monthly means:</span>
+                <span className="text-muted2">Monthly means:</span>
                 {([
                   ["worked", `${Math.max(1, monthsWorked)} months worked`],
                   ["year", "all 12 months"],
@@ -1060,16 +1060,16 @@ function IncomeOrganizer() {
                     key={val}
                     type="button"
                     onClick={() => upd({ allocBasis: val })}
-                    className={`rounded border px-2 py-0.5 ${
+                    className={`rounded-md px-2 py-0.5 ${
                       s.allocBasis === val
-                        ? "border-transparent bg-foreground text-background"
-                        : "border-black/10 text-black/50 hover:text-foreground dark:border-white/10 dark:text-white/50"
+                        ? "bg-accent text-accent-contrast"
+                        : "bg-background text-muted2 hover:text-foreground"
                     }`}
                   >
                     {label}
                   </button>
                 ))}
-                <span className="w-full text-black/35 dark:text-white/35">
+                <span className="w-full text-dim2">
                   {s.allocBasis === "worked"
                     ? "Take-home split across earning months only — what actually lands each payday."
                     : "Take-home spread evenly over the whole year, savings for the off months included."}
@@ -1086,7 +1086,7 @@ function IncomeOrganizer() {
                       next[i] = { ...next[i], label: e.target.value };
                       upd({ allocations: next });
                     }}
-                    className="flex-1 rounded border border-black/10 dark:border-white/10 bg-transparent px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-black/20 dark:focus:ring-white/20"
+                    className="field flex-1 text-sm"
                   />
                   <div className="flex items-center gap-1">
                     <button
@@ -1097,7 +1097,7 @@ function IncomeOrganizer() {
                         upd({ allocations: next });
                       }}
                       title="Toggle between dollar amount and percent of monthly take-home"
-                      className="w-6 shrink-0 rounded border border-black/10 dark:border-white/10 py-1 text-sm font-medium text-black/50 hover:text-foreground dark:text-white/50"
+                      className="btn w-6 shrink-0 px-0! py-1!"
                     >
                       {(a.mode ?? "$") === "%" ? "%" : "$"}
                     </button>
@@ -1120,12 +1120,12 @@ function IncomeOrganizer() {
                         upd({ allocations: next });
                       }}
                       placeholder="0"
-                      className="w-28 rounded border border-black/10 dark:border-white/10 bg-transparent px-2 py-1 text-sm font-mono tabular-nums focus:outline-none focus:ring-1 focus:ring-black/20 dark:focus:ring-white/20"
+                      className="field w-28 text-sm tabular-nums"
                     />
                   </div>
                   <button
                     onClick={() => upd({ allocations: s.allocations.filter((_, j) => j !== i) })}
-                    className="text-black/30 hover:text-red-500 dark:text-white/30 text-lg leading-none"
+                    className="text-neg/70 hover:text-neg text-lg leading-none"
                   >
                     ×
                   </button>
@@ -1133,7 +1133,7 @@ function IncomeOrganizer() {
               ))}
               <button
                 onClick={() => upd({ allocations: [...s.allocations, { label: "", amount: 0 }] })}
-                className="mt-1 text-xs text-black/40 hover:text-black dark:text-white/40 dark:hover:text-white"
+                className="mt-1 text-xs text-dim2 hover:text-foreground"
               >
                 + add row
               </button>
@@ -1177,7 +1177,7 @@ function IncomeOrganizer() {
               value={`− ${fmt(stateTax)}`}
               sub={s.stateCode ? `${(stateEffRate * 100).toFixed(2)}% effective · ${(stateMarginalRate * 100).toFixed(2)}% marginal` : "no state selected"}
             />
-            <div className="mt-1 border-t border-black/10 dark:border-white/10 pt-1">
+            <div className="mt-1 border-t border-line pt-1">
               <Row label="Total taxes" value={fmt(totalTax)} sub={pct(totalTax, grossIncome)} />
             </div>
           </Section>
@@ -1186,7 +1186,7 @@ function IncomeOrganizer() {
             <Row label="After tax + pre-tax deductions" value={fmt(netAfterTaxAndPretax)} />
             {roth401 > 0 && <Row label="Roth 401(k)" value={`− ${fmt(roth401)}`} />}
             <Row label="Roth IRA" value={`− ${fmt(s.rothIra)}`} />
-            <div className="mt-1 border-t border-black/10 dark:border-white/10 pt-1">
+            <div className="mt-1 border-t border-line pt-1">
               <Row
                 label="Monthly take-home"
                 value={fmt(monthlyTakeHome)}
@@ -1212,15 +1212,15 @@ function IncomeOrganizer() {
             <Row label="401(k) elective (Trad + Roth)" value={fmt(k401Elective)} sub={`${pct(k401Elective, k401Limit)} of ${fmt(k401Limit)} limit`} warn={k401Elective > k401Limit} />
             <Row label="401(k) employer" value={fmt(s.k401Employer)} sub="employer match" />
             <Row label="401(k) grand total" value={fmt(k401Total)} sub={`${pct(k401Total, k401TotalLimit)} of ${fmt(k401TotalLimit)} limit`} warn={k401Total > k401TotalLimit} />
-            <div className="my-1 border-t border-black/10 dark:border-white/10" />
+            <div className="my-1 border-t border-line" />
             <Row label="Traditional IRA" value={fmt(s.tradIra)} sub="pre-tax" />
             <Row label="Roth IRA" value={fmt(s.rothIra)} sub={effectiveRothLimit < rothLimit ? `phase-out cap ${fmt(Math.round(effectiveRothLimit))}` : "post-tax"} warn={s.rothIra > effectiveRothLimit} />
             <Row label="IRA total (Trad + Roth)" value={fmt(iraTotal)} sub={`${pct(iraTotal, iraLimit)} of ${fmt(iraLimit)} limit`} warn={iraTotal > iraLimit} />
-            <div className="my-1 border-t border-black/10 dark:border-white/10" />
+            <div className="my-1 border-t border-line" />
             <Row label="HSA" value={fmt(s.hsaContrib)} sub={`${pct(s.hsaContrib, hsaLimit)} of ${fmt(hsaLimit)} limit`} warn={s.hsaContrib > hsaLimit} />
             {s.fsaContrib > 0 && <Row label="Health Care FSA" value={fmt(s.fsaContrib)} sub={`${pct(s.fsaContrib, L.fsa_health)} of ${fmt(L.fsa_health)} limit`} warn={s.fsaContrib > L.fsa_health} />}
             {s.fsaDependentCare > 0 && <Row label="Dependent Care FSA" value={fmt(s.fsaDependentCare)} sub={`${pct(s.fsaDependentCare, L.fsa_dependent_care)} of ${fmt(L.fsa_dependent_care)} limit`} warn={s.fsaDependentCare > L.fsa_dependent_care} />}
-            <div className="mt-1 border-t border-black/10 dark:border-white/10 pt-1">
+            <div className="mt-1 border-t border-line pt-1">
               <Row label="Total retirement / year" value={fmt(totalRetirement)} />
             </div>
           </Section>
@@ -1229,7 +1229,7 @@ function IncomeOrganizer() {
             {s.allocations.map((a, i) => (
               <Row key={i} label={a.label || `Row ${i + 1}`} value={fmt(a.amount)} sub={pct(a.amount, monthlyTakeHome)} />
             ))}
-            <div className="mt-1 border-t border-black/10 dark:border-white/10 pt-1">
+            <div className="mt-1 border-t border-line pt-1">
               <Row
                 label="Monthly take-home"
                 value={fmt(monthlyTakeHome)}
@@ -1275,7 +1275,7 @@ function IncomeOrganizer() {
           }
         >
           {!hasSchedule && (
-            <p className="mb-3 rounded-md border border-black/10 bg-black/[0.02] p-3 text-xs text-black/50 dark:border-white/10 dark:bg-white/[0.03] dark:text-white/50">
+            <p className="mb-3 rounded-lg bg-background p-3 text-xs text-muted2">
               Set an income period to a real pay cadence above (instead of{" "}
               <strong>whole months</strong>) to get per-paycheck amounts. Plan windows below
               still record each account&apos;s contract year.
@@ -1285,39 +1285,39 @@ function IncomeOrganizer() {
             {planViews.map((g) => {
               const custom = !!(s.plans[g.key].start || s.plans[g.key].end);
               return (
-                <div key={g.key} className="rounded-md border border-black/10 dark:border-white/10 p-3">
+                <div key={g.key} className="rounded-xl bg-background p-3">
                   <div className="mb-2 flex items-baseline justify-between gap-2">
-                    <h3 className="text-sm font-medium">{g.title}</h3>
-                    <span className="shrink-0 font-mono text-xs tabular-nums text-black/40 dark:text-white/40">
+                    <h3>{g.title}</h3>
+                    <span className="shrink-0 text-xs tabular-nums text-dim2">
                       {g.checks} {g.checks === 1 ? "check" : "checks"}
                     </span>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <div className="flex flex-col gap-0.5">
-                      <label className="text-xs text-black/50 dark:text-white/50">Plan start</label>
+                      <label className="text-xs text-muted2">Plan start</label>
                       <input
                         type="date"
                         value={s.plans[g.key].start}
                         onChange={(e) => updPlan(g.key, { start: e.target.value })}
-                        className="rounded border border-black/10 dark:border-white/10 bg-transparent px-1.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-black/20 dark:focus:ring-white/20"
+                        className="field text-xs"
                       />
                     </div>
                     <div className="flex flex-col gap-0.5">
-                      <label className="text-xs text-black/50 dark:text-white/50">Plan end</label>
+                      <label className="text-xs text-muted2">Plan end</label>
                       <input
                         type="date"
                         value={s.plans[g.key].end}
                         onChange={(e) => updPlan(g.key, { end: e.target.value })}
-                        className="rounded border border-black/10 dark:border-white/10 bg-transparent px-1.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-black/20 dark:focus:ring-white/20"
+                        className="field text-xs"
                       />
                     </div>
                   </div>
-                  <p className="mt-1 text-xs text-black/35 dark:text-white/35">
+                  <p className="mt-1 text-xs text-dim2">
                     {custom
                       ? `${fmtDate(g.start)} ${g.start.getUTCFullYear()} → ${fmtDate(g.end)} ${g.end.getUTCFullYear()}`
                       : `calendar ${year} · ${g.note}`}
                   </p>
-                  <div className="mt-2 border-t border-black/10 pt-1 dark:border-white/10">
+                  <div className="mt-2 border-t border-line pt-1">
                     {g.rows.map((r) => (
                       <Row
                         key={r.label}
@@ -1336,13 +1336,13 @@ function IncomeOrganizer() {
 
       {store.log.length > 0 && (
         <div className="mt-8">
-          <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-black/40 dark:text-white/40">
+          <h2 className="mb-3 section-caption">
             Year Log
           </h2>
-          <div className="overflow-x-auto rounded-lg border border-black/10 dark:border-white/10">
+          <div className="group-panel overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-black/10 dark:border-white/10 text-left text-xs text-black/40 dark:text-white/40">
+                <tr className="border-b border-line text-left section-caption">
                   <th className="px-3 py-2 font-medium">Year</th>
                   <th className="px-3 py-2 font-medium">Saved</th>
                   <th className="px-3 py-2 text-right font-medium">Gross</th>
@@ -1352,11 +1352,11 @@ function IncomeOrganizer() {
                   <th className="px-3 py-2" />
                 </tr>
               </thead>
-              <tbody className="font-mono tabular-nums">
+              <tbody className="tabular-nums">
                 {store.log.map((snap) => (
-                  <tr key={snap.id} className="border-b border-black/5 dark:border-white/5 last:border-0">
-                    <td className="px-3 py-2 font-sans font-medium">{snap.year}</td>
-                    <td className="px-3 py-2 font-sans text-black/50 dark:text-white/50">
+                  <tr key={snap.id} className="border-b border-line last:border-0">
+                    <td className="px-3 py-2 font-medium">{snap.year}</td>
+                    <td className="px-3 py-2 text-muted2">
                       {new Date(snap.savedAt).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}
                     </td>
                     <td className="px-3 py-2 text-right">{fmt(snap.results.grossIncome)}</td>
@@ -1366,7 +1366,7 @@ function IncomeOrganizer() {
                     <td className="px-3 py-2 text-right">
                       <button
                         onClick={() => deleteSnapshot(snap.id)}
-                        className="text-black/30 hover:text-red-500 dark:text-white/30"
+                        className="text-neg/70 hover:text-neg"
                         title="Delete snapshot"
                       >
                         ×
@@ -1377,7 +1377,7 @@ function IncomeOrganizer() {
               </tbody>
             </table>
           </div>
-          <p className="mt-2 text-xs text-black/35 dark:text-white/35">
+          <p className="mt-2 text-xs text-dim2">
             Snapshots are frozen records — editing a year above doesn&apos;t change saved rows. Save again to capture an update.
           </p>
         </div>

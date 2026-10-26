@@ -18,9 +18,6 @@ import {
   REWARD_CATEGORY_LABELS,
 } from "@/lib/rewards";
 
-const inputClass =
-  "rounded-md border border-black/15 bg-transparent px-2.5 py-1.5 text-sm outline-none placeholder:text-black/40 focus:border-black/40 dark:border-white/15 dark:placeholder:text-white/40 dark:focus:border-white/40";
-
 /**
  * Whether a card's statement-credits list is expanded, remembered per card.
  *
@@ -146,8 +143,8 @@ export function UserCardItem({
   const years = new Date().getFullYear() - card.membershipStartYear;
 
   return (
-    <section className="overflow-hidden rounded-xl border border-black/10 dark:border-white/10">
-      <header className="flex flex-wrap items-start justify-between gap-3 border-b border-black/10 px-4 py-3 dark:border-white/10">
+    <section className="group-panel">
+      <header className="flex flex-wrap items-start justify-between gap-3 border-b-[0.5px] border-line px-3.5 py-3">
         <div className="flex min-w-0 items-start gap-3">
           {/* `group` so the picker's corner button shows while the card is hovered. */}
           <div className="group relative flex flex-col items-start">
@@ -161,13 +158,13 @@ export function UserCardItem({
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <span className="rounded bg-black/[0.06] px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide dark:bg-white/10">
+              <span className="chip">
                 {ISSUER_LABELS[card.issuer] ?? card.issuer}
               </span>
               <span className="font-medium">{card.displayName || card.name || "Card"}</span>
-              <span className="text-black/45 dark:text-white/45">··{card.last4}</span>
+              <span className="text-muted2">··{card.last4}</span>
             </div>
-            <div className="mt-1 flex flex-wrap items-center gap-1 text-xs text-black/50 dark:text-white/50">
+            <div className="mt-1 flex flex-wrap items-center gap-1 text-xs text-muted2">
               <span>Member since</span>
               <StartMonthPicker card={card} onChanged={onChanged} />
               <span>
@@ -183,7 +180,7 @@ export function UserCardItem({
             aria-expanded={open}
             aria-label={open ? "Collapse card" : "Expand card"}
             title={open ? "Collapse" : "Expand"}
-            className="text-sm text-black/45 hover:text-foreground dark:text-white/45"
+            className="text-sm text-muted2 hover:text-foreground"
           >
             <span className={`inline-block transition-transform ${open ? "rotate-90" : ""}`}>›</span>
           </button>
@@ -194,12 +191,12 @@ export function UserCardItem({
             // row. The full name is on hover.
             <span
               title={`Linked · ${card.linkedAccountName}`}
-              className="max-w-[12rem] truncate rounded bg-green-100 px-2 py-0.5 text-[11px] font-medium text-green-700 dark:bg-green-500/15 dark:text-green-400"
+              className="chip min-w-[4rem] max-w-[12rem] truncate text-pos"
             >
               Linked · {card.linkedAccountName}
             </span>
           ) : (
-            <span className="rounded bg-black/[0.06] px-2 py-0.5 text-[11px] text-black/55 dark:bg-white/10 dark:text-white/55">
+            <span className="chip">
               Not linked
             </span>
           )}
@@ -209,7 +206,7 @@ export function UserCardItem({
               disabled={!canMoveUp}
               aria-label="Move card up"
               title="Move up"
-              className="rounded px-1 text-sm text-black/45 hover:text-foreground disabled:opacity-25 dark:text-white/45"
+              className="rounded px-1 text-sm text-muted2 hover:text-foreground disabled:opacity-25"
             >
               ↑
             </button>
@@ -218,7 +215,7 @@ export function UserCardItem({
               disabled={!canMoveDown}
               aria-label="Move card down"
               title="Move down"
-              className="rounded px-1 text-sm text-black/45 hover:text-foreground disabled:opacity-25 dark:text-white/45"
+              className="rounded px-1 text-sm text-muted2 hover:text-foreground disabled:opacity-25"
             >
               ↓
             </button>
@@ -226,7 +223,7 @@ export function UserCardItem({
           <button
             onClick={deleteCard}
             disabled={busy}
-            className="text-xs text-black/50 hover:text-red-600 disabled:opacity-50 dark:text-white/50 dark:hover:text-red-400"
+            className="btn text-neg"
           >
             Remove
           </button>
@@ -237,8 +234,8 @@ export function UserCardItem({
         <>
         <FeeTracker card={card} onChanged={onChanged} />
 
-        <div className="border-b border-black/10 px-4 py-3 dark:border-white/10">
-          <div className="text-[11px] font-semibold uppercase tracking-wide text-black/45 dark:text-white/45">
+        <div className="border-b-[0.5px] border-line px-3.5 py-3">
+          <div className="section-caption">
             Earning rates
           </div>
           <RatesSection card={card} onChanged={onChanged} />
@@ -249,13 +246,13 @@ export function UserCardItem({
         <button
           onClick={toggleCredits}
           aria-expanded={showCredits}
-          className="flex w-full items-center justify-between px-4 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-black/45 hover:text-foreground dark:text-white/45"
+          className="section-caption flex w-full items-center justify-between gap-3 px-3.5 pt-3 pb-1 text-left hover:text-foreground"
         >
           <span className="flex items-center gap-1.5">
             <span className={`transition-transform ${showCredits ? "rotate-90" : ""}`}>›</span>
             Statement credits
           </span>
-          <span className="font-normal normal-case tracking-normal text-black/40 dark:text-white/40">
+          <span className="text-right text-dim2">
             {showCredits
               ? "Hide"
               : `${card.benefitCount} ${card.benefitCount === 1 ? "credit" : "credits"} · ${formatCurrency(card.creditsYtd)} this year`}
@@ -264,9 +261,9 @@ export function UserCardItem({
 
         {showCredits && (
           <>
-            <div className="divide-y divide-black/[0.06] dark:divide-white/[0.06]">
+            <div>
               {card.benefits.length === 0 ? (
-                <p className="px-4 py-5 text-center text-sm text-black/45 dark:text-white/45">
+                <p className="px-3.5 py-5 text-center text-sm text-muted2">
                   No credits yet — add one below.
                 </p>
               ) : (
@@ -286,10 +283,10 @@ export function UserCardItem({
                 onCancel={() => setAdding(false)}
               />
             ) : (
-              <div className="px-4 py-2.5">
+              <div className="px-3.5 py-2.5">
                 <button
                   onClick={() => setAdding(true)}
-                  className="text-sm font-medium text-indigo-600 hover:underline dark:text-indigo-400"
+                  className="text-sm font-medium text-accent hover:underline"
                 >
                   + Add credit
                 </button>
@@ -337,8 +334,8 @@ function StartMonthPicker({
         disabled={busy}
         aria-label="Membership start month"
         title="The month you opened this card — sets where monthly credit strips start"
-        className={`cursor-pointer rounded border border-transparent bg-transparent py-0 pl-0.5 pr-4 text-xs outline-none hover:border-black/15 focus:border-black/40 disabled:opacity-50 dark:hover:border-white/15 dark:focus:border-white/40 ${
-          card.membershipStartMonth ? "" : "text-black/35 dark:text-white/35"
+        className={`cursor-pointer rounded-md bg-transparent py-0 pl-0.5 pr-4 text-xs outline-none hover:bg-panel2 focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-50 ${
+          card.membershipStartMonth ? "" : "text-dim2"
         }`}
       >
         <option value="">month?</option>
@@ -384,25 +381,25 @@ function FeeTracker({
   const breakEven = net >= 0;
 
   return (
-    <div className="border-b border-black/10 px-4 py-3 dark:border-white/10">
+    <div className="border-b-[0.5px] border-line px-3.5 py-3">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-black/45 dark:text-white/45">
+        <span className="section-caption">
           Credits vs. annual fee
         </span>
         {editing ? (
           <span className="flex items-center gap-1">
-            <span className="text-xs text-black/45 dark:text-white/45">Fee $</span>
+            <span className="text-xs text-muted2">Fee $</span>
             <input
               value={feeInput}
               onChange={(e) => setFeeInput(e.target.value.replace(/[^\d.]/g, ""))}
               inputMode="decimal"
               autoFocus
-              className="w-20 rounded border border-black/15 bg-transparent px-1.5 py-0.5 text-xs outline-none focus:border-black/40 dark:border-white/15 dark:focus:border-white/40"
+              className="field w-20 text-xs px-2"
             />
             <button
               onClick={saveFee}
               disabled={busy}
-              className="rounded border border-black/15 px-1.5 py-0.5 text-xs hover:bg-black/[0.03] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.04]"
+              className="btn"
             >
               Save
             </button>
@@ -413,7 +410,7 @@ function FeeTracker({
               setFeeInput(String(card.annualFee));
               setEditing(true);
             }}
-            className="text-xs text-black/45 hover:text-foreground dark:text-white/45"
+            className="text-xs text-muted2 hover:text-foreground"
             title="Edit annual fee"
           >
             Fee {formatCurrency(fee)} · Edit
@@ -423,19 +420,19 @@ function FeeTracker({
 
       {fee > 0 ? (
         <>
-          <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-black/[0.06] dark:bg-white/10">
+          <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-panel2">
             <div
-              className={`h-full rounded-full ${breakEven ? "bg-green-500" : "bg-indigo-500"}`}
+              className={`h-full rounded-full ${breakEven ? "bg-pos" : "bg-accent"}`}
               style={{ width: `${aheadWidth}%` }}
             />
           </div>
-          <div className="mt-1.5 text-xs text-black/55 dark:text-white/55">
+          <div className="mt-1.5 text-xs text-muted2">
             <span className="font-medium text-foreground">
               {formatCurrency(card.creditsYtd)}
             </span>{" "}
             captured this year ·{" "}
             {breakEven ? (
-              <span className="font-medium text-green-600 dark:text-green-400">
+              <span className="font-medium text-pos">
                 ✓ paid for itself, {formatCurrency(net)} ahead
               </span>
             ) : (
@@ -445,7 +442,7 @@ function FeeTracker({
           </div>
         </>
       ) : (
-        <div className="mt-1.5 text-xs text-black/55 dark:text-white/55">
+        <div className="mt-1.5 text-xs text-muted2">
           No annual fee ·{" "}
           <span className="font-medium text-foreground">
             {formatCurrency(card.creditsYtd)}
@@ -543,27 +540,27 @@ function BenefitRow({
         : `Not tracked · ${benefit.periodLabel}`;
 
   return (
-    <div className="px-4 py-3">
+    <div className="group-row">
       <div className="flex items-center justify-between gap-3">
-        <span className="font-medium">{benefit.name}</span>
-        <span className="font-mono text-sm tabular-nums">
+        <span className="min-w-0 font-medium">{benefit.name}</span>
+        <span className="text-sm tabular-nums">
           {formatCurrency(benefit.cappedUsed)}
-          <span className="text-black/45 dark:text-white/45">
+          <span className="text-muted2">
             {" "}
             / {formatCurrency(benefit.amount)}
           </span>
         </span>
       </div>
 
-      <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-black/[0.06] dark:bg-white/10">
+      <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-panel2">
         <div
-          className={`h-full rounded-full ${complete ? "bg-green-500" : "bg-indigo-500"}`}
+          className={`h-full rounded-full ${complete ? "bg-pos" : "bg-accent"}`}
           style={{ width: `${pctWidth}%` }}
         />
       </div>
 
       <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2">
-        <span className="text-xs text-black/45 dark:text-white/45">
+        <span className="text-xs text-muted2">
           {complete ? "✓ " : ""}
           {hint}
         </span>
@@ -578,27 +575,25 @@ function BenefitRow({
                 ? "Switch off — the perk stops counting toward the annual fee"
                 : "Switch on once you've activated this perk with the issuer; it then counts in full every period"
             }
-            className={`flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs transition-colors disabled:opacity-50 ${
-              perkOn
-                ? "border-green-500/40 bg-green-500/15 text-green-700 dark:text-green-400"
-                : "border-black/15 text-black/45 hover:bg-black/[0.03] dark:border-white/15 dark:text-white/45 dark:hover:bg-white/[0.04]"
+            className={`flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs transition-colors disabled:opacity-50 ${
+              perkOn ? "bg-pos/15 text-pos" : "bg-panel2 text-muted2"
             }`}
           >
             <span
               className={`h-1.5 w-1.5 rounded-full ${
-                perkOn ? "bg-green-500" : "bg-black/25 dark:bg-white/25"
+                perkOn ? "bg-pos" : "bg-dim2"
               }`}
             />
             Perk {perkOn ? "on" : "off"}
           </button>
           <div className="flex items-center gap-1">
-            <span className="text-xs text-black/45 dark:text-white/45">Used $</span>
+            <span className="text-xs text-muted2">Used $</span>
             <input
               value={logValue}
               onChange={(e) => setLogValue(e.target.value.replace(/[^\d.]/g, ""))}
               inputMode="decimal"
               placeholder="0"
-              className="w-16 rounded border border-black/15 bg-transparent px-1.5 py-0.5 text-xs outline-none focus:border-black/40 dark:border-white/15 dark:focus:border-white/40"
+              className="field w-16 text-xs px-2"
             />
             <button
               onClick={() => {
@@ -606,7 +601,7 @@ function BenefitRow({
                 if (Number.isFinite(n) && n >= 0) patch(n);
               }}
               disabled={busy}
-              className="rounded border border-black/15 px-1.5 py-0.5 text-xs hover:bg-black/[0.03] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.04]"
+              className="btn"
             >
               Save
             </button>
@@ -617,7 +612,7 @@ function BenefitRow({
                   patch(null);
                 }}
                 disabled={busy}
-                className="text-xs text-black/45 hover:text-foreground disabled:opacity-50 dark:text-white/45"
+                className="text-xs text-muted2 hover:text-foreground disabled:opacity-50"
                 title={canAuto ? "Revert to auto-tracking from transactions" : "Clear the logged amount"}
               >
                 {canAuto ? "Auto" : "Clear"}
@@ -628,7 +623,7 @@ function BenefitRow({
             onClick={del}
             disabled={busy}
             aria-label="Delete benefit"
-            className="text-black/30 hover:text-red-600 disabled:opacity-50 dark:text-white/30 dark:hover:text-red-400"
+            className="text-neg/70 hover:text-neg disabled:opacity-50"
           >
             ✕
           </button>
@@ -643,7 +638,7 @@ function BenefitRow({
         rows={notes.includes("\n") ? 3 : 1}
         placeholder="Notes — where to use this credit"
         aria-label={`Notes for ${benefit.name}`}
-        className="mt-2 w-full resize-y rounded border border-black/10 bg-transparent px-2 py-1 text-xs outline-none placeholder:text-black/35 focus:border-black/40 dark:border-white/10 dark:placeholder:text-white/35 dark:focus:border-white/40"
+        className="field mt-2 w-full resize-y text-xs"
       />
 
       <YearStrip benefit={benefit} onChanged={onChanged} />
@@ -680,24 +675,24 @@ function YearStrip({
   }
 
   const cellClass = (w: BenefitDTO["yearBreakdown"][number]) => {
-    const ring = w.manual ? " ring-2 ring-inset ring-indigo-400/70" : "";
+    const ring = w.manual ? " ring-2 ring-inset ring-accent/70" : "";
     if (w.captured)
-      return "border-green-500/30 bg-green-500/15 text-green-700 dark:text-green-400" + ring;
+      return "border-pos/30 bg-pos/15 text-pos" + ring;
     if (w.used > 0)
-      return "border-amber-500/30 bg-amber-500/15 text-amber-700 dark:text-amber-400" + ring;
+      return "border-warn/30 bg-warn/15 text-warn" + ring;
     if (w.future && !w.manual)
-      return "border-dashed border-black/15 text-black/25 dark:border-white/15 dark:text-white/25";
-    return "border-black/10 text-black/35 dark:border-white/10 dark:text-white/35" + ring;
+      return "border-dashed border-line text-dim2";
+    return "border-line text-dim2" + ring;
   };
 
   return (
     <div className="mt-2.5">
       <div className="flex items-center justify-between">
-        <span className="text-[11px] text-black/40 dark:text-white/40">
+        <span className="text-[11px] text-dim2">
           This year{" "}
-          <span className="text-black/30 dark:text-white/30">· click a month to override</span>
+          <span className="text-dim2">· click a month to override</span>
         </span>
-        <span className="text-[11px] tabular-nums text-black/40 dark:text-white/40">
+        <span className="text-[11px] tabular-nums text-dim2">
           {capturedCount}/{elapsed.length} captured · {formatCurrency(benefit.ytdCaptured)} of{" "}
           {formatCurrency(benefit.yearTarget)}
         </span>
@@ -709,7 +704,7 @@ function YearStrip({
             onClick={() => toggle(w)}
             disabled={busy}
             title={`${w.label}: ${formatCurrency(w.used)} / ${formatCurrency(w.target)}${w.manual ? " (manual)" : ""}${w.future ? " · upcoming" : w.captured ? " ✓" : ""}\nClick to ${w.manual ? "clear override" : w.captured ? "mark not captured" : "mark captured"}`}
-            className={`flex-1 rounded border py-1 text-center text-[10px] font-medium transition-colors hover:brightness-110 disabled:opacity-50 ${cellClass(w)}`}
+            className={`flex-1 rounded-md border py-1 text-center text-[10px] font-medium transition-colors hover:brightness-110 disabled:opacity-50 ${cellClass(w)}`}
           >
             {w.short}
           </button>
@@ -762,22 +757,22 @@ function EarningsSection({
     isPoints ? `${Math.round(n).toLocaleString()} pts` : formatCurrency(n);
 
   return (
-    <div className="border-b border-black/10 px-4 py-3 dark:border-white/10">
+    <div className="border-b-[0.5px] border-line px-3.5 py-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-black/45 dark:text-white/45">
+        <span className="section-caption">
           Points earned
         </span>
-        <span className="text-xs text-black/40 dark:text-white/40">
+        <span className="text-xs text-dim2">
           {card.earningsPeriodLabel}
         </span>
       </div>
 
       {!e ? (
-        <p className="mt-2 text-xs text-black/45 dark:text-white/45">
+        <p className="mt-2 text-xs text-muted2">
           Link this card to an account to estimate what it earns.
         </p>
       ) : e.byCategory.length === 0 ? (
-        <p className="mt-2 text-xs text-black/45 dark:text-white/45">
+        <p className="mt-2 text-xs text-muted2">
           No spending on this card in this window yet.
         </p>
       ) : (
@@ -785,7 +780,7 @@ function EarningsSection({
           <div className="mt-2 overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-[11px] uppercase tracking-wide text-black/40 dark:text-white/40">
+                <tr className="section-caption border-b-[0.5px] border-line">
                   <th className="pb-1 text-left font-medium">Category</th>
                   <th className="pb-1 text-right font-medium">Spend</th>
                   <th className="pb-1 text-right font-medium">Rate</th>
@@ -793,7 +788,7 @@ function EarningsSection({
                   <th className="pb-1 text-right font-medium">vs. next best</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-black/[0.06] dark:divide-white/[0.06]">
+              <tbody className="divide-y-[0.5px] divide-line">
                 {e.byCategory.map((r) => (
                   <EarningsRow key={r.key} row={r} isPoints={isPoints} />
                 ))}
@@ -801,19 +796,17 @@ function EarningsSection({
             </table>
           </div>
 
-          <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 border-t border-black/10 pt-2 dark:border-white/10">
-            <span className="text-xs text-black/50 dark:text-white/50">
+          <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 border-t-[0.5px] border-line pt-2">
+            <span className="text-xs text-muted2">
               {formatCurrency(e.totalSpend)} spent ·{" "}
-              <span className="font-mono tabular-nums text-sky-700 dark:text-sky-400">
+              <span className="tabular-nums text-pos">
                 {fmtEarned(e.totalEarned)}
               </span>
               {isPoints && ` ≈ ${formatCurrency(e.totalValue)}`}
             </span>
             <span
-              className={`font-mono text-sm tabular-nums ${
-                e.incrementalValue >= 0
-                  ? "text-sky-700 dark:text-sky-400"
-                  : "text-amber-700 dark:text-amber-400"
+              className={`text-sm tabular-nums ${
+                e.incrementalValue >= 0 ? "text-pos" : "text-warn"
               }`}
               title="What this card earned beyond the best alternative card you hold, on the same transactions"
             >
@@ -823,7 +816,7 @@ function EarningsSection({
           </div>
 
           {isPoints && (
-            <div className="mt-1.5 text-[11px] text-black/40 dark:text-white/40">
+            <div className="mt-1.5 text-[11px] text-dim2">
               {editing ? (
                 <span className="flex items-center gap-1">
                   Point worth
@@ -832,13 +825,13 @@ function EarningsSection({
                     onChange={(ev) => setCppInput(ev.target.value.replace(/[^\d.]/g, ""))}
                     inputMode="decimal"
                     autoFocus
-                    className="w-14 rounded border border-black/15 bg-transparent px-1.5 py-0.5 outline-none focus:border-black/40 dark:border-white/15 dark:focus:border-white/40"
+                    className="field w-14 px-2"
                   />
                   ¢
                   <button
                     onClick={saveCpp}
                     disabled={busy}
-                    className="rounded border border-black/15 px-1.5 py-0.5 hover:bg-black/[0.03] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.04]"
+                    className="btn"
                   >
                     Save
                   </button>
@@ -870,25 +863,25 @@ function EarningsRow({ row, isPoints }: { row: EarningsCategoryDTO; isPoints: bo
       <td className="py-1">
         {row.categoryLabel}
         {!row.isBonus && (
-          <span className="ml-1 text-[11px] text-black/35 dark:text-white/35">base</span>
+          <span className="ml-1 text-[11px] text-dim2">base</span>
         )}
       </td>
-      <td className="py-1 text-right font-mono text-xs tabular-nums text-black/60 dark:text-white/60">
+      <td className="py-1 text-right text-xs tabular-nums text-muted2">
         {formatCurrency(row.spend)}
       </td>
-      <td className="py-1 text-right font-mono text-xs tabular-nums text-black/60 dark:text-white/60">
+      <td className="py-1 text-right text-xs tabular-nums text-muted2">
         {row.rate}
       </td>
-      <td className="py-1 text-right font-mono text-xs tabular-nums">
+      <td className="py-1 text-right text-xs tabular-nums">
         {isPoints ? Math.round(row.earned).toLocaleString() : formatCurrency(row.earned)}
       </td>
       <td
-        className={`py-1 text-right font-mono text-xs tabular-nums ${
+        className={`py-1 text-right text-xs tabular-nums ${
           row.vsBest > 0
-            ? "text-sky-700 dark:text-sky-400"
+            ? "text-pos"
             : row.vsBest < 0
-              ? "text-amber-700 dark:text-amber-400"
-              : "text-black/35 dark:text-white/35"
+              ? "text-warn"
+              : "text-dim2"
         }`}
         title={row.bestAlternative ? `Best alternative: ${row.bestAlternative}` : undefined}
       >
@@ -919,7 +912,7 @@ function RatesSection({
   return (
     <div className="mt-2">
       {card.rewardRates.length === 0 ? (
-        <p className="text-xs text-black/45 dark:text-white/45">
+        <p className="text-xs text-muted2">
           No earning rates yet — add one below, or re-add this card from a preset.
         </p>
       ) : (
@@ -928,16 +921,16 @@ function RatesSection({
             <span
               key={r.id}
               title={r.notes ?? undefined}
-              className="inline-flex items-center gap-1.5 rounded-md border border-black/10 px-2 py-1 text-xs dark:border-white/10"
+              className="chip inline-flex items-center gap-1.5"
             >
-              <span className="font-medium">{r.categoryLabel}</span>
-              <span className="font-mono tabular-nums">{r.display}</span>
-              {r.notes && <span className="text-black/35 dark:text-white/35">*</span>}
+              <span className="font-medium text-foreground">{r.categoryLabel}</span>
+              <span className="tabular-nums text-foreground">{r.display}</span>
+              {r.notes && <span className="text-dim2">*</span>}
               <button
                 onClick={() => delRate(r.id)}
                 disabled={busy}
                 aria-label={`Delete ${r.categoryLabel} rate`}
-                className="text-black/30 hover:text-red-600 disabled:opacity-50 dark:text-white/30 dark:hover:text-red-400"
+                className="text-neg/70 hover:text-neg disabled:opacity-50"
               >
                 ✕
               </button>
@@ -958,7 +951,7 @@ function RatesSection({
       ) : (
         <button
           onClick={() => setAdding(true)}
-          className="mt-2 text-xs font-medium text-indigo-600 hover:underline dark:text-indigo-400"
+          className="mt-2 text-xs font-medium text-accent hover:underline"
         >
           + Add / override rate
         </button>
@@ -1005,8 +998,7 @@ function AddRateForm({
     onDone();
   }
 
-  const small =
-    "rounded-md border border-black/15 bg-transparent px-2 py-1 text-xs outline-none focus:border-black/40 dark:border-white/15 dark:focus:border-white/40";
+  const small = "field text-xs";
 
   return (
     <form onSubmit={submit} className="mt-2 flex flex-wrap items-center gap-2">
@@ -1036,18 +1028,18 @@ function AddRateForm({
       <button
         type="submit"
         disabled={busy}
-        className="rounded-md bg-foreground px-2.5 py-1 text-xs font-medium text-background hover:opacity-90 disabled:opacity-50"
+        className="btn btn-primary"
       >
         Save
       </button>
       <button
         type="button"
         onClick={onCancel}
-        className="text-xs text-black/50 hover:text-foreground dark:text-white/50"
+        className="btn"
       >
         Cancel
       </button>
-      {error && <span className="text-xs text-red-600 dark:text-red-400">{error}</span>}
+      {error && <span className="text-xs text-neg">{error}</span>}
     </form>
   );
 }
@@ -1095,7 +1087,7 @@ function AddBenefitForm({
   return (
     <form
       onSubmit={submit}
-      className="border-t border-black/10 bg-black/[0.015] px-4 py-3 dark:border-white/10 dark:bg-white/[0.02]"
+      className="border-t-[0.5px] border-line px-3.5 py-3"
     >
       <div className="grid gap-2 sm:grid-cols-2">
         <input
@@ -1103,7 +1095,7 @@ function AddBenefitForm({
           onChange={(e) => setName(e.target.value)}
           placeholder="Benefit name (e.g. Airline Fee Credit)"
           required
-          className={inputClass}
+          className="field"
         />
         <input
           value={amount}
@@ -1111,12 +1103,12 @@ function AddBenefitForm({
           placeholder="Amount ($)"
           inputMode="decimal"
           required
-          className={inputClass}
+          className="field"
         />
         <select
           value={period}
           onChange={(e) => setPeriod(e.target.value)}
-          className={inputClass}
+          className="field"
         >
           {BENEFIT_PERIODS.map((p) => (
             <option key={p} value={p}>
@@ -1127,7 +1119,7 @@ function AddBenefitForm({
         <select
           value={category}
           onChange={(e) => setCategory(e.target.value)}
-          className={inputClass}
+          className="field"
         >
           <option value="">Track manually (no category)</option>
           {TRACKABLE_CATEGORIES.map((c) => (
@@ -1138,20 +1130,20 @@ function AddBenefitForm({
         </select>
       </div>
       {error && (
-        <p className="mt-2 text-sm text-red-600 dark:text-red-400">{error}</p>
+        <p className="mt-2 text-sm text-neg">{error}</p>
       )}
       <div className="mt-2.5 flex gap-2">
         <button
           type="submit"
           disabled={busy}
-          className="rounded-md bg-foreground px-3 py-1.5 text-sm font-medium text-background hover:opacity-90 disabled:opacity-50"
+          className="btn btn-primary"
         >
           {busy ? "Adding…" : "Add benefit"}
         </button>
         <button
           type="button"
           onClick={onCancel}
-          className="rounded-md border border-black/15 px-3 py-1.5 text-sm hover:bg-black/[0.03] dark:border-white/15 dark:hover:bg-white/[0.04]"
+          className="btn"
         >
           Cancel
         </button>

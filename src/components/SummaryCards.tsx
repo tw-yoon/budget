@@ -20,8 +20,8 @@ export function SummaryCards({ summary }: { summary: AnalyticsSummary }) {
 
   const toneClass: Record<string, string> = {
     neutral: "text-foreground",
-    income: "text-green-600 dark:text-green-400",
-    spend: "text-red-600 dark:text-red-400",
+    income: "text-pos",
+    spend: "text-neg",
   };
 
   return (
@@ -29,9 +29,9 @@ export function SummaryCards({ summary }: { summary: AnalyticsSummary }) {
       {cards.map((c) => (
         <div
           key={c.label}
-          className="rounded-lg border border-black/10 px-4 py-3 dark:border-white/10"
+          className="group-panel px-4 py-3"
         >
-          <div className="text-xs uppercase tracking-wide text-black/50 dark:text-white/50">
+          <div className="section-caption">
             {c.label}
           </div>
           <div className={`mt-1 text-xl font-semibold tabular-nums ${toneClass[c.tone]}`}>

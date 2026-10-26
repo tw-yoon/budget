@@ -18,9 +18,8 @@ async function fetchStatus(check = false): Promise<UpdateStatusDTO | null> {
 
 type Phase = "idle" | "checking" | "starting" | "updating" | "stillNotBack";
 
-const buttonClass =
-  "self-start rounded-lg border border-black/10 px-4 py-2 text-sm font-medium transition-colors hover:border-black/30 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:hover:border-white/30";
-const mutedClass = "text-sm text-black/55 dark:text-white/55";
+const buttonClass = "btn btn-primary self-start";
+const mutedClass = "text-sm text-muted2";
 
 export function SettingsUpdates() {
   const [status, setStatus] = useState<UpdateStatusDTO | null>(null);
@@ -132,7 +131,7 @@ export function SettingsUpdates() {
         {status.failed && (
           <div className="flex flex-col gap-2">
             <p className="text-sm">The last update didn&apos;t finish:</p>
-            <pre className="whitespace-pre-wrap break-words rounded-lg border border-black/10 px-3 py-2 text-xs dark:border-white/10">
+            <pre className="whitespace-pre-wrap break-words rounded-xl bg-panel px-3 py-2 text-xs">
               {status.failed}
             </pre>
             <p className={mutedClass}>Run ./Budget.command --update in Terminal to see why.</p>
@@ -158,7 +157,7 @@ export function SettingsUpdates() {
             </button>
           </>
         )}
-        {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+        {error && <p className="text-sm text-neg">{error}</p>}
       </>
     );
   }
@@ -166,7 +165,7 @@ export function SettingsUpdates() {
   return (
     <div className="flex flex-col gap-5">
       <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Updates</h1>
+        <h1>Updates</h1>
         <p className={mutedClass}>Keep Budget current.</p>
       </header>
       <div className="flex flex-col gap-3">{body}</div>
@@ -248,7 +247,7 @@ function PhoneUpdate() {
 
   return (
     <section className="flex flex-col gap-3">
-      <h2 className="text-lg font-semibold tracking-tight">iPhone</h2>
+      <h2>iPhone</h2>
       {status.installing ? (
         <p className={mutedClass}>Updating the iPhone… Keep it unlocked and on the Mac&apos;s Wi-Fi.</p>
       ) : (
@@ -263,7 +262,7 @@ function PhoneUpdate() {
           </button>
         </>
       )}
-      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+      {error && <p className="text-sm text-neg">{error}</p>}
     </section>
   );
 }

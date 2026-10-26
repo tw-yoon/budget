@@ -172,16 +172,16 @@ export function SpendingGraph() {
   const areaFill = fillCrosses ? "url(#spendFill)" : !chart || chart.splitFill <= 0 ? UNDER : OVER;
 
   return (
-    <div className="rounded-lg border border-black/10 p-4 text-black/60 dark:border-white/10 dark:text-white/60">
+    <div className="group-panel p-4 text-muted2">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h3 className="text-sm font-medium text-foreground">Spending</h3>
-          <p className="text-xs text-black/50 dark:text-white/50">{selMonth?.label ?? "—"}</p>
+          <h3>Spending</h3>
+          <p className="text-xs text-muted2">{selMonth?.label ?? "—"}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <label className="flex items-center gap-1.5 text-xs text-black/55 dark:text-white/55">
+          <label className="flex items-center gap-1.5 text-xs text-muted2">
             Limit
-            <span className="inline-flex items-center rounded-md border border-black/15 px-2 py-1 text-foreground dark:border-white/15">
+            <span className="inline-flex items-center rounded-lg bg-panel2 px-2 py-1 text-foreground">
               $
               <input
                 type="number"
@@ -193,15 +193,15 @@ export function SpendingGraph() {
               />
             </span>
           </label>
-          <div className="flex gap-1 rounded-md border border-black/15 p-0.5 dark:border-white/15">
+          <div className="flex gap-1 rounded-lg bg-panel2 p-0.5">
             {(["lastMonth", "lastYear"] as const).map((mode) => (
               <button
                 key={mode}
                 onClick={() => setCompareMode(mode)}
-                className={`rounded px-2 py-1 text-xs transition-colors ${
+                className={`rounded-md px-2 py-1 text-xs transition-colors ${
                   compareMode === mode
-                    ? "bg-foreground text-background"
-                    : "text-black/60 hover:text-foreground dark:text-white/60"
+                    ? "bg-panel text-foreground shadow-sm"
+                    : "text-muted2 hover:text-foreground"
                 }`}
               >
                 {mode === "lastMonth" ? "Last month" : "Last year"}
@@ -217,11 +217,11 @@ export function SpendingGraph() {
       </div>
 
       {loading ? (
-        <div className="flex h-64 items-center justify-center text-sm text-black/50 dark:text-white/50">Loading…</div>
+        <div className="flex h-64 items-center justify-center text-sm text-muted2">Loading…</div>
       ) : error ? (
-        <div className="flex h-64 items-center justify-center text-sm text-red-600 dark:text-red-400">{error}</div>
+        <div className="flex h-64 items-center justify-center text-sm text-neg">{error}</div>
       ) : !chart || chart.peak === 0 ? (
-        <div className="flex h-64 items-center justify-center text-sm text-black/50 dark:text-white/50">
+        <div className="flex h-64 items-center justify-center text-sm text-muted2">
           No spending in {selMonth?.label ?? "this month"}.
         </div>
       ) : (
@@ -243,20 +243,19 @@ export function SpendingGraph() {
                     <stop offset="1" stopColor={UNDER} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="currentColor" strokeOpacity={0.12} vertical={false} />
-                <XAxis dataKey="day" type="number" domain={[1, chart.D]} ticks={chart.ticks} tick={{ fill: "currentColor", fontSize: 12 }} tickLine={false} axisLine={false} />
-                <YAxis domain={[0, chart.top]} tickFormatter={(v) => formatCompactCurrency(v)} tick={{ fill: "currentColor", fontSize: 12 }} tickLine={false} axisLine={false} width={52} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--grid)" vertical={false} />
+                <XAxis dataKey="day" type="number" domain={[1, chart.D]} ticks={chart.ticks} tick={{ fill: "var(--muted)", fontSize: 12 }} tickLine={false} axisLine={false} />
+                <YAxis domain={[0, chart.top]} tickFormatter={(v) => formatCompactCurrency(v)} tick={{ fill: "var(--muted)", fontSize: 12 }} tickLine={false} axisLine={false} width={52} />
                 <Tooltip
                   formatter={(v) => (v == null ? "—" : formatCurrency(Number(v)))}
                   labelFormatter={(d) => `Day ${d}`}
-                  contentStyle={{ borderRadius: 8, fontSize: 12, border: "1px solid rgba(0,0,0,0.1)" }}
+                  contentStyle={{ borderRadius: 10, fontSize: 12, border: "none", background: "var(--panel)", color: "var(--text)", fontFamily: "inherit", boxShadow: "0 2px 10px rgba(0,0,0,0.15)" }}
                 />
                 <ReferenceLine
                   y={limit}
-                  stroke="currentColor"
-                  strokeOpacity={0.45}
+                  stroke="var(--dim)"
                   strokeDasharray="5 4"
-                  label={{ value: `Limit ${formatCompactCurrency(limit)}`, position: "insideTopRight", fontSize: 10, fill: "currentColor" }}
+                  label={{ value: `Limit ${formatCompactCurrency(limit)}`, position: "insideTopRight", fontSize: 10, fill: "var(--muted)" }}
                 />
                 <Line dataKey="avg" name="Average" stroke={AVG_COLOR} strokeWidth={1.5} dot={false} connectNulls />
                 <Line dataKey="compare" name={compareLabel} stroke={CMP_COLOR} strokeWidth={1.5} strokeDasharray="4 3" dot={false} connectNulls />
@@ -265,7 +264,7 @@ export function SpendingGraph() {
             </ResponsiveContainer>
           </div>
 
-          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-black/55 dark:text-white/55">
+          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted2">
             <span className="inline-flex items-center gap-1.5">
               <span className="h-2 w-4 rounded-sm" style={{ background: `linear-gradient(90deg, ${UNDER}, ${OVER})` }} />
               This month {formatCurrency(chart.spent)}
@@ -278,7 +277,7 @@ export function SpendingGraph() {
               <span className="h-0.5 w-4 border-t-2 border-dashed" style={{ borderColor: CMP_COLOR }} />
               {compareLabel}
             </span>
-            <span className={over ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"}>
+            <span className={over ? "text-neg" : "text-pos"}>
               {over
                 ? `${formatCurrency(chart.spent - limit)} over the ${formatCurrency(limit)} limit`
                 : `${formatCurrency(limit - chart.spent)} left of the ${formatCurrency(limit)} limit`}

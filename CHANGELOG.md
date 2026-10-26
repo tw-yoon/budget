@@ -11,6 +11,17 @@ update), so nothing here is a stability promise.
 
 ## Unreleased
 
+## 0.16.0 — 2026-10-25
+
+- The web app has a new look that matches the iPhone app: the system font,
+  rounded grouped panels, a Mac-style sidebar with icons, and Apple's colors
+  in light and dark.
+- Choosing Light or Dark in Settings now applies to every part of the page,
+  even when the Mac is set to the other one.
+- Transactions has a Detailed view: bigger rows with the merchant's logo,
+  the bank's own description, your note and the weekday.
+- Venmo and Zelle payments can be given a subcategory, like in the ledger.
+
 ## 0.15.3 — 2026-10-25
 
 - "Transfer In" and "Transfer Out" are merged into one "Transfer"

@@ -69,19 +69,19 @@ export function TransactionLinkPicker({
   if (linkedTo) {
     return (
       <div className="flex flex-wrap items-center gap-1.5 text-xs">
-        <span className="text-black/45 dark:text-white/45">Pays back</span>
-        <span className="rounded bg-emerald-100 px-1.5 py-0.5 font-medium text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
+        <span className="text-muted2">Pays back</span>
+        <span className="chip text-pos">
           #{linkedTo.label ?? "?"} {linkedTo.name} · {linkedTo.category}
         </span>
         <button
           type="button"
           disabled={busy}
           onClick={() => save(null)}
-          className="rounded px-1.5 py-0.5 text-black/50 hover:bg-black/[0.06] disabled:opacity-50 dark:text-white/50 dark:hover:bg-white/10"
+          className="btn text-neg disabled:opacity-50"
         >
           Disconnect
         </button>
-        {error && <span className="text-red-600 dark:text-red-400">{error}</span>}
+        {error && <span className="text-neg">{error}</span>}
       </div>
     );
   }
@@ -91,7 +91,7 @@ export function TransactionLinkPicker({
       <button
         type="button"
         onClick={openPicker}
-        className="text-xs text-black/45 underline-offset-2 hover:underline dark:text-white/45"
+        className="text-xs text-muted2 underline-offset-2 hover:underline"
       >
         Connect to a purchase…
       </button>
@@ -100,11 +100,11 @@ export function TransactionLinkPicker({
 
   return (
     <div className="flex flex-col gap-1.5 text-xs">
-      <span className="text-black/45 dark:text-white/45">Connect to a purchase</span>
+      <span className="text-muted2">Connect to a purchase</span>
       {candidates === null ? (
-        <span className="text-black/40 dark:text-white/40">Looking…</span>
+        <span className="text-dim2">Looking…</span>
       ) : candidates.length === 0 ? (
-        <span className="text-black/40 dark:text-white/40">
+        <span className="text-dim2">
           No likely purchase found — enter a number below.
         </span>
       ) : (
@@ -115,16 +115,16 @@ export function TransactionLinkPicker({
               type="button"
               disabled={busy}
               onClick={() => save(c.label)}
-              className="rounded border border-black/15 px-1.5 py-1 text-left hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/20 dark:hover:bg-white/[0.06]"
+              className="btn h-auto w-full whitespace-normal text-left disabled:opacity-50"
             >
-              <span className="font-mono text-black/40 dark:text-white/40">#{c.label}</span>{" "}
+              <span className="text-dim2">#{c.label}</span>{" "}
               {formatDate(c.date)} · {c.name} · {formatCurrency(c.amount)}
             </button>
           ))}
         </div>
       )}
       <div className="flex items-center gap-1.5">
-        <span className="font-mono text-black/40 dark:text-white/40">#</span>
+        <span className="text-dim2">#</span>
         <input
           type="number"
           value={typed}
@@ -135,25 +135,25 @@ export function TransactionLinkPicker({
           }}
           placeholder="number"
           disabled={busy}
-          className="w-24 rounded border border-black/15 bg-white px-1.5 py-1 dark:border-white/20 dark:bg-neutral-900"
+          className="field w-24"
         />
         <button
           type="button"
           disabled={busy || !typed}
           onClick={() => save(Number(typed))}
-          className="rounded bg-black px-2 py-1 font-medium text-white hover:bg-black/80 disabled:opacity-50 dark:bg-white dark:text-black"
+          className="btn btn-primary disabled:opacity-50"
         >
           Connect
         </button>
         <button
           type="button"
           onClick={() => setOpen(false)}
-          className="rounded px-2 py-1 text-black/50 hover:bg-black/[0.04] dark:text-white/50"
+          className="btn"
         >
           Cancel
         </button>
       </div>
-      {error && <span className="text-red-600 dark:text-red-400">{error}</span>}
+      {error && <span className="text-neg">{error}</span>}
     </div>
   );
 }

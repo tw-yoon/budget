@@ -32,13 +32,13 @@ export function ProOnly({
 
   const notice = (
     <>
-      <p className="mt-2 max-w-prose text-sm text-black/55 dark:text-white/55">
+      <p className="mt-2 max-w-prose text-sm text-muted2">
         {title} is part of Pro. Nothing you have entered is lost — turn Pro on
         and it is here as you left it.
       </p>
       <Link
         href="/settings/mode"
-        className="mt-6 inline-flex items-center rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90"
+        className="btn btn-primary mt-6 inline-flex items-center"
       >
         Settings → Mode
       </Link>
@@ -48,14 +48,14 @@ export function ProOnly({
   if (nested)
     return (
       <section className="py-8">
-        <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
+        <h2>{title}</h2>
         {notice}
       </section>
     );
 
   return (
     <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-16">
-      <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+      <h1>{title}</h1>
       {notice}
     </main>
   );

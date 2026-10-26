@@ -15,7 +15,7 @@ export default function VenmoPage() {
         emptyHint={
           <>
             Drop your{" "}
-            <code className="rounded bg-black/[0.06] px-1 py-0.5 text-xs dark:bg-white/10">
+            <code className="chip">
               VenmoStatement_*.csv
             </code>{" "}
             exports in your Downloads folder, then hit Import / re-sync CSV.

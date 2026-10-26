@@ -60,22 +60,22 @@ export function AccountCard({
     account.manualCreditLimit != null;
 
   const inputCls =
-    "rounded border border-black/15 bg-transparent px-1.5 py-0.5 outline-none focus:border-black/40 dark:border-white/15 dark:focus:border-white/40";
+    "field px-1.5 py-0.5";
 
   return (
     <div
-      className={`flex items-start justify-between gap-4 px-4 py-3 ${
+      className={`group-row flex items-start justify-between gap-4 ${
         account.disconnected ? "opacity-50" : ""
       }`}
     >
       <div className="min-w-0">
         <div className="truncate font-medium">{name}</div>
-        <div className="mt-0.5 truncate text-xs text-black/50 dark:text-white/50">
+        <div className="mt-0.5 truncate text-xs text-muted2">
           {account.mask && <span>··{account.mask} · </span>}
           {account.subtype ?? account.type.toLowerCase()} · {account.institution}
         </div>
         {account.disconnected && (
-          <div className="mt-0.5 text-xs font-medium text-black/60 dark:text-white/60">
+          <div className="mt-0.5 text-xs font-medium text-muted2">
             Disconnected · as of {formatDate(account.balanceFetchedAt)}
           </div>
         )}
@@ -89,7 +89,7 @@ export function AccountCard({
         {editing ? (
           <div className="mt-1.5 flex flex-col gap-1.5 text-xs">
             <label className="flex items-center gap-1.5">
-              <span className="w-16 text-black/55 dark:text-white/55">Name</span>
+              <span className="w-16 text-muted2">Name</span>
               <input
                 value={nameInput}
                 onChange={(e) => setNameInput(e.target.value)}
@@ -99,7 +99,7 @@ export function AccountCard({
             </label>
             {isCredit && (
               <label className="flex flex-wrap items-center gap-1.5">
-                <span className="w-16 text-black/55 dark:text-white/55">Due day</span>
+                <span className="w-16 text-muted2">Due day</span>
                 <input
                   value={dayInput}
                   onChange={(e) =>
@@ -109,7 +109,7 @@ export function AccountCard({
                   placeholder="6"
                   className={`w-12 ${inputCls}`}
                 />
-                <span className="ml-1 text-black/55 dark:text-white/55">
+                <span className="ml-1 text-muted2">
                   Credit limit $
                 </span>
                 <input
@@ -127,17 +127,17 @@ export function AccountCard({
               <button
                 onClick={save}
                 disabled={busy}
-                className="rounded border border-black/15 px-1.5 py-0.5 hover:bg-black/[0.03] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.04]"
+                className="btn btn-primary px-2 py-0.5"
               >
                 Save
               </button>
               <button
                 onClick={() => setEditing(false)}
-                className="text-black/45 hover:text-foreground dark:text-white/45"
+                className="text-dim2 hover:text-foreground"
               >
                 Cancel
               </button>
-              <span className="text-black/40 dark:text-white/40">
+              <span className="text-dim2">
                 (blank a field to clear it)
               </span>
             </div>
@@ -145,7 +145,7 @@ export function AccountCard({
         ) : (
           <button
             onClick={() => setEditing(true)}
-            className="mt-1 text-xs text-indigo-600 hover:underline dark:text-indigo-400"
+            className="mt-1 text-xs text-accent hover:underline"
           >
             {hasOverrides ? "Edit" : "Edit / rename"}
           </button>
@@ -154,8 +154,8 @@ export function AccountCard({
 
       <div className="shrink-0 text-right">
         <div
-          className={`font-mono tabular-nums ${
-            account.isLiability ? "text-red-600 dark:text-red-400" : ""
+          className={`tabular-nums ${
+            account.isLiability ? "text-neg" : ""
           }`}
         >
           {formatCurrency(
@@ -163,7 +163,7 @@ export function AccountCard({
           )}
         </div>
         {available != null && (
-          <div className="mt-0.5 text-xs text-black/45 dark:text-white/45">
+          <div className="mt-0.5 text-xs text-dim2">
             {availableLabel} {formatCurrency(available)}
             {account.manualCreditLimit != null &&
               ` of ${formatCurrency(account.manualCreditLimit)} · manual`}
@@ -179,8 +179,8 @@ function paymentStatus(
 ): { text: string; className: string } | null {
   if (account.type !== "CREDIT") return null;
 
-  const amber = "text-amber-600 dark:text-amber-400";
-  const muted = "text-black/60 dark:text-white/60";
+  const amber = "text-warn";
+  const muted = "text-muted2";
   const rel = (d: number) => (d === 0 ? "today" : `in ${d}d`);
 
   // Manual override wins — used when the issuer doesn't share a due date via
@@ -205,7 +205,7 @@ function paymentStatus(
   if (account.paymentIsOverdue) {
     return {
       text: `Payment overdue — was due ${formatDate(account.nextPaymentDueDate)}${min}`,
-      className: "text-red-600 dark:text-red-400",
+      className: "text-neg",
     };
   }
 

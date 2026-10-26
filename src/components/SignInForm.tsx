@@ -43,10 +43,10 @@ export function SignInForm() {
   }
 
   return (
-    <form onSubmit={submit} className="flex flex-col gap-4 rounded-lg border border-black/10 p-6 dark:border-white/10">
+    <form onSubmit={submit} className="group-panel flex flex-col gap-4 p-6">
       <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Sign In</h1>
-        <p className="text-sm text-black/55 dark:text-white/55">
+        <h1>Sign In</h1>
+        <p className="text-sm text-muted2">
           This Budget server needs its access token. Find it on the Mac running Budget, under
           Settings → Remote Access.
         </p>
@@ -58,15 +58,15 @@ export function SignInForm() {
           autoComplete="current-password"
           value={token}
           onChange={(e) => setToken(e.target.value)}
-          className="rounded-md border border-black/15 bg-transparent px-3 py-2 font-mono dark:border-white/15"
+          className="field py-2"
           autoFocus
         />
       </label>
-      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+      {error && <p className="text-sm text-neg">{error}</p>}
       <button
         type="submit"
         disabled={busy || token.trim() === ""}
-        className="rounded-md bg-foreground px-3 py-2 text-sm font-medium text-background disabled:opacity-40"
+        className="btn btn-primary py-2"
       >
         {busy ? "Signing in…" : "Sign in"}
       </button>

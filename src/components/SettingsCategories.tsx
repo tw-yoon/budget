@@ -267,8 +267,8 @@ export function SettingsCategories() {
   return (
     <div className="flex flex-col gap-5">
       <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Categories</h1>
-        <p className="text-sm text-black/55 dark:text-white/55">
+        <h1>Categories</h1>
+        <p className="text-sm text-muted2">
           Used by the ledger, Rules, Venmo and Zelle. Renaming one onto
           another merges them. Subcategories roll up into their category in
           Analytics. Plaid&rsquo;s own subcategories are listed too — rename
@@ -277,18 +277,18 @@ export function SettingsCategories() {
       </header>
 
       {notice && (
-        <div className="rounded-lg border border-green-300 bg-green-50 px-4 py-3 text-sm text-green-700 dark:border-green-500/30 dark:bg-green-500/10 dark:text-green-400">
+        <div className="rounded-xl bg-pos/10 px-4 py-3 text-sm text-pos">
           {notice}
         </div>
       )}
       {error && (
-        <div className="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-400">
+        <div className="rounded-xl bg-neg/10 px-4 py-3 text-sm text-neg">
           {error}
         </div>
       )}
 
       {unmappedPrimaries.length > 0 && (
-        <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-400">
+        <div className="rounded-xl bg-warn/10 px-4 py-3 text-sm">
           <p className="font-medium">
             {unmappedPrimaries.length} Plaid label
             {unmappedPrimaries.length === 1 ? "" : "s"} not mapped to a category:{" "}
@@ -297,7 +297,7 @@ export function SettingsCategories() {
               .join(", ")}
             .
           </p>
-          <p className="mt-1 text-amber-700 dark:text-amber-400/80">
+          <p className="mt-1 text-muted2">
             Those transactions report under Plaid&rsquo;s own wording instead of one of your
             categories, and won&rsquo;t follow if you rename a category later.
           </p>
@@ -321,22 +321,22 @@ export function SettingsCategories() {
           value={adding}
           onChange={(e) => setAdding(e.target.value)}
           placeholder="New category"
-          className="w-56 rounded-md border border-black/15 bg-transparent px-3 py-2 text-sm outline-none focus:border-black/40 dark:border-white/15 dark:focus:border-white/40"
+          className="field w-56 py-2 text-sm"
         />
         <button
           type="submit"
-          className="rounded-md bg-black px-3 py-2 text-sm font-medium text-white hover:bg-black/80 dark:bg-white dark:text-black"
+          className="btn btn-primary py-2"
         >
           Add
         </button>
-        <div className="ml-auto flex rounded-md border border-black/15 text-sm dark:border-white/15">
+        <div className="ml-auto flex rounded-lg bg-panel2 p-0.5 text-sm">
           {(["list", "map"] as const).map((v) => (
             <button
               key={v}
               type="button"
               onClick={() => setView(v)}
-              className={`px-3 py-2 capitalize ${
-                view === v ? "bg-black/[0.08] font-medium dark:bg-white/15" : "text-black/55 dark:text-white/55"
+              className={`rounded-md px-3 py-1.5 capitalize ${
+                view === v ? "bg-panel font-medium shadow-sm" : "text-muted2"
               }`}
             >
               {v}
@@ -358,14 +358,15 @@ export function SettingsCategories() {
           }}
         />
       ) : loading && categories.length === 0 ? (
-        <div className="rounded-lg border border-black/10 px-6 py-16 text-center text-sm text-black/50 dark:border-white/10 dark:text-white/50">
+        <div className="group-panel px-6 py-16 text-center text-sm text-muted2">
           Loading…
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-black/10 dark:border-white/10">
+        <div className="group-panel">
+          <div className="overflow-x-auto">
           <table className="w-full border-collapse text-sm">
             <thead>
-              <tr className="border-b border-black/10 text-left text-xs uppercase tracking-wide text-black/50 dark:border-white/10 dark:text-white/50">
+              <tr className="section-caption border-b-[0.5px] border-line text-left">
                 <th className="px-4 py-3 font-medium">Category</th>
                 <th className="px-4 py-3 font-medium">Used by</th>
                 <th className="px-4 py-3 font-medium">Plaid labels</th>
@@ -379,10 +380,10 @@ export function SettingsCategories() {
                 return (
                 <tbody
                   key={c.id}
-                  className="border-b border-black/[0.06] last:border-0 dark:border-white/[0.06]"
+                  className="border-b-[0.5px] border-line last:border-0"
                 >
                 <tr className="align-top">
-                  <td className="px-4 py-3 font-medium">
+                  <td className="min-w-40 px-4 py-3 font-medium">
                     {isReserved ? (
                       <span
                         title='"Transfer" controls how transactions are excluded from spending — it cannot be renamed or deleted'
@@ -415,7 +416,7 @@ export function SettingsCategories() {
                             setEditing(null);
                           }
                         }}
-                        className="w-44 rounded border border-black/15 bg-white px-1.5 py-1 dark:border-white/20 dark:bg-neutral-900"
+                        className="field w-44 px-1.5 py-1"
                       />
                     ) : (
                       <button
@@ -435,10 +436,10 @@ export function SettingsCategories() {
                       </button>
                     )}
                   </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-black/55 dark:text-white/55">
+                  <td className="whitespace-nowrap px-4 py-3 text-muted2">
                     {c.resolvedTransactionCount} tx
                     {c.resolvedTransactionCount !== c.transactionCount && (
-                      <span className="text-black/35 dark:text-white/35">
+                      <span className="text-dim2">
                         {" "}
                         ({c.transactionCount} direct)
                       </span>
@@ -458,12 +459,12 @@ export function SettingsCategories() {
                             type="button"
                             onClick={() => togglePrimary(c, p)}
                             title={unmapped ? "Not mapped to any category — click to map it here" : undefined}
-                            className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
+                            className={`rounded-md px-1.5 py-0.5 text-[10px] font-medium ${
                               on
-                                ? "bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300"
+                                ? "bg-accent/15 text-accent"
                                 : unmapped
-                                ? "bg-amber-100 text-amber-800 ring-1 ring-amber-300 hover:bg-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:ring-amber-500/40"
-                                : "bg-black/[0.04] text-black/35 hover:bg-black/[0.08] dark:bg-white/[0.06] dark:text-white/35"
+                                ? "bg-warn/10 text-warn ring-1 ring-warn hover:bg-warn/20"
+                                : "bg-panel2 text-dim2 hover:text-muted2"
                             }`}
                           >
                             {p}
@@ -479,7 +480,7 @@ export function SettingsCategories() {
                         setAddingSubTo(c.id);
                         setSubDraft("");
                       }}
-                      className="rounded px-2 py-1 text-xs text-black/50 hover:bg-black/[0.06] dark:text-white/50 dark:hover:bg-white/10"
+                      className="btn px-2 py-1 text-xs"
                     >
                       Add sub
                     </button>
@@ -499,7 +500,7 @@ export function SettingsCategories() {
                           ? '"Transfer" controls how transactions are excluded from spending — it cannot be renamed or deleted'
                           : undefined
                       }
-                      className="rounded px-2 py-1 text-xs text-black/50 hover:bg-black/[0.06] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent dark:text-white/50 dark:hover:bg-white/10"
+                      className={`btn px-2 py-1 text-xs ${isReserved ? "" : "text-neg"}`}
                     >
                       Delete
                     </button>
@@ -509,9 +510,9 @@ export function SettingsCategories() {
                   const key = subKey(c.id, sub.name);
                   return (
                     <tr key={key} className="align-top">
-                      <td className="py-1.5 pl-8 pr-4 text-black/70 dark:text-white/70">
+                      <td className="py-1.5 pl-8 pr-4 text-muted2">
                         <div className="flex items-start gap-1.5">
-                        <span className="text-black/25 dark:text-white/25">↳</span>
+                        <span className="text-dim2">↳</span>
                         {editing === key ? (
                           <input
                             autoFocus
@@ -535,7 +536,7 @@ export function SettingsCategories() {
                                 setEditing(null);
                               }
                             }}
-                            className="w-40 rounded border border-black/15 bg-white px-1.5 py-0.5 dark:border-white/20 dark:bg-neutral-900"
+                            className="field w-40 px-1.5 py-0.5"
                           />
                         ) : (
                           <button
@@ -552,7 +553,7 @@ export function SettingsCategories() {
                         )}
                         {sub.plaidLabels.length > 0 && (
                           <span
-                            className="mt-0.5 rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-medium text-sky-700 dark:bg-sky-500/15 dark:text-sky-300"
+                            className="chip mt-0.5"
                             title={`Plaid: ${sub.plaidLabels.map((l) => l.code).join(", ")}`}
                           >
                             {sub.renamed
@@ -562,10 +563,10 @@ export function SettingsCategories() {
                         )}
                         </div>
                       </td>
-                      <td className="whitespace-nowrap px-4 py-1.5 text-black/55 dark:text-white/55">
+                      <td className="whitespace-nowrap px-4 py-1.5 text-muted2">
                         {sub.transactionCount + sub.plaidTransactionCount} tx
                         {sub.plaidTransactionCount > 0 && sub.transactionCount > 0 && (
-                          <span className="text-black/35 dark:text-white/35">
+                          <span className="text-dim2">
                             {" "}
                             ({sub.transactionCount} direct)
                           </span>
@@ -580,7 +581,7 @@ export function SettingsCategories() {
                             type="button"
                             onClick={() => deleteSub(c, sub)}
                             title={isResetOnly(sub) ? "Go back to Plaid's name" : undefined}
-                            className="rounded px-2 py-1 text-xs text-black/50 hover:bg-black/[0.06] dark:text-white/50 dark:hover:bg-white/10"
+                            className="btn px-2 py-1 text-xs text-neg"
                           >
                             {isResetOnly(sub) ? "Reset" : "Delete"}
                           </button>
@@ -599,7 +600,7 @@ export function SettingsCategories() {
                         }}
                         className="flex items-center gap-2"
                       >
-                        <span className="text-black/25 dark:text-white/25">↳</span>
+                        <span className="text-dim2">↳</span>
                         <input
                           autoFocus
                           value={subDraft}
@@ -608,18 +609,18 @@ export function SettingsCategories() {
                             if (e.key === "Escape") setAddingSubTo(null);
                           }}
                           placeholder={`New subcategory of ${c.name}`}
-                          className="w-56 rounded border border-black/15 bg-white px-2 py-1 text-sm dark:border-white/20 dark:bg-neutral-900"
+                          className="field w-56 px-2 py-1 text-sm"
                         />
                         <button
                           type="submit"
-                          className="rounded bg-black px-2.5 py-1 text-xs font-medium text-white hover:bg-black/80 dark:bg-white dark:text-black"
+                          className="btn btn-primary px-2.5 py-1 text-xs"
                         >
                           Add
                         </button>
                         <button
                           type="button"
                           onClick={() => setAddingSubTo(null)}
-                          className="rounded px-2 py-1 text-xs text-black/50 hover:bg-black/[0.06] dark:text-white/50 dark:hover:bg-white/10"
+                          className="btn px-2 py-1 text-xs"
                         >
                           Cancel
                         </button>
@@ -631,6 +632,7 @@ export function SettingsCategories() {
                 );
               })}
           </table>
+          </div>
         </div>
       )}
     </div>

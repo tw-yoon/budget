@@ -31,7 +31,7 @@ export function RefreshBalancesButton({ onRefreshed }: { onRefreshed?: () => voi
       <button
         onClick={handleRefresh}
         disabled={status === "refreshing"}
-        className="inline-flex items-center gap-2 rounded-md border border-black/15 px-3 py-1.5 text-sm font-medium transition-colors hover:bg-black/[0.03] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.04]"
+        className="btn inline-flex items-center gap-2"
       >
         <svg
           className={`h-3.5 w-3.5 ${status === "refreshing" ? "animate-spin" : ""}`}
@@ -46,7 +46,7 @@ export function RefreshBalancesButton({ onRefreshed }: { onRefreshed?: () => voi
         {status === "refreshing" ? "Refreshing…" : "Refresh balances"}
       </button>
       {status === "error" && (
-        <span className="text-sm text-red-600 dark:text-red-400">{error}</span>
+        <span className="text-sm text-neg">{error}</span>
       )}
     </div>
   );

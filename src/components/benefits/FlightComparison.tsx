@@ -4,10 +4,7 @@ import { useState } from "react";
 import type { RewardRateDTO, UserCardDTO } from "@/types";
 import { ISSUER_LABELS } from "@/lib/categories";
 
-const inputClass =
-  "w-full rounded-md border border-black/15 bg-transparent px-2.5 py-1.5 text-sm outline-none placeholder:text-black/40 focus:border-black/40 dark:border-white/15 dark:placeholder:text-white/40 dark:focus:border-white/40";
-
-const labelClass = "text-xs font-medium text-black/60 dark:text-white/60";
+const labelClass = "text-xs font-medium text-muted2";
 
 const money = (n: number) =>
   n.toLocaleString("en-US", { style: "currency", currency: "USD" });
@@ -124,9 +121,9 @@ export function FlightComparison({ cards }: { cards: UserCardDTO[] }) {
   const portalCheaper = diff > 0;
 
   return (
-    <div className="rounded-xl border border-black/10 p-4 dark:border-white/10">
+    <div className="group-panel p-4">
       <div className="text-sm font-medium">Flight price comparison</div>
-      <p className="mt-1 text-xs text-black/55 dark:text-white/55">
+      <p className="mt-1 text-xs text-muted2">
         Compare buying the same flight direct from the airline against your
         card&apos;s travel portal. Pick the card you&apos;d pay with on each side
         — net cost subtracts the value of the points it earns, so you see which
@@ -173,7 +170,7 @@ export function FlightComparison({ cards }: { cards: UserCardDTO[] }) {
         <button
           type="button"
           onClick={() => setShowCpp((v) => !v)}
-          className="text-xs font-medium text-blue-600 hover:underline dark:text-blue-400"
+          className="text-xs font-medium text-accent hover:underline"
         >
           {showCpp ? "Hide point-value help" : "How is point value set?"}
         </button>
@@ -195,7 +192,7 @@ export function FlightComparison({ cards }: { cards: UserCardDTO[] }) {
             value={money(portal.net)}
             winner={portalCheaper}
           />
-          <div className="sm:col-span-2 rounded-lg bg-black/[0.03] px-3 py-2 text-sm dark:bg-white/[0.04]">
+          <div className="sm:col-span-2 rounded-lg bg-background px-3 py-2 text-sm">
             {Math.abs(diff) < 0.005 ? (
               <>It&apos;s a wash — both net out to about the same.</>
             ) : (
@@ -247,7 +244,7 @@ function SideCard({
 }) {
   const { rate, isPercent, points, reward } = result;
   return (
-    <div className="flex flex-col gap-2 rounded-lg border border-black/10 p-3 dark:border-white/10">
+    <div className="flex flex-col gap-2 rounded-lg bg-background p-3">
       <div className="text-sm font-medium">{title}</div>
       <Field label="Cash price ($)">
         <input
@@ -255,7 +252,7 @@ function SideCard({
           onChange={(e) => onPrice(e.target.value)}
           placeholder={pricePlaceholder}
           inputMode="decimal"
-          className={`mt-1 ${inputClass}`}
+          className="field mt-1 w-full"
         />
       </Field>
 
@@ -264,7 +261,7 @@ function SideCard({
           <select
             value={cardId}
             onChange={(e) => onCard(e.target.value)}
-            className={`mt-1 ${inputClass}`}
+            className="field mt-1 w-full"
           >
             <option value="">Enter rate manually</option>
             {cards.map((c) => (
@@ -282,18 +279,18 @@ function SideCard({
           onChange={(e) => onEarn(e.target.value)}
           placeholder={earnPlaceholder}
           inputMode="decimal"
-          className={`mt-1 ${inputClass}`}
+          className="field mt-1 w-full"
         />
       </Field>
 
       {cardId && rate?.notes && (
-        <p className="text-xs text-black/45 dark:text-white/45">
+        <p className="text-xs text-muted2">
           {rate.notes} — edit above if your rate differs here.
         </p>
       )}
 
       {isPercent ? (
-        <p className="text-xs text-black/45 dark:text-white/45">
+        <p className="text-xs text-muted2">
           Cash back is worth a flat 1¢ each, so point value doesn&apos;t apply.
         </p>
       ) : (
@@ -303,7 +300,7 @@ function SideCard({
             onChange={(e) => onCpp(e.target.value)}
             placeholder="1.5"
             inputMode="decimal"
-            className={`mt-1 ${inputClass}`}
+            className="field mt-1 w-full"
           />
         </Field>
       )}
@@ -331,8 +328,8 @@ function CppHelper({ onApply }: { onApply: (value: string) => void }) {
   const rounded = cpp > 0 ? cpp.toFixed(2) : "";
 
   return (
-    <div className="mt-2 rounded-lg border border-black/10 bg-black/[0.02] p-3 text-xs dark:border-white/10 dark:bg-white/[0.03]">
-      <p className="text-black/60 dark:text-white/60">
+    <div className="mt-2 rounded-lg bg-background p-3 text-xs">
+      <p className="text-muted2">
         Each side&apos;s point value is pre-filled from its card: cash back and
         standard portal redemptions are <strong>1.0¢</strong>; Chase Sapphire
         points transfer / Points Boost for up to ~50% more (<strong>1.5¢</strong>).
@@ -346,7 +343,7 @@ function CppHelper({ onApply }: { onApply: (value: string) => void }) {
             onChange={(e) => setCash(e.target.value)}
             placeholder="450"
             inputMode="decimal"
-            className={`mt-1 ${inputClass}`}
+            className="field mt-1 w-full"
           />
         </Field>
         <Field label="Points it costs">
@@ -355,19 +352,19 @@ function CppHelper({ onApply }: { onApply: (value: string) => void }) {
             onChange={(e) => setPoints(e.target.value)}
             placeholder="30000"
             inputMode="decimal"
-            className={`mt-1 ${inputClass}`}
+            className="field mt-1 w-full"
           />
         </Field>
       </div>
       {cpp > 0 && (
         <div className="mt-2 flex items-center justify-between gap-2">
-          <span className="text-black/70 dark:text-white/70">
+          <span className="text-muted2">
             = <strong>{rounded}¢</strong> per point
           </span>
           <button
             type="button"
             onClick={() => onApply(rounded)}
-            className="rounded-md bg-foreground px-2.5 py-1 text-xs font-medium text-background hover:opacity-90"
+            className="btn btn-primary"
           >
             Use for both sides
           </button>
@@ -388,7 +385,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 function Earned({ text, value }: { text: string; value: number }) {
   return (
-    <div className="mt-1 text-xs text-black/55 dark:text-white/55">
+    <div className="mt-1 text-xs text-muted2">
       {text}
       {value > 0 && ` (${money(value)} value)`}
     </div>
@@ -406,16 +403,12 @@ function ResultCard({
 }) {
   return (
     <div
-      className={`rounded-lg border p-3 ${
-        winner
-          ? "border-green-400/60 bg-green-50 dark:border-green-500/40 dark:bg-green-500/10"
-          : "border-black/10 dark:border-white/10"
-      }`}
+      className={`rounded-lg p-3 ${winner ? "bg-pos/15" : "bg-background"}`}
     >
-      <div className="text-xs text-black/55 dark:text-white/55">{label}</div>
+      <div className="text-xs text-muted2">{label}</div>
       <div className="mt-0.5 text-lg font-semibold tabular-nums">{value}</div>
       {winner && (
-        <div className="mt-0.5 text-xs font-medium text-green-700 dark:text-green-400">
+        <div className="mt-0.5 text-xs font-medium text-pos">
           Cheaper
         </div>
       )}

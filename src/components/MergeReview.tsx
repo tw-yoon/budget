@@ -16,8 +16,7 @@ type Dup = MergePreview["duplicates"][number];
 const key = (d: Dup) => `${d.old.id}|${d.new.id}`;
 const defaults = (p: MergePreview) => new Set(p.duplicates.filter((d) => d.confident).map(key));
 
-const selectCls =
-  "rounded-md border border-black/15 bg-transparent px-2 py-1 text-sm outline-none focus:border-black/40 dark:border-white/15 dark:focus:border-white/40";
+const selectCls = "field text-sm";
 
 function accountLabel(a: MergeAccountBrief) {
   return a.mask ? `${a.name} ··${a.mask}` : a.name;
@@ -130,34 +129,34 @@ export function MergeReview({
   const dupCount = ticked.size;
 
   return (
-    <section className="overflow-hidden rounded-lg border border-black/10 dark:border-white/10">
-      <div className="flex items-center justify-between border-b border-black/10 px-4 py-2.5 dark:border-white/10">
-        <h2 className="text-sm font-semibold">
+    <section className="overflow-hidden rounded-xl bg-background">
+      <div className="flex items-center justify-between border-b-[0.5px] border-line px-4 py-2.5">
+        <h2>
           {preview
             ? `Merge the disconnected ${preview.from.institution} into ${preview.into.institution}`
             : "Merge"}
         </h2>
         <button
           onClick={onClose}
-          className="text-xs font-medium text-black/55 hover:underline dark:text-white/55"
+          className="btn"
         >
           Close
         </button>
       </div>
 
-      {error && <div className="px-4 py-2 text-sm text-red-600 dark:text-red-400">{error}</div>}
-      {done && <div className="px-4 py-2 text-sm text-emerald-700 dark:text-emerald-400">{done}</div>}
+      {error && <div className="px-4 py-2 text-sm text-neg">{error}</div>}
+      {done && <div className="px-4 py-2 text-sm text-pos">{done}</div>}
 
       {!preview ? (
-        <p className="px-4 py-4 text-sm text-black/45 dark:text-white/45">Loading…</p>
+        <p className="px-4 py-4 text-sm text-dim2">Loading…</p>
       ) : (
         <div className={`flex flex-col gap-4 px-4 py-3 text-sm ${loading ? "opacity-60" : ""}`}>
           <div>
-            <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-black/50 dark:text-white/50">
+            <h3 className="mb-1.5">
               Accounts
             </h3>
             {preview.oldAccounts.length === 0 && preview.mergedAccounts.length === 0 && (
-              <p className="text-black/45 dark:text-white/45">No accounts left to merge.</p>
+              <p className="text-dim2">No accounts left to merge.</p>
             )}
             <div className="flex flex-col gap-1.5">
               {preview.oldAccounts.map((o) => {
@@ -168,11 +167,11 @@ export function MergeReview({
                   <div key={o.id} className="flex flex-wrap items-center gap-2">
                     <span className="min-w-0 flex-1">
                       {accountLabel(o)}
-                      <span className="ml-2 text-xs text-black/45 dark:text-white/45">
+                      <span className="ml-2 text-xs text-dim2">
                         {o.transactionCount} transactions
                       </span>
                     </span>
-                    <span className="text-black/40 dark:text-white/40">→</span>
+                    <span className="text-dim2">→</span>
                     <select
                       value={chosen}
                       disabled={loading || saving}
@@ -190,7 +189,7 @@ export function MergeReview({
                 );
               })}
               {preview.mergedAccounts.map((a) => (
-                <div key={a.id} className="text-black/55 dark:text-white/55">
+                <div key={a.id} className="text-muted2">
                   {accountLabel(a)} · merged
                 </div>
               ))}
@@ -198,14 +197,14 @@ export function MergeReview({
           </div>
 
           <div>
-            <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-black/50 dark:text-white/50">
+            <h3 className="mb-1.5">
               Duplicates
             </h3>
             {preview.duplicates.length === 0 ? (
-              <p className="text-black/45 dark:text-white/45">No possible duplicates.</p>
+              <p className="text-dim2">No possible duplicates.</p>
             ) : (
               <>
-                <p className="mb-2 text-xs text-black/50 dark:text-white/50">
+                <p className="mb-2 text-xs text-muted2">
                   Each pair is one transaction both connections recorded. Merging keeps the earlier
                   row, with its label, category, splits, links and notes.
                 </p>
@@ -214,7 +213,7 @@ export function MergeReview({
                 )}
                 {unsure.length > 0 && (
                   <>
-                    <p className="mb-1 mt-3 text-xs font-medium text-black/60 dark:text-white/60">
+                    <p className="mb-1 mt-3 text-xs font-medium text-muted2">
                       Not sure — tick only if they are the same
                     </p>
                     <DupList dups={unsure} ticked={ticked} blocked={blocked} onToggle={toggle} />
@@ -228,7 +227,7 @@ export function MergeReview({
             <button
               onClick={merge}
               disabled={loading || saving || (accountCount === 0 && dupCount === 0)}
-              className="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
+              className="btn btn-primary"
             >
               {saving ? "Merging…" : "Merge"}
             </button>
@@ -251,11 +250,11 @@ function DupList({
   onToggle: (d: Dup) => void;
 }) {
   return (
-    <div className="divide-y divide-black/[0.06] rounded-md border border-black/10 dark:divide-white/[0.06] dark:border-white/10">
+    <div className="group-panel">
       {dups.map((d) => (
         <label
           key={key(d)}
-          className={`flex cursor-pointer items-start gap-3 px-3 py-2 ${blocked(d) ? "opacity-40" : ""}`}
+          className={`group-row flex cursor-pointer items-start gap-3 ${blocked(d) ? "opacity-40" : ""}`}
         >
           <input
             type="checkbox"
@@ -276,8 +275,8 @@ function DupList({
 
 function TxLine({ tx, dim = false }: { tx: MergeTxBrief; dim?: boolean }) {
   return (
-    <div className={`flex items-baseline gap-2 ${dim ? "text-xs text-black/50 dark:text-white/50" : ""}`}>
-      <span className="w-12 shrink-0 tabular-nums text-black/40 dark:text-white/40">
+    <div className={`flex items-baseline gap-2 ${dim ? "text-xs text-muted2" : ""}`}>
+      <span className="w-12 shrink-0 tabular-nums text-dim2">
         {tx.label != null ? `#${tx.label}` : ""}
       </span>
       <span className="shrink-0 tabular-nums">{formatDate(tx.date)}</span>

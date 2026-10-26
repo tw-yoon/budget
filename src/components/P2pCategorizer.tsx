@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { formatCurrency, formatDate } from "@/lib/format";
+import { joinCategory, splitCategory } from "@/lib/categories";
 import { TransactionLinkPicker } from "./TransactionLinkPicker";
 
 interface P2pTx {
@@ -39,6 +40,23 @@ export function P2pCategorizer({ title, subtitle, endpoint, showImport, emptyHin
   const [importing, setImporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // Category name -> its subcategories, for the subcategory suggestions.
+  const [subcategories, setSubcategories] = useState<Map<string, string[]>>(new Map());
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/categories")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json) => {
+        if (!json || cancelled) return;
+        const cats = json.categories as { name: string; subcategories: { name: string }[] }[];
+        setSubcategories(new Map(cats.map((c) => [c.name, c.subcategories.map((s) => s.name)])));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -80,13 +98,13 @@ export function P2pCategorizer({ title, subtitle, endpoint, showImport, emptyHin
     }
   };
 
-  const updateCategory = async (id: string, userCategory: string) => {
+  const updateCategory = async (id: string, userCategory: string, userSubcategory: string | null) => {
     setData((prev) =>
       prev
         ? {
             ...prev,
             transactions: prev.transactions.map((t) =>
-              t.id === id ? { ...t, category: userCategory } : t
+              t.id === id ? { ...t, category: joinCategory(userCategory, userSubcategory) } : t
             ),
           }
         : prev
@@ -95,7 +113,7 @@ export function P2pCategorizer({ title, subtitle, endpoint, showImport, emptyHin
       const res = await fetch(`${endpoint}/${id}`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ userCategory }),
+        body: JSON.stringify({ userCategory, userSubcategory }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -113,7 +131,7 @@ export function P2pCategorizer({ title, subtitle, endpoint, showImport, emptyHin
     let out = 0;
     let inc = 0;
     for (const t of txns) {
-      if (IGNORED.has(t.category)) continue; // ignore uncategorized/transfers
+      if (IGNORED.has(splitCategory(t.category).parent)) continue; // ignore uncategorized/transfers
       if (t.direction === "out") out += t.amount;
       else inc += t.amount;
     }
@@ -124,14 +142,14 @@ export function P2pCategorizer({ title, subtitle, endpoint, showImport, emptyHin
     <div className="flex flex-col gap-5">
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-          <p className="text-sm text-black/55 dark:text-white/55">{subtitle}</p>
+          <h1>{title}</h1>
+          <p className="text-sm text-muted2">{subtitle}</p>
         </div>
         {showImport && (
           <button
             onClick={runImport}
             disabled={importing}
-            className="rounded-md border border-black/15 px-3 py-1.5 text-sm font-medium hover:bg-black/[0.03] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.05]"
+            className="btn btn-primary disabled:opacity-50"
           >
             {importing ? "Importing…" : "Import / re-sync CSV"}
           </button>
@@ -139,24 +157,24 @@ export function P2pCategorizer({ title, subtitle, endpoint, showImport, emptyHin
       </header>
 
       {notice && (
-        <div className="rounded-lg border border-green-300 bg-green-50 px-4 py-3 text-sm text-green-700 dark:border-green-500/30 dark:bg-green-500/10 dark:text-green-400">
+        <div className="group-panel px-4 py-3 text-sm text-pos">
           {notice}
         </div>
       )}
       {error && (
-        <div className="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-400">
+        <div className="group-panel px-4 py-3 text-sm text-neg">
           {error}
         </div>
       )}
 
       {loading && !data ? (
-        <div className="rounded-lg border border-black/10 px-6 py-16 text-center text-sm text-black/50 dark:border-white/10 dark:text-white/50">
+        <div className="group-panel px-6 py-16 text-center text-sm text-muted2">
           Loading…
         </div>
       ) : !data || data.transactions.length === 0 ? (
-        <div className="rounded-lg border border-black/10 px-6 py-16 text-center dark:border-white/10">
+        <div className="group-panel px-6 py-16 text-center">
           <p className="text-sm font-medium">Nothing to categorize yet</p>
-          <p className="mx-auto mt-1 max-w-md text-sm text-black/55 dark:text-white/55">
+          <p className="mx-auto mt-1 max-w-md text-sm text-muted2">
             {emptyHint}
           </p>
         </div>
@@ -168,10 +186,10 @@ export function P2pCategorizer({ title, subtitle, endpoint, showImport, emptyHin
             <Stat label="Net spend" value={formatCurrency(totals.out - totals.inc)} />
           </div>
 
-          <div className="overflow-x-auto rounded-lg border border-black/10 dark:border-white/10">
+          <div className="group-panel overflow-x-auto">
             <table className="w-full border-collapse text-sm">
               <thead>
-                <tr className="border-b border-black/10 text-left text-xs uppercase tracking-wide text-black/50 dark:border-white/10 dark:text-white/50">
+                <tr className="section-caption border-b border-line text-left">
                   <th className="px-4 py-3 font-medium">#</th>
                   <th className="px-4 py-3 font-medium">Date</th>
                   <th className="px-4 py-3 font-medium">Who</th>
@@ -181,39 +199,43 @@ export function P2pCategorizer({ title, subtitle, endpoint, showImport, emptyHin
                 </tr>
               </thead>
               <tbody>
-                {data.transactions.map((t) => (
+                {data.transactions.map((t) => {
+                  const { parent, sub } = splitCategory(t.category);
+                  return (
                   <tr
                     key={t.id}
-                    className="border-b border-black/[0.06] last:border-0 hover:bg-black/[0.02] dark:border-white/[0.06] dark:hover:bg-white/[0.03]"
+                    className="border-b border-line last:border-0 hover:bg-panel2"
                   >
-                    <td className="whitespace-nowrap px-4 py-3 font-mono text-xs tabular-nums text-black/35 dark:text-white/35">
+                    <td className="whitespace-nowrap px-4 py-3 text-xs tabular-nums text-dim2">
                       {t.label ?? "—"}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-black/55 dark:text-white/55">
+                    <td className="whitespace-nowrap px-4 py-3 text-muted2">
                       {formatDate(t.date)}
                     </td>
                     <td className="px-4 py-3">{t.counterparty ?? "—"}</td>
-                    <td className="px-4 py-3 text-black/60 dark:text-white/60">
+                    <td className="px-4 py-3 text-muted2">
                       {t.note || "—"}
                     </td>
                     <td
-                      className={`whitespace-nowrap px-4 py-3 text-right font-mono tabular-nums ${
+                      className={`whitespace-nowrap px-4 py-3 text-right tabular-nums ${
                         t.direction === "in"
-                          ? "text-green-600 dark:text-green-400"
-                          : "text-black/80 dark:text-white/80"
+                          ? "text-pos"
+                          : "text-foreground"
                       }`}
                     >
                       {t.direction === "in" ? "+" : "−"}
                       {formatCurrency(t.amount)}
                     </td>
                     <td className="px-4 py-3">
+                      <div className="flex flex-wrap items-center gap-1.5">
                       <select
-                        value={t.category}
+                        value={parent}
                         disabled={t.linkedTo !== null}
-                        onChange={(e) => updateCategory(t.id, e.target.value)}
-                        className={`rounded-md border border-black/15 bg-transparent px-2 py-1 text-sm outline-none focus:border-black/40 disabled:opacity-60 dark:border-white/15 dark:focus:border-white/40 ${
-                          IGNORED.has(t.category)
-                            ? "text-black/40 dark:text-white/40"
+                        // A new category starts without a subcategory.
+                        onChange={(e) => updateCategory(t.id, e.target.value, null)}
+                        className={`field disabled:opacity-60 ${
+                          IGNORED.has(parent)
+                            ? "text-dim2"
                             : ""
                         }`}
                       >
@@ -224,10 +246,38 @@ export function P2pCategorizer({ title, subtitle, endpoint, showImport, emptyHin
                         ))}
                         {/* A linked row shows an inherited category that may not
                             be in this page's fixed list. */}
-                        {!data.categories.includes(t.category) && (
-                          <option value={t.category}>{t.category}</option>
+                        {!data.categories.includes(parent) && (
+                          <option value={parent}>{parent}</option>
                         )}
                       </select>
+                      {parent !== "Uncategorized" && (
+                        <>
+                          <input
+                            // Remounts with the saved value whenever it changes.
+                            key={t.category}
+                            type="text"
+                            defaultValue={sub ?? ""}
+                            placeholder="Subcategory"
+                            aria-label="Subcategory"
+                            list={`p2p-subs-${t.id}`}
+                            disabled={t.linkedTo !== null}
+                            onBlur={(e) => {
+                              const next = e.target.value.trim() || null;
+                              if (next !== sub) updateCategory(t.id, parent, next);
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") e.currentTarget.blur();
+                            }}
+                            className="field w-36 disabled:opacity-60"
+                          />
+                          <datalist id={`p2p-subs-${t.id}`}>
+                            {(subcategories.get(parent) ?? []).map((s) => (
+                              <option key={s} value={s} />
+                            ))}
+                          </datalist>
+                        </>
+                      )}
+                      </div>
                       {t.direction === "in" && (
                         <div className="mt-1">
                           <TransactionLinkPicker
@@ -239,7 +289,8 @@ export function P2pCategorizer({ title, subtitle, endpoint, showImport, emptyHin
                       )}
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -260,13 +311,13 @@ function Stat({
 }) {
   const color =
     tone === "in"
-      ? "text-green-600 dark:text-green-400"
+      ? "text-pos"
       : tone === "out"
-        ? "text-black/80 dark:text-white/80"
+        ? "text-foreground"
         : "";
   return (
-    <div className="rounded-lg border border-black/10 px-4 py-3 dark:border-white/10">
-      <div className="text-xs text-black/50 dark:text-white/50">{label}</div>
+    <div className="group-panel px-4 py-3">
+      <div className="section-caption">{label}</div>
       <div className={`mt-0.5 text-lg font-semibold tabular-nums ${color}`}>
         {value}
       </div>

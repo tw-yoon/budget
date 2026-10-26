@@ -54,11 +54,11 @@ export function CategoryChart() {
         : `${windowMonths[0].label} – ${windowMonths[windowMonths.length - 1].label}`;
 
   return (
-    <div className="min-w-0 overflow-hidden rounded-lg border border-black/10 p-4 dark:border-white/10">
+    <div className="min-w-0 overflow-hidden group-panel p-4">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h3 className="text-sm font-medium">Spending by category</h3>
-          <p className="text-xs text-black/50 dark:text-white/50">
+          <h3>Spending by category</h3>
+          <p className="text-xs text-muted2">
             {rangeLabel}
             {windowMonths.length > 1 ? ` · ${windowMonths.length} months` : ""}
           </p>
@@ -67,11 +67,11 @@ export function CategoryChart() {
       </div>
 
       {loading ? (
-        <div className="flex h-52 items-center justify-center text-sm text-black/50 dark:text-white/50">Loading…</div>
+        <div className="flex h-52 items-center justify-center text-sm text-muted2">Loading…</div>
       ) : error ? (
-        <div className="flex h-52 items-center justify-center text-sm text-red-600 dark:text-red-400">{error}</div>
+        <div className="flex h-52 items-center justify-center text-sm text-neg">{error}</div>
       ) : slices.length === 0 ? (
-        <div className="flex h-52 items-center justify-center text-sm text-black/50 dark:text-white/50">
+        <div className="flex h-52 items-center justify-center text-sm text-muted2">
           No spending in {rangeLabel}.
         </div>
       ) : (
@@ -93,12 +93,12 @@ export function CategoryChart() {
                 </Pie>
                 <Tooltip
                   formatter={(v) => formatCurrency(Number(v))}
-                  contentStyle={{ borderRadius: 8, fontSize: 12, border: "1px solid rgba(0,0,0,0.1)" }}
+                  contentStyle={{ borderRadius: 10, fontSize: 12, border: "none", background: "var(--panel)", color: "var(--text)", fontFamily: "inherit", boxShadow: "0 2px 10px rgba(0,0,0,0.15)" }}
                 />
               </PieChart>
             </ResponsiveContainer>
             <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-              <span className="text-xs text-black/50 dark:text-white/50">Total</span>
+              <span className="text-xs text-muted2">Total</span>
               <span className="font-semibold tabular-nums">{formatCurrency(sum)}</span>
             </div>
           </div>
@@ -107,8 +107,8 @@ export function CategoryChart() {
               <li key={s.category} className="flex items-center gap-2">
                 <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: categoryColor(s.category) }} />
                 <span className="flex-1 truncate">{s.category}</span>
-                <span className="text-black/45 dark:text-white/45">{Math.round((s.amount / (sum || 1)) * 100)}%</span>
-                <span className="font-mono tabular-nums">{formatCurrency(s.amount)}</span>
+                <span className="text-muted2">{Math.round((s.amount / (sum || 1)) * 100)}%</span>
+                <span className="tabular-nums">{formatCurrency(s.amount)}</span>
               </li>
             ))}
           </ul>

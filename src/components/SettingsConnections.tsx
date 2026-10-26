@@ -10,8 +10,8 @@ export function SettingsConnections() {
 
   const header = (
     <header>
-      <h1 className="text-2xl font-semibold tracking-tight">Connections</h1>
-      <p className="text-sm text-black/55 dark:text-white/55">
+      <h1>Connections</h1>
+      <p className="text-sm text-muted2">
         Banks and debit cards. Accounts and transactions import from whatever
         is connected here.
       </p>
@@ -22,7 +22,7 @@ export function SettingsConnections() {
     return (
       <div className="flex flex-col gap-5">
         {header}
-        <div className="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-400">
+        <div className="rounded-xl bg-neg/10 px-4 py-3 text-sm text-neg">
           {error}
         </div>
       </div>
@@ -33,7 +33,7 @@ export function SettingsConnections() {
     return (
       <div className="flex flex-col gap-5">
         {header}
-        <div className="rounded-lg border border-black/10 px-4 py-6 text-center text-sm text-black/50 dark:border-white/10 dark:text-white/50">
+        <div className="group-panel px-4 py-6 text-center text-sm text-muted2">
           Loading…
         </div>
       </div>

@@ -1,14 +1,14 @@
 // Semantic cash-flow colors, shared across every analytics chart so the same
 // concept reads the same everywhere.
-export const INCOME_COLOR = "#22c55e"; // green  — money in
-export const DRAW_COLOR = "#ef4444"; // red    — drawn from savings
-export const SAVED_COLOR = "#3b82f6"; // blue   — saved (surplus)
-export const HUB_COLOR = "#475569"; // slate  — monthly total / spent
+export const INCOME_COLOR = "#34c759"; // green  — money in
+export const DRAW_COLOR = "#ff3b30"; // red    — drawn from savings
+export const SAVED_COLOR = "#5856d6"; // indigo — saved (surplus)
+export const HUB_COLOR = "#8e8e93"; // gray  — monthly total / spent
 
 // Spend-category hues: distinct colors that deliberately avoid the reserved
-// green / red / blue so a category slice never reads as income or savings.
+// green / red / indigo so a category slice never reads as income or savings.
 const SPEND_PALETTE = [
-  "#6366f1", "#a855f7", "#ec4899", "#f97316", "#14b8a6",
+  "#a2845e", "#a855f7", "#ec4899", "#f97316", "#14b8a6",
   "#8b5cf6", "#eab308", "#06b6d4", "#db2777", "#0d9488",
   "#7c3aed", "#ca8a04", "#c084fc", "#64748b",
 ];
@@ -17,7 +17,7 @@ const OTHER_COLOR = "#94a3b8";
 // Stable colors for the common humanized Plaid categories so the heavy hitters
 // never collide within a single chart.
 const FIXED: Record<string, string> = {
-  "Food and Drink": "#6366f1",
+  "Food and Drink": "#30b0c7",
   "General Merchandise": "#a855f7",
   Travel: "#ec4899",
   Transportation: "#f97316",

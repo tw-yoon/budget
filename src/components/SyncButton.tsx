@@ -57,7 +57,7 @@ export function SyncButton({ onSynced }: { onSynced?: () => void }) {
       <button
         onClick={handleSync}
         disabled={status === "syncing"}
-        className="inline-flex items-center gap-2 rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90 disabled:opacity-50"
+        className="btn btn-primary inline-flex items-center gap-2"
       >
         {status === "syncing" ? (
           <>
@@ -72,8 +72,8 @@ export function SyncButton({ onSynced }: { onSynced?: () => void }) {
         <span
           className={`text-sm ${
             status === "error"
-              ? "text-red-600 dark:text-red-400"
-              : "text-black/60 dark:text-white/60"
+              ? "text-neg"
+              : "text-muted2"
           }`}
         >
           {message}

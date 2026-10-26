@@ -59,10 +59,9 @@ async function cropToCard(
   const outCtx = out.getContext("2d");
   if (!outCtx) throw new Error("This browser would not give a canvas to draw on.");
 
-  // Round the corners into the image itself. It cannot be done in CSS here:
-  // globals.css squares off every border-radius in the app, which is the
-  // terminal look everything else wants. A rounded clip leaves the corners
-  // transparent, and PNG keeps that.
+  // Round the corners into the image itself, so the saved PNG carries them
+  // wherever it is shown. A rounded clip leaves the corners transparent, and
+  // PNG keeps that.
   const radius = cornerRadiusFor(cut.width);
   if (radius > 0 && typeof outCtx.roundRect === "function") {
     outCtx.beginPath();
@@ -152,8 +151,6 @@ export function CardArtPicker({
     }
   }
 
-  const link = "text-xs text-black/50 hover:text-foreground disabled:opacity-50 dark:text-white/50";
-
   return (
     <>
       <input
@@ -181,30 +178,30 @@ export function CardArtPicker({
       {preview && (
         <div className="mt-1.5 flex flex-col gap-1">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={preview.url} alt="The card as it will be saved" className="w-[92px] rounded-md" />
-          <span className="text-[10px] text-black/45 dark:text-white/45">
+          <img src={preview.url} alt="The card as it will be saved" className="w-[92px] rounded-[10px]" />
+          <span className="text-[10px] text-muted2">
             {preview.source.width}×{preview.source.height} · cut by {preview.from}
           </span>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {/* Nothing is stored until this is pressed, so it reads as the
                 action rather than as another quiet link beside Cancel. */}
             <button
               type="button"
               onClick={save}
               disabled={busy}
-              className="rounded-md bg-foreground px-2.5 py-1 text-xs font-medium text-background hover:opacity-90 disabled:opacity-50"
+              className="btn btn-primary"
             >
               {busy ? "Saving…" : "Save image"}
             </button>
-            <button type="button" onClick={clearPreview} disabled={busy} className={link}>
+            <button type="button" onClick={clearPreview} disabled={busy} className="btn">
               Cancel
             </button>
           </div>
-          <span className="text-[10px] text-amber-700 dark:text-amber-400">Not saved yet</span>
+          <span className="text-[10px] text-warn">Not saved yet</span>
         </div>
       )}
 
-      {error && <span className="mt-1.5 text-[10px] text-red-600 dark:text-red-400">{error}</span>}
+      {error && <span className="mt-1.5 text-[10px] text-neg">{error}</span>}
     </>
   );
 }

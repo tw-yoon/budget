@@ -56,9 +56,9 @@ export function ConnectedBanks({
     busy?.itemId === bank.itemId && busy.action === action;
 
   return (
-    <section className="overflow-hidden rounded-lg border border-black/10 dark:border-white/10">
-      <div className="flex items-center justify-between border-b border-black/10 px-4 py-2.5 dark:border-white/10">
-        <h2 className="text-sm font-semibold">Connected institutions</h2>
+    <section className="group-panel">
+      <div className="flex items-center justify-between gap-3 border-b-[0.5px] border-line px-4 py-2.5">
+        <h2>Connected institutions</h2>
         <div className="flex items-center gap-3">
           <PlaidLink label="+ Connect a bank" variant="link" onConnected={onChanged} />
           <PlaidLink
@@ -70,19 +70,19 @@ export function ConnectedBanks({
         </div>
       </div>
       {error && (
-        <div className="px-4 py-2 text-sm text-red-600 dark:text-red-400">{error}</div>
+        <div className="px-4 py-2 text-sm text-neg">{error}</div>
       )}
-      <div className="divide-y divide-black/[0.06] dark:divide-white/[0.06]">
+      <div>
         {banks.map((bank) => (
           <div
             key={bank.itemId}
-            className="flex items-center justify-between gap-4 px-4 py-2.5 text-sm"
+            className="group-row flex items-center justify-between gap-4 text-sm"
           >
             <div className="min-w-0">
               <span className={`font-medium ${bank.disconnectedAt ? "opacity-50" : ""}`}>
                 {bank.institution}
               </span>
-              <span className="ml-2 text-xs text-black/45 dark:text-white/45">
+              <span className="ml-2 text-xs text-dim2">
                 {bank.disconnectedAt && (
                   <>Disconnected {formatDate(bank.disconnectedAt)} · </>
                 )}
@@ -96,7 +96,7 @@ export function ConnectedBanks({
                   key={target.itemId}
                   onClick={() => setReview({ from: bank.itemId, into: target.itemId })}
                   disabled={busy?.itemId === bank.itemId}
-                  className="text-xs font-medium text-indigo-600 hover:underline disabled:opacity-50 dark:text-indigo-400"
+                  className="text-xs font-medium text-accent hover:underline disabled:opacity-50"
                 >
                   Merge into {target.institution}
                   {bank.mergeInto.length > 1 && ` …${target.itemId.slice(-6)}`}…
@@ -107,7 +107,7 @@ export function ConnectedBanks({
                   key={source.itemId}
                   onClick={() => setReview({ from: source.itemId, into: bank.itemId })}
                   title={`Merged from the disconnected ${source.institution} on ${formatDate(source.mergedAt)}`}
-                  className="text-xs font-medium text-indigo-600 hover:underline dark:text-indigo-400"
+                  className="text-xs font-medium text-accent hover:underline"
                 >
                   Review duplicates…
                 </button>
@@ -123,7 +123,7 @@ export function ConnectedBanks({
                   <button
                     onClick={() => run(bank, "disconnect")}
                     disabled={busy?.itemId === bank.itemId}
-                    className="text-xs font-medium text-red-600 hover:underline disabled:opacity-50 dark:text-red-400"
+                    className="btn text-neg"
                   >
                     {isBusy(bank, "disconnect") ? "Disconnecting…" : "Disconnect"}
                   </button>
@@ -132,7 +132,7 @@ export function ConnectedBanks({
               <button
                 onClick={() => run(bank, "delete")}
                 disabled={busy?.itemId === bank.itemId}
-                className="text-xs font-medium text-red-600 hover:underline disabled:opacity-50 dark:text-red-400"
+                className="btn text-neg"
               >
                 {isBusy(bank, "delete")
                   ? "Deleting…"
@@ -145,7 +145,7 @@ export function ConnectedBanks({
         ))}
       </div>
       {review && (
-        <div className="border-t border-black/10 p-3 dark:border-white/10">
+        <div className="border-t-[0.5px] border-line p-3">
           <MergeReview
             key={`${review.from}|${review.into}`}
             fromItemId={review.from}

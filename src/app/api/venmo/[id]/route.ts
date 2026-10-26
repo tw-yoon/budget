@@ -1,15 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { listCategoryNames } from "@/services/categories.service";
+import { joinCategory } from "@/lib/categories";
 
 // PATCH /api/venmo/:id — update the user category of one Venmo transaction.
+//   body: { userCategory: string, userSubcategory?: string | null }
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params;
-    const body = (await req.json()) as { userCategory?: string };
+    const body = (await req.json()) as { userCategory?: string; userSubcategory?: string | null };
     const category = body.userCategory;
     // Validate against the user's own list — a hardcoded set would reject the
     // categories they just created.
@@ -23,7 +25,7 @@ export async function PATCH(
       // overwrite it here. (This route sets userCategory with no source guard,
       // so without this the derived category would be silently replaced.)
       where: { id, source: "VENMO", linkedToId: null },
-      data: { userCategory: category },
+      data: { userCategory: joinCategory(category, body.userSubcategory) },
     });
     if (count === 0) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });

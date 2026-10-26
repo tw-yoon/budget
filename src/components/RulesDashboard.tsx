@@ -28,7 +28,7 @@ interface CategoryOption {
 }
 
 const inputCls =
-  "rounded-md border border-black/15 bg-transparent px-2.5 py-1.5 text-sm outline-none placeholder:text-black/40 focus:border-black/40 dark:border-white/15 dark:placeholder:text-white/40 dark:focus:border-white/40";
+  "field text-sm placeholder:text-dim2";
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
@@ -111,8 +111,8 @@ export function RulesDashboard() {
     <div className="flex flex-col gap-5">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Rules</h1>
-          <p className="text-sm text-black/55 dark:text-white/55">
+          <h1>Rules</h1>
+          <p className="text-sm text-muted2">
             Auto-assign a category, or a subcategory, when a transaction matches.
           </p>
         </div>
@@ -120,13 +120,13 @@ export function RulesDashboard() {
           <button
             onClick={applyNow}
             disabled={applying}
-            className="rounded-md border border-black/15 px-3 py-1.5 text-sm font-medium hover:bg-black/[0.03] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.04]"
+            className="btn"
           >
             {applying ? "Applying…" : "Apply now"}
           </button>
           <button
             onClick={() => setAdding((v) => !v)}
-            className="rounded-md bg-foreground px-3 py-1.5 text-sm font-medium text-background hover:opacity-90"
+            className="btn btn-primary"
           >
             + Add rule
           </button>
@@ -134,10 +134,10 @@ export function RulesDashboard() {
       </header>
 
       {applyMsg && (
-        <p className="text-xs text-black/55 dark:text-white/55">{applyMsg}</p>
+        <p className="text-xs text-muted2">{applyMsg}</p>
       )}
 
-      <p className="rounded-lg border border-amber-300/50 bg-amber-50 px-4 py-2.5 text-xs text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
+      <p className="rounded-xl bg-warn/10 px-4 py-2.5 text-xs">
         Rules run top-to-bottom on each sync; the <strong>first match wins</strong>.
         They never overwrite a category you set by hand or one from Venmo, unless
         you hit <strong>Use rule for these</strong>{" "}on a rule. Set a
@@ -147,7 +147,7 @@ export function RulesDashboard() {
       </p>
 
       {categoriesError && (
-        <p className="text-sm text-red-600 dark:text-red-400">
+        <p className="text-sm text-neg">
           Failed to load categories.{" "}
           <button
             type="button"
@@ -171,21 +171,21 @@ export function RulesDashboard() {
       )}
 
       {error ? (
-        <div className="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-400">
+        <div className="rounded-xl bg-neg/10 px-4 py-3 text-sm text-neg">
           {error}
         </div>
       ) : rules === null ? (
-        <div className="rounded-lg border border-black/10 px-6 py-12 text-center text-sm text-black/50 dark:border-white/10 dark:text-white/50">
+        <div className="group-panel px-6 py-12 text-center text-sm text-muted2">
           Loading…
         </div>
       ) : rules.length === 0 ? (
-        <div className="rounded-lg border border-black/10 px-6 py-12 text-center text-sm text-black/50 dark:border-white/10 dark:text-white/50">
+        <div className="group-panel px-6 py-12 text-center text-sm text-muted2">
           No rules yet. Hit <span className="font-medium">+ Add rule</span> to
           create one.
         </div>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-black/10 dark:border-white/10">
-          <div className="divide-y divide-black/[0.06] dark:divide-white/[0.06]">
+        <div className="group-panel">
+          <div>
             {rules.map((r) => (
               <Row
                 key={r.id}
@@ -319,19 +319,19 @@ function Row({
 
   return (
     <div
-      className={`flex items-center justify-between gap-4 px-4 py-3 ${
+      className={`group-row flex items-center justify-between gap-4 ${
         rule.enabled ? "" : "opacity-50"
       }`}
     >
       <div className="min-w-0 text-sm">
         <div className="truncate">
-          <span className="text-black/55 dark:text-white/55">
+          <span className="text-muted2">
             {FIELD_LABELS[rule.field as keyof typeof FIELD_LABELS] ?? rule.field}{" "}
             {MATCH_TYPE_LABELS[
               rule.matchType as keyof typeof MATCH_TYPE_LABELS
             ] ?? rule.matchType}{" "}
           </span>
-          <span className="font-mono">&ldquo;{rule.pattern}&rdquo;</span>
+          <span>&ldquo;{rule.pattern}&rdquo;</span>
         </div>
         {editing ? (
           <form
@@ -353,20 +353,20 @@ function Row({
             <button
               type="submit"
               disabled={busy || !cat}
-              className="rounded-md bg-foreground px-3 py-1.5 text-sm font-medium text-background hover:opacity-90 disabled:opacity-50"
+              className="btn btn-primary"
             >
               Save
             </button>
             <button
               type="button"
               onClick={() => setEditing(false)}
-              className="rounded-md border border-black/15 px-3 py-1.5 text-sm hover:bg-black/[0.03] dark:border-white/15 dark:hover:bg-white/[0.04]"
+              className="btn"
             >
               Cancel
             </button>
           </form>
         ) : (
-          <div className="mt-0.5 text-xs text-black/50 dark:text-white/50">
+          <div className="mt-0.5 text-xs text-muted2">
             →{" "}
             <button
               type="button"
@@ -384,7 +384,7 @@ function Row({
           </div>
         )}
         {o && (
-          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-black/45 dark:text-white/45">
+          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-dim2">
             {matched === 0 ? (
               <span>No matching transactions yet</span>
             ) : (
@@ -404,7 +404,7 @@ function Row({
                 type="button"
                 onClick={() => takeOver(o.handSet)}
                 disabled={busy}
-                className="rounded border border-black/15 px-1.5 py-0.5 text-black/60 hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:text-white/60 dark:hover:bg-white/[0.06]"
+                className="btn px-1.5 py-0.5 text-xs"
               >
                 Use rule for these
               </button>
@@ -413,7 +413,7 @@ function Row({
         )}
       </div>
       <div className="flex shrink-0 items-center gap-3">
-        <label className="flex cursor-pointer items-center gap-1.5 text-xs text-black/50 dark:text-white/50">
+        <label className="flex cursor-pointer items-center gap-1.5 text-xs text-muted2">
           <input
             type="checkbox"
             checked={rule.enabled}
@@ -426,7 +426,7 @@ function Row({
           onClick={remove}
           disabled={busy}
           aria-label="Delete rule"
-          className="text-black/30 hover:text-red-600 disabled:opacity-50 dark:text-white/30 dark:hover:text-red-400"
+          className="text-neg/70 hover:text-neg disabled:opacity-50"
         >
           ✕
         </button>
@@ -481,7 +481,7 @@ function RuleForm({
   return (
     <form
       onSubmit={submit}
-      className="rounded-lg border border-black/10 p-4 dark:border-white/10"
+      className="group-panel p-4"
     >
       <div className="grid gap-2 sm:grid-cols-5">
         <select
@@ -522,20 +522,20 @@ function RuleForm({
         />
       </div>
       {error && (
-        <p className="mt-2 text-sm text-red-600 dark:text-red-400">{error}</p>
+        <p className="mt-2 text-sm text-neg">{error}</p>
       )}
       <div className="mt-2.5 flex gap-2">
         <button
           type="submit"
           disabled={busy || !category}
-          className="rounded-md bg-foreground px-3 py-1.5 text-sm font-medium text-background hover:opacity-90 disabled:opacity-50"
+          className="btn btn-primary"
         >
           {busy ? "Adding…" : "Add rule"}
         </button>
         <button
           type="button"
           onClick={onCancel}
-          className="rounded-md border border-black/15 px-3 py-1.5 text-sm hover:bg-black/[0.03] dark:border-white/15 dark:hover:bg-white/[0.04]"
+          className="btn"
         >
           Cancel
         </button>

@@ -289,11 +289,11 @@ export function CashFlowSankey() {
   };
 
   return (
-    <div className="rounded-lg border border-black/10 p-4 text-black/70 dark:border-white/10 dark:text-white/70">
+    <div className="group-panel p-4 text-foreground">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h3 className="text-sm font-medium text-foreground">Cash flow over time</h3>
-          <p className="text-xs text-black/50 dark:text-white/50">
+          <h3>Cash flow over time</h3>
+          <p className="text-xs text-muted2">
             {rangeLabel}
             {!single && model.months.length ? ` · ${model.months.length} months` : ""}
           </p>
@@ -325,13 +325,13 @@ export function CashFlowSankey() {
         style={{ touchAction: "pan-y" }}
       >
         {loading ? (
-          <div className="flex h-72 items-center justify-center text-sm text-black/50 dark:text-white/50">Loading…</div>
+          <div className="flex h-72 items-center justify-center text-sm text-muted2">Loading…</div>
         ) : error ? (
-          <div className="flex h-72 items-center justify-center text-sm text-red-600 dark:text-red-400">{error}</div>
+          <div className="flex h-72 items-center justify-center text-sm text-neg">{error}</div>
         ) : total === 0 ? (
-          <div className="flex h-72 items-center justify-center text-sm text-black/50 dark:text-white/50">No transactions to chart.</div>
+          <div className="flex h-72 items-center justify-center text-sm text-muted2">No transactions to chart.</div>
         ) : !hasFlow ? (
-          <div className="flex h-72 flex-col items-center justify-center gap-1 text-sm text-black/50 dark:text-white/50">
+          <div className="flex h-72 flex-col items-center justify-center gap-1 text-sm text-muted2">
             <span>No cash flow in {rangeLabel}.</span>
             <span className="text-xs">Drag or use the arrows to find activity.</span>
           </div>
@@ -545,24 +545,24 @@ export function CashFlowSankey() {
             near the right edge so it stays inside the chart. */}
         {hoverable && hover && (
           <div
-            className="pointer-events-none absolute z-10 whitespace-nowrap border border-line bg-panel px-2 py-1.5 text-xs shadow-sm"
+            className="pointer-events-none absolute z-10 whitespace-nowrap rounded-lg bg-panel px-2 py-1.5 text-xs shadow-md ring-1 ring-line"
             style={{
               left: hover.x > (width || 0) - 190 ? undefined : hover.x + 14,
               right: hover.x > (width || 0) - 190 ? Math.max(0, (width || 0) - hover.x + 14) : undefined,
               top: Math.max(0, hover.y - 46),
             }}
           >
-            <div className="text-[10px] uppercase tracking-wide text-black/45 dark:text-white/45">
+            <div className="text-[10px] text-muted2">
               {hover.month}
             </div>
             <div className="mt-0.5 flex items-center gap-1.5 text-foreground">
               <span className="h-2 w-2 shrink-0" style={{ background: hover.color, opacity: hover.faded ? 0.5 : 1 }} />
               {hover.parent && (
-                <span className="text-black/55 dark:text-white/55">{hover.parent} ›</span>
+                <span className="text-muted2">{hover.parent} ›</span>
               )}
               <span className={hover.faded ? "italic" : "font-medium"}>{hover.name}</span>
             </div>
-            <div className="mt-0.5 font-mono tabular-nums text-foreground">
+            <div className="mt-0.5 tabular-nums text-foreground">
               {formatCurrency(hover.amount)}
             </div>
           </div>
@@ -570,7 +570,7 @@ export function CashFlowSankey() {
       </div>
 
       {hasFlow && (
-        <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-black/55 dark:text-white/55">
+        <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted2">
           <span className="inline-flex items-center gap-1.5">
             <span className="h-2 w-2 rounded-sm" style={{ background: INCOME_COLOR }} />Income
           </span>
@@ -586,15 +586,15 @@ export function CashFlowSankey() {
             <span className="h-2 w-2 rounded-sm" style={{ background: SAVED_COLOR }} />To savings
           </span>
           {model.drawn > 0 ? (
-            <span className="text-red-600 dark:text-red-400">
+            <span className="text-neg">
               Drew {formatCurrency(model.drawn)} from savings over this span
             </span>
           ) : model.drawn < 0 ? (
-            <span className="text-blue-600 dark:text-blue-400">
+            <span className="text-accent">
               Added {formatCurrency(-model.drawn)} to savings over this span
             </span>
           ) : null}
-          <span className="ml-auto hidden text-black/40 sm:inline dark:text-white/40">
+          <span className="ml-auto hidden text-dim2 sm:inline">
             {hoverable ? "Hover for detail · drag to move" : "Drag to move"}
           </span>
         </div>

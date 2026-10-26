@@ -92,6 +92,15 @@ export function localDay(d: Date): Date {
   return new Date(y, m - 1, day);
 }
 
+/** "Sat" — the weekday of the same calendar day formatDate shows. */
+export function formatWeekday(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleDateString("en-US", {
+    weekday: "short",
+    timeZone: isDateOnly(d) ? "UTC" : undefined,
+  });
+}
+
 export function formatDate(iso: string): string {
   const d = new Date(iso);
   return d.toLocaleDateString("en-US", {

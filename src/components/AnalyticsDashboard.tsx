@@ -47,20 +47,20 @@ export function AnalyticsDashboard() {
     <div className="flex flex-col gap-5">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Analytics</h1>
-          <p className="text-sm text-black/55 dark:text-white/55">
+          <h1>Analytics</h1>
+          <p className="text-sm text-muted2">
             Summary over the last {months} months
           </p>
         </div>
-        <div className="flex gap-1 rounded-md border border-black/15 p-0.5 dark:border-white/15">
+        <div className="flex gap-1 rounded-lg bg-panel2 p-0.5">
           {RANGES.map((r) => (
             <button
               key={r}
               onClick={() => setMonths(r)}
-              className={`rounded px-3 py-1 text-sm transition-colors ${
+              className={`rounded-md px-3 py-1 text-sm transition-colors ${
                 months === r
-                  ? "bg-foreground text-background"
-                  : "text-black/60 hover:text-foreground dark:text-white/60"
+                  ? "bg-panel text-foreground shadow-sm"
+                  : "text-muted2 hover:text-foreground"
               }`}
             >
               {r}m
@@ -70,11 +70,11 @@ export function AnalyticsDashboard() {
       </header>
 
       {error ? (
-        <div className="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-400">
+        <div className="group-panel px-4 py-3 text-sm text-neg">
           {error}
         </div>
       ) : loading && !data ? (
-        <div className="rounded-lg border border-black/10 px-4 py-6 text-center text-sm text-black/50 dark:border-white/10 dark:text-white/50">
+        <div className="group-panel px-4 py-6 text-center text-sm text-muted2">
           Loading…
         </div>
       ) : data ? (
@@ -96,7 +96,7 @@ export function AnalyticsDashboard() {
       </div>
 
       {mode === "normal" && !error && (
-        <p className="text-center text-xs text-black/45 dark:text-white/45">
+        <p className="text-center text-xs text-muted2">
           Cash flow and cumulative spending are hidden in Normal mode —{" "}
           <Link
             href="/settings/mode"

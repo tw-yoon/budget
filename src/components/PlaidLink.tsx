@@ -136,8 +136,8 @@ export function PlaidLink({
 
   const className =
     variant === "link"
-      ? "text-xs font-medium text-indigo-600 hover:underline disabled:opacity-50 dark:text-indigo-400"
-      : "inline-flex items-center gap-2 rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90 disabled:opacity-50";
+      ? "text-xs font-medium text-accent hover:underline disabled:opacity-50"
+      : "btn btn-primary inline-flex items-center gap-2";
 
   return (
     <span className="inline-flex items-center gap-2">
@@ -148,8 +148,8 @@ export function PlaidLink({
         <span
           className={`text-xs ${
             status === "error"
-              ? "text-red-600 dark:text-red-400"
-              : "text-black/55 dark:text-white/55"
+              ? "text-neg"
+              : "text-muted2"
           }`}
         >
           {message}
