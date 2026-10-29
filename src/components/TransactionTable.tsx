@@ -301,7 +301,7 @@ export function TransactionTable({
                       <CategoryEditor
                         transaction={t}
                         category={category}
-                        subcategory={split?.sub ?? ""}
+                        subcategory={categoryDetailed ?? ""}
                         knownSubs={knownSubs}
                         hasOverride={rawOverride !== null}
                         categories={categories}
@@ -351,11 +351,9 @@ export function TransactionTable({
                         title="Edit category"
                       >
                         <span>
-                          {split
-                            ? split.sub
-                              ? `${category} > ${split.sub}`
-                              : category
-                            : categoryDetailed ?? category}
+                          {categoryDetailed
+                            ? `${category} > ${categoryDetailed}`
+                            : category}
                         </span>
                         {rawOverride !== null && (
                           <span className="chip shrink-0 whitespace-nowrap">

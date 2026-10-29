@@ -11,6 +11,15 @@ update), so nothing here is a stability promise.
 
 ## Unreleased
 
+## 0.16.1 — 2026-10-29
+
+- A category or note you set on a pending transaction now stays when it posts.
+- A transaction the bank sorted into a subcategory shows it as
+  "Category > Subcategory" in the ledger, opens with it filled in when you
+  edit it, and counts under it in Analytics.
+- In the cash-flow diagram, a category's subcategories no longer add up to
+  more than the category itself when it had refunds.
+
 ## 0.16.0 — 2026-10-25
 
 - The web app has a new look that matches the iPhone app: the system font,

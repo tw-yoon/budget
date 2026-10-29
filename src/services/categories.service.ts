@@ -460,6 +460,22 @@ export async function loadPlaidDetailedNames(): Promise<Map<string, string>> {
   return new Map(rows.map((r) => [r.pfcDetailed, r.name]));
 }
 
+/** Plaid's detailed label as the sub a row shows, under the name given it in Settings if any. */
+export async function loadPlaidSubNamer(): Promise<(detailed: string | null, primary: string) => string | null> {
+  const names = await loadPlaidDetailedNames();
+  return (detailed, primary) =>
+    detailed ? names.get(detailed) ?? humanizePfcDetailed(detailed, primary) : null;
+}
+
+/** Plaid's category for a row as a raw value: "Parent > Sub" when Plaid gives a sub. */
+export async function loadPlaidCategorizer(): Promise<(primary: string, detailed: string | null) => string> {
+  const [name, sub] = await Promise.all([loadPlaidNamer(), loadPlaidSubNamer()]);
+  return (primary, detailed) => {
+    const s = sub(detailed, primary);
+    return s ? `${name(primary)} > ${s}` : name(primary);
+  };
+}
+
 /**
  * Every Plaid detailed label seen on a transaction, resolved the way the
  * ledger resolves it: under the category its primary maps to (Plaid's own

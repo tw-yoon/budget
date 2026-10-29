@@ -11,7 +11,7 @@
       "name": "SAMPLE MART #12",
       "merchantName": "Sample Mart",
       "category": "Groceries",
-      "categoryDetailed": "Groceries",
+      "categoryDetailed": null,
       "userCategory": null,
       "plaidCategory": "Groceries",
       "plaidCategoryDetailed": null,

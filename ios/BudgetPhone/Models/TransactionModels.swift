@@ -119,14 +119,14 @@ extension TransactionDTO {
   var isSplittable: Bool { Ledger.isSplittable(amount: amount, pending: pending) }
   var isMoneyIn: Bool { amount < 0 }
 
-  /// The web's category line: the user's "Parent > Sub" when overridden,
-  /// else Plaid's detailed category, else its primary.
+  /// The web's category line: "Parent > Sub", the sub being the user's or
+  /// else Plaid's detailed category.
   var categoryLabel: String {
     if let raw = userCategory {
       let (parent, sub) = CategoryPath.split(raw)
       return sub.map { "\(parent) > \($0)" } ?? parent
     }
-    return categoryDetailed ?? category
+    return categoryDetailed.map { "\(category) > \($0)" } ?? category
   }
 
   /// The parent category the editor starts on.
@@ -135,7 +135,7 @@ extension TransactionDTO {
   }
 
   var editableSubcategory: String? {
-    userCategory.flatMap { CategoryPath.split($0).sub }
+    userCategory.map { CategoryPath.split($0).sub } ?? categoryDetailed
   }
 
   /// The parts plus the leftover, when there is a leftover line to draw.

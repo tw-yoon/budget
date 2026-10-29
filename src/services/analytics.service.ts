@@ -21,7 +21,7 @@ import { NOT_TAGGED_TRANSFER, splitCategory } from "@/lib/categories";
 import { isP2p } from "@/lib/zelle";
 import { resolveLinkedCategory } from "@/lib/links";
 import { sliceForAnalytics } from "@/lib/splits";
-import { loadPlaidNamer } from "@/services/categories.service";
+import { loadPlaidCategorizer } from "@/services/categories.service";
 import type {
   AnalyticsResult,
   CashflowSeries,
@@ -58,11 +58,12 @@ async function fetchTxInputs(start: Date): Promise<TxInput[]> {
       amount: true,
       date: true,
       pfcPrimary: true,
+      pfcDetailed: true,
       merchantName: true,
       name: true,
       source: true,
       userCategory: true,
-      linkedTo: { select: { userCategory: true, pfcPrimary: true } },
+      linkedTo: { select: { userCategory: true, pfcPrimary: true, pfcDetailed: true } },
       splits: { select: { amount: true, userCategory: true } },
     },
   });
@@ -70,13 +71,13 @@ async function fetchTxInputs(start: Date): Promise<TxInput[]> {
   // Plaid's primaries resolve through the user's own mapping, so an
   // uncategorized row reports the category they chose rather than Plaid's
   // wording. Loaded once per query, not per row.
-  const plaidName = await loadPlaidNamer();
+  const plaidCategory = await loadPlaidCategorizer();
 
   return rows.flatMap((r) => {
     // The linked purchase's own effective category, humanized the same way a
     // top-level row's would be.
     const linkedToCategory = r.linkedTo
-      ? r.linkedTo.userCategory ?? plaidName(r.linkedTo.pfcPrimary)
+      ? r.linkedTo.userCategory ?? plaidCategory(r.linkedTo.pfcPrimary, r.linkedTo.pfcDetailed)
       : null;
     const { raw } = resolveLinkedCategory({
       amount: r.amount,
@@ -91,7 +92,8 @@ async function fetchTxInputs(start: Date): Promise<TxInput[]> {
 
     // A user category (Venmo/Zelle/manual/inherited) wins over Plaid's PFC
     // primary, and is what the remainder wears.
-    const effective = raw ?? plaidName(r.pfcPrimary);
+    // Plaid's detailed label is the sub, as the ledger shows it.
+    const effective = raw ?? plaidCategory(r.pfcPrimary, r.pfcDetailed);
     // Money in nets against its category (a refund, a card credit, a payback)
     // unless it is income: Plaid's own label counts, not just a hand-set one.
     const isOffset = r.amount < 0 && splitCategory(effective).parent !== "Income";

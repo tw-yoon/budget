@@ -27,6 +27,11 @@ struct TransactionModelTests {
     let purchase = try TestData.transaction("tx-purchase")
     #expect(purchase.editableCategory == "Shopping")
     #expect(purchase.editableSubcategory == "Clothes")
+    // Plaid's own detailed label reads, and edits, as the sub too.
+    var plaid = try TestData.transaction("tx-split")
+    plaid.categoryDetailed = "Organic"
+    #expect(plaid.categoryLabel == "Groceries > Organic")
+    #expect(plaid.editableSubcategory == "Organic")
   }
 
   @Test func badgesMatchRowBadges() throws {

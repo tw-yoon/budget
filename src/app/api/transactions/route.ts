@@ -1,13 +1,13 @@
 import { withServerTiming } from "@/lib/server-timing";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { humanizePfcDetailed } from "@/lib/format";
 import { NOT_TAGGED_TRANSFER, splitCategory } from "@/lib/categories";
 import { getCashoutBreakdowns } from "@/services/venmo.service";
 import {
   loadPlaidCategoryMap,
   loadPlaidNamer,
-  loadPlaidDetailedNames,
+  loadPlaidSubNamer,
+  loadPlaidCategorizer,
 } from "@/services/categories.service";
 import { netAmount, resolveLinkedCategory } from "@/lib/links";
 import { remainderOf } from "@/lib/splits";
@@ -160,21 +160,17 @@ async function handleGET(req: NextRequest) {
             where: { id: { in: targetIds } },
             select: {
               id: true, label: true, name: true, merchantName: true,
-              userCategory: true, pfcPrimary: true,
+              userCategory: true, pfcPrimary: true, pfcDetailed: true,
             },
           })
         : Promise.resolve([]),
     ]);
 
-    const [plaidName, detailedNames] = await Promise.all([
+    const [plaidName, plaidSub, plaidCategory] = await Promise.all([
       loadPlaidNamer(),
-      loadPlaidDetailedNames(),
+      loadPlaidSubNamer(),
+      loadPlaidCategorizer(),
     ]);
-    // Plaid's detailed label, under the name given it in Settings if any.
-    const plaidSub = (detailed: string | null, primary: string) =>
-      detailed
-        ? detailedNames.get(detailed) ?? humanizePfcDetailed(detailed, primary)
-        : null;
 
     const refundsByPurchase = new Map<string, RefundDTO[]>();
     for (const r of refundRows) {
@@ -201,7 +197,7 @@ async function handleGET(req: NextRequest) {
           // splitCategory derives both the parent category and the subcategory
           // for a linked row. Splitting it here would strip the subcategory a
           // linked refund inherits.
-          category: t.userCategory ?? plaidName(t.pfcPrimary),
+          category: t.userCategory ?? plaidCategory(t.pfcPrimary, t.pfcDetailed),
         },
       ])
     );

@@ -100,6 +100,21 @@ async function syncItem(
         select: { externalId: true },
       })).map((t) => t.externalId)
     );
+    // A posted row replaces its pending one under a new id (the pending one
+    // arrives in `removed`), so what the owner set on the pending row moves over.
+    // shortcut: assumes Plaid sends both in the same page, which it does in practice.
+    const fromPending = new Map(
+      (await prisma.transaction.findMany({
+        where: {
+          externalId: {
+            in: addedTxs.flatMap((tx) => tx.pending_transaction_id ?? []),
+          },
+        },
+        select: {
+          externalId: true, userCategory: true, userCategorySource: true, personalNote: true,
+        },
+      })).map(({ externalId, ...kept }) => [externalId, kept])
+    );
 
     // ── Added ─────────────────────────────────────────────────────────────────
     for (const tx of addedTxs) {
@@ -111,6 +126,11 @@ async function syncItem(
         name: tx.name,
         merchantName: tx.merchant_name ?? null,
       });
+      const prior = tx.pending_transaction_id
+        ? fromPending.get(tx.pending_transaction_id)
+        : undefined;
+      // A hand-set (or Venmo) category beats the rules; a rule one is re-run.
+      const keepPrior = prior?.userCategory != null && prior.userCategorySource !== "RULE";
       // Only a row that is really new takes a number, so none is burned.
       let label = 0;
       if (!known.has(tx.transaction_id)) {
@@ -124,8 +144,9 @@ async function syncItem(
           externalId: tx.transaction_id,
           accountId,
           logoUrl: tx.logo_url ?? null,
-          userCategory: ruleCat ?? undefined,
-          userCategorySource: ruleCat ? "RULE" : undefined,
+          userCategory: keepPrior ? prior.userCategory : ruleCat ?? undefined,
+          userCategorySource: keepPrior ? prior.userCategorySource : ruleCat ? "RULE" : undefined,
+          personalNote: prior?.personalNote ?? undefined,
           label,
         },
         update: fields,

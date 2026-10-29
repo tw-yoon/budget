@@ -217,8 +217,14 @@ export function buildCashflow(
         .sort((a, b) => b.amount - a.amount),
       spend: [...b.spend.entries()]
         .map(([category, e]) => {
-          const subs = [...e.subs.entries()]
-            .map(([name, amount]) => ({ name, amount: round(amount) }))
+          const named = [...e.subs.entries()].filter(([, amount]) => amount > 0);
+          // A refund with no sub (or one bigger than its sub's spending) nets
+          // out of the category but not out of any sub, so the subs could add
+          // up to more than the category. Shrink them to fit, evenly.
+          const sum = named.reduce((t, [, amount]) => t + amount, 0);
+          const fit = sum > e.total ? Math.max(e.total, 0) / sum : 1;
+          const subs = named
+            .map(([name, amount]) => ({ name, amount: round(amount * fit) }))
             .filter((s) => s.amount > 0)
             .sort((a, b) => b.amount - a.amount);
           return {
