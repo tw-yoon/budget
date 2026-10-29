@@ -2,7 +2,9 @@ import SwiftUI
 
 /// Cash flow over time (../src/components/charts/CashFlowSankey.tsx). The
 /// phone shows one month's Sankey at a time: the arrows pan, there is no
-/// zoom and no drag, and a tap stands in for hover. Subcategories always
+/// drag, and a tap stands in for hover. Pinching out (phone only) shows every
+/// category, each bar at least a label tall, as tall as that takes; the page
+/// scrolls. Pinching in goes back. Subcategories always
 /// branch out (the web shows them only at widths of 560 px and up), and
 /// names sit inside wide node columns rather than beside thin ones.
 struct CashFlowSankeyCard: View {
@@ -14,6 +16,7 @@ struct CashFlowSankeyCard: View {
   @State private var selection: Selection?
   /// The readout's size, to keep it beside the tap and inside the plot.
   @State private var readoutSize: CGSize = .zero
+  @State private var expanded = false
   @Environment(\.dynamicTypeSize) private var dynamicTypeSize
   @AppStorage(AmountPrivacy.storageKey) private var hidesAmounts = false
 
@@ -26,11 +29,11 @@ struct CashFlowSankeyCard: View {
 
   var body: some View {
     let shown = Array(months[window.range.clamped(to: 0..<months.count)])
-    let month = shown.first.map(CashflowSankey.month)
+    let month = shown.first.map { CashflowSankey.month($0, all: expanded) }
     let label = MonthWindow.label(shown.map(\.label))
 
     ChartCard(title: "Cash flow over time", subtitle: label) {
-      // One Sankey on screen: pan only, no zoom.
+      // One Sankey on screen: the arrows pan; a pinch zooms (see chart).
       WindowNav(canEarlier: window.canEarlier, canLater: window.canLater) {
         selection = nil
         window.pan($0)
@@ -63,9 +66,38 @@ struct CashFlowSankeyCard: View {
   }
 
   private func chart(_ month: CashflowSankey.Month) -> some View {
+    // The chart's height depends on its width once expanded, so the width is
+    // read here and the frame set from the layout, not the other way round.
+    let layout = chartWidth.map {
+      expanded
+        ? SankeyLayout.expanded(month: month, width: $0, baseHeight: Self.height, hidesAmounts: hidesAmounts)
+        : SankeyLayout(month: month, width: $0, height: Self.height, hidesAmounts: hidesAmounts)
+    }
+    return Color.clear
+      .frame(maxWidth: .infinity)
+      .frame(height: layout?.height ?? Self.height)
+      .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { chartWidth = $0 }
+      .overlay {
+        if let layout { plot(layout, month: month) }
+      }
+      .simultaneousGesture(
+        MagnifyGesture().onEnded { pinch in
+          let open = pinch.magnification > 1.15 ? true : pinch.magnification < 0.87 ? false : expanded
+          guard open != expanded else { return }
+          selection = nil
+          withAnimation(.snappy) { expanded = open }
+        }
+      )
+      .accessibilityAction(named: expanded ? "Show Fewer Categories" : "Show Every Category") {
+        selection = nil
+        expanded.toggle()
+      }
+  }
+
+  @State private var chartWidth: CGFloat?
+
+  private func plot(_ layout: SankeyLayout, month: CashflowSankey.Month) -> some View {
     GeometryReader { geometry in
-      let layout = SankeyLayout(
-        month: month, width: geometry.size.width, height: Self.height, hidesAmounts: hidesAmounts)
       ChartEntrance(animatesIn: animatesIn) { progress in
         Canvas { context, _ in
           layout.draw(in: &context, progress: progress)
@@ -92,7 +124,7 @@ struct CashFlowSankeyCard: View {
           let left = x > geometry.size.width - size.width - 14 ? x - size.width - 14 : x + 14
           // Above the tap, but kept between the month label at the top and
           // the in/out totals line at the bottom, never over them.
-          let top = max(layout.topPad, min(y - 46, Self.height - layout.botPad - size.height))
+          let top = max(layout.topPad, min(y - 46, layout.height - layout.botPad - size.height))
           readout(selection.band, month: month)
             .fixedSize()
             .onGeometryChange(for: CGSize.self) { $0.size } action: { readoutSize = $0 }
@@ -106,7 +138,6 @@ struct CashFlowSankeyCard: View {
           hidesAmounts ? AmountPrivacy.mask($0.accessibilityLabel, with: "hidden amount") : $0.accessibilityLabel
         }.joined(separator: ". "))
     }
-    .frame(height: Self.height)
   }
 
   private func readout(_ band: SankeyLayout.Band, month: CashflowSankey.Month) -> some View {
@@ -240,7 +271,8 @@ struct SankeyLayout {
   let topPad: CGFloat = 22
   let botPad: CGFloat = 30
   let pad: CGFloat = 7
-  let subPad: CGFloat = 3
+  /// Between subcategory bars; wider when expanded, so labels never touch.
+  let subPad: CGFloat
   /// Hide Amounts: node labels carry only names, the totals line dots.
   let hidesAmounts: Bool
   /// The width of every node column.
@@ -254,8 +286,14 @@ struct SankeyLayout {
   let bands: [Band]
   let hubBand: Band
 
-  init(month: CashflowSankey.Month, width: CGFloat, height: CGFloat, hidesAmounts: Bool = false) {
+  /// `minNodeHeight` raises every bar to at least that height (expanded);
+  /// `fixedScale` overrides the one `height` would give.
+  init(
+    month: CashflowSankey.Month, width: CGFloat, height: CGFloat, hidesAmounts: Bool = false,
+    minNodeHeight: CGFloat = 0, fixedScale: CGFloat? = nil
+  ) {
     self.month = month
+    subPad = minNodeHeight > 0 ? 6 : 3
     self.hidesAmounts = hidesAmounts
     self.width = width
     self.height = height
@@ -263,7 +301,11 @@ struct SankeyLayout {
     let usableH = height - topPad - botPad
     let maxNodes = CGFloat(max(1, month.inflow.count, month.outflow.count))
     let maxHub = max(1, month.hubTotal)
-    let scale = (usableH - (maxNodes - 1) * pad) / maxHub * 0.92
+    let scale: CGFloat = fixedScale ?? (usableH - (maxNodes - 1) * pad) / maxHub * 0.92
+    let tall = { (h: CGFloat) in max(h, minNodeHeight) }
+    // Expanded, the columns hang from the top instead of centring, so the
+    // diagram's height can follow from its content.
+    let centre = { (span: CGFloat) in minNodeHeight > 0 ? topPad : topPad + (usableH - span) / 2 }
     self.scale = scale
     let hasSubStage = month.outflow.contains { !($0.subs ?? []).isEmpty }
     self.hasSubStage = hasSubStage
@@ -281,7 +323,7 @@ struct SankeyLayout {
     let xSpL = hubR + run  // left edge of the spend nodes
     let xSubL = xSpL + nodeW + run  // left edge of the subcategory nodes
     let hubH = month.hubTotal * scale
-    let hubTop = topPad + (usableH - hubH) / 2
+    let hubTop = centre(hubH)
     hub = CGRect(x: hubL, y: hubTop, width: hubW, height: max(1, hubH))
 
     func hitRect(_ node: CGRect) -> CGRect {
@@ -311,36 +353,38 @@ struct SankeyLayout {
 
     var bands: [Band] = []
     // Inflow side (left): income sources, then the savings drawdown.
-    let inSpan = month.inflow.reduce(0) { $0 + $1.amount * scale } + CGFloat(month.inflow.count - 1) * pad
-    var ny = topPad + (usableH - inSpan) / 2
+    let inSpan = month.inflow.reduce(0) { $0 + tall($1.amount * scale) } + CGFloat(month.inflow.count - 1) * pad
+    var ny = centre(inSpan)
     var hy = hubTop
     for n in month.inflow {
       let h = n.amount * scale
-      let node = CGRect(x: 0, y: ny, width: nodeW, height: max(1, h))
+      let nh = tall(h)
+      let node = CGRect(x: 0, y: ny, width: nodeW, height: max(1, nh))
       bands.append(
         Band(
           name: n.name, amount: n.amount, hex: n.hex,
-          ribbon: Self.ribbon(x0: xInR, t0: ny, b0: ny + h, x1: hubL, t1: hy, b1: hy + h),
+          ribbon: Self.ribbon(x0: xInR, t0: ny, b0: ny + nh, x1: hubL, t1: hy, b1: hy + h),
           node: node, hit: hitRect(node), ribbonOpacity: 0.5, ribbonTo: CategoryColors.hubBar,
           label: label(n.name, n.amount, beside: node, leftOf: false, style: .node)))
-      ny += h + pad
+      ny += nh + pad
       hy += h
     }
 
     // Outflow side (right): spend categories, then the surplus to savings.
     // A category with subcategories branches into them; whatever wasn't
     // subcategorized flows on as an "Other" node.
-    let outSpan = month.outflow.reduce(0) { $0 + $1.amount * scale } + CGFloat(month.outflow.count - 1) * pad
-    var oy = topPad + (usableH - outSpan) / 2
+    let outSpan = month.outflow.reduce(0) { $0 + tall($1.amount * scale) } + CGFloat(month.outflow.count - 1) * pad
+    var oy = centre(outSpan)
     hy = hubTop
     var subCursor = topPad  // keeps adjacent categories' sub stacks from overlapping
     for n in month.outflow {
       let h = n.amount * scale
-      let node = CGRect(x: xSpL, y: oy, width: nodeW, height: max(1, h))
+      let nh = tall(h)
+      let node = CGRect(x: xSpL, y: oy, width: nodeW, height: max(1, nh))
       bands.append(
         Band(
           name: n.name, amount: n.amount, hex: n.hex,
-          ribbon: Self.ribbon(x0: hubR, t0: hy, b0: hy + h, x1: xSpL, t1: oy, b1: oy + h),
+          ribbon: Self.ribbon(x0: hubR, t0: hy, b0: hy + h, x1: xSpL, t1: oy, b1: oy + nh),
           node: node, hit: hitRect(node), ribbonOpacity: 0.5, ribbonFrom: CategoryColors.hubBar,
           label: label(n.name, n.amount, beside: node, leftOf: true, style: .node)))
 
@@ -350,34 +394,54 @@ struct SankeyLayout {
         let parts =
           named.map { (name: $0.name, amount: $0.amount, rest: false) }
           + (rest > 0.005 ? [(name: "Other", amount: rest, rest: true)] : [])
-        let span = parts.reduce(0) { $0 + $1.amount * scale } + CGFloat(parts.count - 1) * subPad
-        var sy = max(subCursor, oy + (h - span) / 2)
+        let span = parts.reduce(0) { $0 + tall($1.amount * scale) } + CGFloat(parts.count - 1) * subPad
+        var sy = max(subCursor, oy + (nh - span) / 2)
         var py = oy  // cursor along the parent node's right edge
+        let stretch = h > 0 ? nh / h : 1  // a raised parent bar shares its height out evenly
         for p in parts {
           let sh = p.amount * scale
-          let sub = CGRect(x: xSubL, y: sy, width: nodeW, height: max(1, sh))
+          let ph = sh * stretch
+          let subH = tall(sh)
+          let sub = CGRect(x: xSubL, y: sy, width: nodeW, height: max(1, subH))
           bands.append(
             // A solid, lighter shade of the parent's colour (lighter still
             // for the remainder); the flow shades from the parent into it.
             Band(
               name: p.name, parent: n.name, amount: p.amount,
               hex: CategoryColors.lighter(n.hex, by: p.rest ? 0.65 : 0.4),
-              ribbon: Self.ribbon(x0: xSpL + nodeW, t0: py, b0: py + sh, x1: xSubL, t1: sy, b1: sy + sh),
+              ribbon: Self.ribbon(x0: xSpL + nodeW, t0: py, b0: py + ph, x1: xSubL, t1: sy, b1: sy + subH),
               node: sub, hit: hitRect(sub),
               ribbonOpacity: p.rest ? 0.3 : 0.45, ribbonFrom: n.hex, faded: p.rest,
               label: label(p.name, p.amount, beside: sub, leftOf: true, style: p.rest ? .rest : .sub)))
-          sy += sh + subPad
-          py += sh
+          sy += subH + subPad
+          py += ph
         }
         subCursor = sy - subPad + pad
       }
-      oy += h + pad
+      oy += nh + pad
       hy += h
     }
     self.bands = bands
     hubBand = Band(
       name: "Total cash flow", amount: month.hubTotal, hex: CategoryColors.hubBar, ribbon: nil,
       node: hub, hit: hub, ribbonOpacity: 0, label: nil)
+  }
+
+  /// Pinched open: every bar at least a label tall, at the scale of the
+  /// `baseHeight` layout, and as tall as that takes.
+  static func expanded(
+    month: CashflowSankey.Month, width: CGFloat, baseHeight: CGFloat, hidesAmounts: Bool
+  ) -> SankeyLayout {
+    let scale = SankeyLayout(month: month, width: width, height: baseHeight).scale
+    let make = { (height: CGFloat) in
+      SankeyLayout(
+        month: month, width: width, height: height, hidesAmounts: hidesAmounts,
+        minNodeHeight: lineHeight, fixedScale: scale)
+    }
+    // Top-aligned, so the bars sit where they sit at any height: measure once.
+    let draft = make(baseHeight)
+    let bottom = (draft.bands.map(\.node) + [draft.hub]).map(\.maxY).max() ?? 0
+    return make(max(baseHeight, bottom + draft.botPad))
   }
 
   /// ribbon: a filled cubic-bézier band between two vertical segments.

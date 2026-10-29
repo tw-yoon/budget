@@ -45,15 +45,17 @@ enum CashflowSankey {
     return head.sorted { $0.amount > $1.amount }
   }
 
-  static func month(_ m: CashflowMonth) -> Month {
+  /// `all` (pinched open) keeps every income source and category instead of
+  /// folding the small ones into "Other".
+  static func month(_ m: CashflowMonth, all: Bool = false) -> Month {
     let income = foldTail(
       m.income.map { Node(name: $0.source, amount: $0.amount, hex: CategoryColors.income) },
-      top: topIncome, otherName: "Other income", otherHex: CategoryColors.income)
+      top: all ? .max : topIncome, otherName: "Other income", otherHex: CategoryColors.income)
     let spend = foldTail(
       m.spend.map {
         Node(name: $0.category, amount: $0.amount, hex: CategoryColors.hex(for: $0.category), subs: $0.subs)
       },
-      top: topSpend, otherName: "Other", otherHex: CategoryColors.hex(for: "Other"))
+      top: all ? .max : topSpend, otherName: "Other", otherHex: CategoryColors.hex(for: "Other"))
     let incomeTotal = income.reduce(0) { $0 + $1.amount }
     let spendTotal = spend.reduce(0) { $0 + $1.amount }
     let draw = max(0, spendTotal - incomeTotal)

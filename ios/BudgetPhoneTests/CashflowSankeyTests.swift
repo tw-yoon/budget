@@ -193,4 +193,24 @@ struct CashflowSankeyTests {
     let ys = labelled.map(\.point.y)
     for (a, b) in zip(ys, ys.dropFirst()) { #expect(b - a >= SankeyLayout.lineHeight) }
   }
+
+  @Test func expandedShowsEveryCategoryWithALabel() {
+    let spend = (1...10).map { ("Category \($0)", $0 == 1 ? 2000.0 : 3.0) }
+    let raw = month(
+      income: [("Sample Payroll", 2500)], spend: spend,
+      subs: ["Category 1": (1...6).map { ("Sub \($0)", $0 == 1 ? 1500.0 : 2.0) }])
+    let folded = CashflowSankey.month(raw)
+    #expect(folded.outflow.count < 10)
+    let m = CashflowSankey.month(raw, all: true)
+    #expect(m.outflow.filter { $0.name.hasPrefix("Category") }.count == 10)
+
+    let normal = SankeyLayout(month: m, width: 402, height: 372)
+    let open = SankeyLayout.expanded(month: m, width: 402, baseHeight: 372, hidesAmounts: false)
+    #expect(open.height > 372)
+    #expect(open.scale == normal.scale)
+    for band in open.bands {
+      #expect(band.label != nil, "\(band.name) has no label")
+      #expect(band.node.minY >= open.topPad - 0.5 && band.node.maxY <= open.height - open.botPad + 0.5)
+    }
+  }
 }

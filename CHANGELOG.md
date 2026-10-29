@@ -11,6 +11,11 @@ update), so nothing here is a stability promise.
 
 ## Unreleased
 
+## 0.16.2 — 2026-10-29
+
+- iPhone: pinch out on the cash-flow diagram to see every category and
+  subcategory with its name; pinch in to go back.
+
 ## 0.16.1 — 2026-10-29
 
 - A category or note you set on a pending transaction now stays when it posts.
