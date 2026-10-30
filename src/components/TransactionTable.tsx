@@ -129,6 +129,18 @@ export function TransactionTable({
   const [overrides, setOverrides] = useState<Map<string, string | null>>(
     new Map()
   );
+  // Flags toggled this session, id -> flagged, so the marker flips at once.
+  const [flags, setFlags] = useState<Map<string, boolean>>(new Map());
+
+  const setFlag = async (id: string, flagged: boolean) => {
+    setFlags((prev) => new Map(prev).set(id, flagged));
+    const res = await fetch(`/api/transactions/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ flagged }),
+    }).catch(() => null);
+    if (!res?.ok) setFlags((prev) => new Map(prev).set(id, !flagged));
+  };
 
   // Subcategories from Settings plus any used on this page or saved this
   // session, grouped by parent — feeds the editor's datalist so existing subs
@@ -213,6 +225,7 @@ export function TransactionTable({
                 ? t.plaidCategoryDetailed
                 : t.categoryDetailed;
             const isEditing = editing === t.id;
+            const flagged = flags.get(t.id) ?? t.flagged;
             return (
               <FragmentRow key={t.id}>
                 <tr
@@ -222,6 +235,19 @@ export function TransactionTable({
                   onClick={isExpandable ? () => toggle(t.id) : undefined}
                 >
                   <td className={`whitespace-nowrap px-4 ${padY} text-xs tabular-nums text-dim2`}>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setFlag(t.id, !flagged);
+                      }}
+                      aria-pressed={flagged}
+                      aria-label={flagged ? "Unflag" : "Flag"}
+                      title={flagged ? "Unflag" : "Flag to come back to"}
+                      className={`mr-1.5 ${flagged ? "text-warn" : "opacity-25 hover:opacity-70"}`}
+                    >
+                      ⚑
+                    </button>
                     {t.label ?? "—"}
                   </td>
                   <td className={`whitespace-nowrap px-4 ${padY} text-muted2`}>

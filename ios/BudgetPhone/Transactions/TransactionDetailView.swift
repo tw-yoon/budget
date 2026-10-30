@@ -71,6 +71,15 @@ struct TransactionDetailView: View {
     .tabBarScrollTracking()
     .navigationTitle(t.title)
     .toolbar {
+      if isLive {
+        ToolbarItem(placement: .primaryAction) {
+          Button(t.flagged ? "Unflag" : "Flag", systemImage: t.flagged ? "flag.fill" : "flag") {
+            run(.flag(!t.flagged))
+          }
+          .tint(t.flagged ? .orange : nil)
+          .disabled(saving)
+        }
+      }
       if isLive && t.linkedTo == nil {
         ToolbarItem(placement: .confirmationAction) {
           if saving {
@@ -247,6 +256,7 @@ struct TransactionDetailView: View {
   private enum Write {
     case category(CategoryUpdate)
     case unlink
+    case flag(Bool)
     case deleteSplit(String)
   }
 
@@ -260,6 +270,7 @@ struct TransactionDetailView: View {
         switch write {
         case .category(let update): try await store.setCategory(id, update)
         case .unlink: try await store.setLink(id, label: nil)
+        case .flag(let flagged): try await store.setFlag(id, flagged)
         case .deleteSplit(let splitId): try await store.deleteSplit(id, splitId: splitId)
         }
         catalog.noteUsed(store.row(id)?.userCategory)

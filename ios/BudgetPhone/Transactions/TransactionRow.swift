@@ -41,6 +41,13 @@ struct TransactionRow: View {
           }
           VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .firstTextBaseline, spacing: compact ? 8 : 12) {
+              if t.flagged {
+                Image(systemName: "flag.fill")
+                  .font(.footnote)
+                  .foregroundStyle(.orange)
+                  .accessibilityLabel("Flagged")
+                  .padding(.trailing, compact ? 0 : -6)
+              }
               Text(t.title)
                 .font(compact ? .body : .body.weight(.medium))
                 .lineLimit(compact ? 1 : 2)

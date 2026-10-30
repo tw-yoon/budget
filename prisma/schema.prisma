@@ -74,6 +74,8 @@ model Transaction {
   isTransfer   Boolean  @default(false)
   isFee        Boolean  @default(false)
   personalNote String?
+  // The owner's "come back to this" marker. Owner-only, so sync never touches it.
+  flagged      Boolean  @default(false)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 

@@ -47,6 +47,7 @@ const tx = (accountId, date, amount, name, over = {}) => ({
   userCategory: null,
   userCategorySource: null,
   personalNote: null,
+  flagged: false,
   counterparty: null,
   linkedToId: null,
   fundsCashoutId: null,
@@ -209,6 +210,8 @@ test("notes are both kept; links, counterparty and splits fall back to the new r
   assert.equal(f.userCategorySource, "LINK");
   assert.equal(f.counterparty, "Sample Person");
   assert.equal(f.moveSplits, true);
+  assert.equal(f.flagged, false);
+  assert.equal(mergedTransactionFields(k, { ...d, flagged: true }).flagged, true);
   assert.equal(mergedTransactionFields({ ...k, splitCount: 1 }, d).moveSplits, false);
   assert.equal(mergedTransactionFields(k, { ...d, personalNote: "for the trip" }).personalNote, "for the trip");
   // A link between the pair itself is dropped, not carried onto the survivor.

@@ -170,6 +170,10 @@ final class TransactionsStore {
     try await write(.link(label), id)
   }
 
+  func setFlag(_ id: String, _ flagged: Bool) async throws(APIError) {
+    try await write(.flag(flagged), id)
+  }
+
   func addSplit(_ id: String, _ split: NewSplit) async throws(APIError) {
     try await write(.addSplit(split), id)
   }
@@ -181,6 +185,7 @@ final class TransactionsStore {
   private enum Write {
     case category(CategoryUpdate)
     case link(Int?)
+    case flag(Bool)
     case addSplit(NewSplit)
     case deleteSplit(String)
   }
@@ -195,6 +200,7 @@ final class TransactionsStore {
       switch write {
       case .category(let update): try await client.updateCategory(transactionId: id, update)
       case .link(let label): try await client.updateLink(transactionId: id, LinkUpdate(linkedToLabel: label))
+      case .flag(let flagged): try await client.updateFlag(transactionId: id, FlagUpdate(flagged: flagged))
       case .addSplit(let split): try await client.addSplit(transactionId: id, split)
       case .deleteSplit(let splitId): try await client.deleteSplit(transactionId: id, splitId: splitId)
       }
@@ -215,6 +221,7 @@ final class TransactionsStore {
     case .link(nil): return row.withLink(nil)
     case .link(let label?):
       return pages.lazy.joined().first { $0.label == label }.map { row.withLink($0) }
+    case .flag(let flagged): return row.withFlag(flagged)
     case .addSplit(let split): return row.withSplit(split)
     case .deleteSplit(let splitId): return row.withoutSplit(splitId)
     }

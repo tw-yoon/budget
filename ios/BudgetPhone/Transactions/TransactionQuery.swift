@@ -11,13 +11,14 @@ struct TransactionQuery: Hashable, Sendable, Codable {
   var accountId: String?
   var hideInternal = true
   var showLinked = false
+  var flaggedOnly = false
   var sort: Sort = .date
   var ascending = false
 
   /// True when the filter menu has nothing set away from its defaults.
   /// Search is not a filter here; it has its own field.
   var filtersAreDefault: Bool {
-    accountId == nil && hideInternal && !showLinked && sort == .date && !ascending
+    accountId == nil && hideInternal && !showLinked && !flaggedOnly && sort == .date && !ascending
   }
 
   /// True when the search field sends a search (queryItems trims it).
@@ -34,6 +35,7 @@ struct TransactionQuery: Hashable, Sendable, Codable {
       URLQueryItem(name: "sort", value: sort.rawValue),
       URLQueryItem(name: "dir", value: ascending ? "asc" : "desc"),
     ]
+    if flaggedOnly { items.append(URLQueryItem(name: "flagged", value: "true")) }
     if hasSearch {
       items.append(URLQueryItem(name: "search", value: search.trimmingCharacters(in: .whitespacesAndNewlines)))
     }

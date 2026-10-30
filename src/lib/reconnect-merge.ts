@@ -44,6 +44,7 @@ export interface MergeTx {
   userCategory: string | null;
   userCategorySource: string | null;
   personalNote: string | null;
+  flagged: boolean;
   counterparty: string | null;
   linkedToId: string | null;
   fundsCashoutId: string | null;
@@ -295,6 +296,7 @@ export function mergedTransactionFields(k: MergeTx, d: MergeTx) {
     userCategorySource: catFrom.userCategory ? catFrom.userCategorySource : null,
     linkedToId: linkFrom?.linkedToId ?? null,
     personalNote: kn && dn && kn !== dn ? `${kn}\n${dn}` : (kn ?? dn),
+    flagged: k.flagged || d.flagged,
     counterparty: k.counterparty ?? d.counterparty,
     fundsCashoutId: k.fundsCashoutId ?? d.fundsCashoutId,
     // The duplicate's splits move over only when the survivor has none.
@@ -307,6 +309,7 @@ export function isEdited(t: MergeTx): boolean {
   return Boolean(
     (t.userCategory && t.userCategorySource !== "RULE") ||
       t.personalNote ||
+      t.flagged ||
       t.linkedToId ||
       t.splitCount > 0
   );

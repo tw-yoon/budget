@@ -35,6 +35,11 @@ struct LinkUpdate: Encodable, Equatable, Sendable {
   }
 }
 
+/// PATCH /api/transactions/:id — `{ flagged }`, TransactionTable.tsx's setFlag.
+struct FlagUpdate: Encodable, Equatable, Sendable {
+  let flagged: Bool
+}
+
 /// POST /api/transactions/:id/splits.
 struct NewSplit: Encodable, Equatable, Sendable {
   let amount: Double

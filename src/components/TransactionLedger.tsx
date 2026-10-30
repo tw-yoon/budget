@@ -24,6 +24,7 @@ export function TransactionLedger() {
   // connected payment is the child side of a link, and its parent already
   // lists it and nets it out. Ticking the box brings the children back.
   const [showLinked, setShowLinked] = useState(false);
+  const [flaggedOnly, setFlaggedOnly] = useState(false);
   const [accountId, setAccountId] = useState("");
   const [accountGroups, setAccountGroups] = useState<AccountGroup[]>([]);
   const [page, setPage] = useState(1);
@@ -105,6 +106,7 @@ export function TransactionLedger() {
         sort,
         dir,
       });
+      if (flaggedOnly) params.set("flagged", "true");
       if (debouncedSearch) params.set("search", debouncedSearch);
       if (accountId) params.set("accountId", accountId);
 
@@ -116,7 +118,7 @@ export function TransactionLedger() {
     } finally {
       setLoading(false);
     }
-  }, [page, hideInternal, showLinked, debouncedSearch, accountId, sort, dir]);
+  }, [page, hideInternal, showLinked, flaggedOnly, debouncedSearch, accountId, sort, dir]);
 
   useEffect(() => {
     // Intentional data-fetch effect: refetch whenever page/filters change.
@@ -155,6 +157,7 @@ export function TransactionLedger() {
             {selectedAccount && ` · ${selectedAccount.displayName ?? selectedAccount.name}`}
             {hideInternal && " · transfers & fees hidden"}
             {!showLinked && " · connected payments hidden"}
+            {flaggedOnly && " · flagged only"}
           </p>
         </div>
         <SyncButton onSynced={load} />
@@ -211,6 +214,18 @@ export function TransactionLedger() {
             className="h-4 w-4 accent-current"
           />
           Show connected payments
+        </label>
+        <label className="flex cursor-pointer select-none items-center gap-2 text-sm text-muted2">
+          <input
+            type="checkbox"
+            checked={flaggedOnly}
+            onChange={(e) => {
+              setFlaggedOnly(e.target.checked);
+              setPage(1);
+            }}
+            className="h-4 w-4 accent-current"
+          />
+          Flagged only
         </label>
         <div className="ml-auto flex rounded-lg bg-panel2 p-0.5 text-sm">
           {(["compact", "detailed"] as const).map((v) => (

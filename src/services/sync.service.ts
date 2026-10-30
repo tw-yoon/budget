@@ -111,7 +111,7 @@ async function syncItem(
           },
         },
         select: {
-          externalId: true, userCategory: true, userCategorySource: true, personalNote: true,
+          externalId: true, userCategory: true, userCategorySource: true, personalNote: true, flagged: true,
         },
       })).map(({ externalId, ...kept }) => [externalId, kept])
     );
@@ -147,6 +147,7 @@ async function syncItem(
           userCategory: keepPrior ? prior.userCategory : ruleCat ?? undefined,
           userCategorySource: keepPrior ? prior.userCategorySource : ruleCat ? "RULE" : undefined,
           personalNote: prior?.personalNote ?? undefined,
+          flagged: prior?.flagged ?? undefined,
           label,
         },
         update: fields,

@@ -29,6 +29,7 @@ struct LedgerFilterMenu: View {
       .pickerStyle(.menu)
       Toggle("Hide transfers & fees", isOn: Binding(get: { q.hideInternal }, set: { v in update { $0.hideInternal = v } }))
       Toggle("Show connected payments", isOn: Binding(get: { q.showLinked }, set: { v in update { $0.showLinked = v } }))
+      Toggle("Flagged only", isOn: Binding(get: { q.flaggedOnly }, set: { v in update { $0.flaggedOnly = v } }))
       // Phone-only, and also a pinch on the list. Shared with Venmo and Zelle.
       Section {
         // Animated by the list (CompactRowsSync).

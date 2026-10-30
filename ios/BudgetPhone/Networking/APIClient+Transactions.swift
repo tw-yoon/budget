@@ -28,6 +28,10 @@ extension APIClient {
     _ = try await send("PATCH", "api/transactions/\(transactionId)", body: encode(update), timeout: 15)
   }
 
+  func updateFlag(transactionId: String, _ update: FlagUpdate) async throws(APIError) {
+    _ = try await send("PATCH", "api/transactions/\(transactionId)", body: encode(update), timeout: 15)
+  }
+
   func linkCandidates(transactionId: String) async throws(APIError) -> [LinkCandidate] {
     let r: LinkCandidatesResponse = try decode(
       await send("GET", "api/transactions/\(transactionId)/link-candidates", timeout: 15))

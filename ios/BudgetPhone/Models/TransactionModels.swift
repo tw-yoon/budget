@@ -57,6 +57,7 @@ struct TransactionDTO: Codable, Equatable, Sendable, Identifiable {
   let isTransfer: Bool
   let isFee: Bool
   let personalNote: String?
+  var flagged: Bool
   let source: String  // PLAID | VENMO
   let label: Int?
   var linkedTo: LinkedTargetDTO?
@@ -204,6 +205,12 @@ extension TransactionDTO {
                       category: $0.userCategory ?? $0.plaidCategory)
     }
     return t.withEffectiveCategory()
+  }
+
+  func withFlag(_ flagged: Bool) -> TransactionDTO {
+    var t = self
+    t.flagged = flagged
+    return t
   }
 
   func withSplit(_ split: NewSplit) -> TransactionDTO {

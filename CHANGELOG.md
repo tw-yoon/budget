@@ -11,6 +11,13 @@ update), so nothing here is a stability promise.
 
 ## Unreleased
 
+## 0.17.0 — 2026-10-29
+
+- Flag a transaction to come back to it later. On the web, click the flag
+  next to its number; on the iPhone, long-press the row or tap the flag on its
+  screen. "Flagged only" in the filters lists just those. A flag set while a
+  transaction is pending stays when it posts.
+
 ## 0.16.2 — 2026-10-29
 
 - iPhone: pinch out on the cash-flow diagram to see every category and

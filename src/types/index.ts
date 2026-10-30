@@ -44,6 +44,7 @@ export interface TransactionDTO {
   isTransfer: boolean;
   isFee: boolean;
   personalNote: string | null;
+  flagged: boolean; // the owner marked it to come back to
   source: string; // PLAID | VENMO
   label: number | null; // permanent display serial, shown left of the date
   // Set on a money-in row connected to the purchase it pays back. While set,

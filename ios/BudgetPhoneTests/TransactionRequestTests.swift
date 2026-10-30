@@ -29,11 +29,12 @@ struct TransactionRequestTests {
     q.accountId = "acc-card"
     q.hideInternal = false
     q.showLinked = true
+    q.flaggedOnly = true
     q.sort = .label
     q.ascending = true
     #expect(dict(q.queryItems(page: 3)) == [
       "page": "3", "limit": "50", "hideInternal": "false", "hideLinked": "false",
-      "sort": "label", "dir": "asc", "search": "sample mart", "accountId": "acc-card",
+      "sort": "label", "dir": "asc", "flagged": "true", "search": "sample mart", "accountId": "acc-card",
     ])
     #expect(!q.filtersAreDefault)
   }
@@ -55,6 +56,11 @@ struct TransactionRequestTests {
   @Test func linkBodies() throws {
     #expect(try json(LinkUpdate(linkedToLabel: 700)) == #"{"linkedToLabel":700}"#)
     #expect(try json(LinkUpdate(linkedToLabel: nil)) == #"{"linkedToLabel":null}"#)
+  }
+
+  @Test func flagBodies() throws {
+    #expect(try json(FlagUpdate(flagged: true)) == #"{"flagged":true}"#)
+    #expect(try json(FlagUpdate(flagged: false)) == #"{"flagged":false}"#)
   }
 
   @Test func splitBody() throws {

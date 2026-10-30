@@ -23,6 +23,7 @@ import type { Prisma } from "@prisma/client";
 //   &hideInternal=true        exclude rows flagged isTransfer or isFee
 //   &hideLinked=true          exclude rows linked to a purchase (the children
 //                             of a connected payment; the purchase itself stays)
+//   &flagged=true             only rows the owner flagged
 //   &sort=date|label          ordering column (default date)
 //   &dir=asc|desc             ordering direction (default desc)
 async function handleGET(req: NextRequest) {
@@ -38,6 +39,7 @@ async function handleGET(req: NextRequest) {
     const search = searchParams.get("search")?.trim();
     const hideInternal = searchParams.get("hideInternal") === "true";
     const hideLinked = searchParams.get("hideLinked") === "true";
+    const flaggedOnly = searchParams.get("flagged") === "true";
     // Anything unrecognised falls back to the default rather than erroring —
     // these arrive from the querystring and are not worth a 400.
     const sort = searchParams.get("sort") === "label" ? "label" : "date";
@@ -91,6 +93,7 @@ async function handleGET(req: NextRequest) {
     // on this AND clause overrides hideInternal's "keep anything linked"
     // exception: asking for linked rows to go means they go.
     if (hideLinked) and.push({ linkedToId: null });
+    if (flaggedOnly) and.push({ flagged: true });
 
     const dateFilter: Prisma.DateTimeFilter = {};
     const from = parseDate(searchParams.get("from"));
@@ -244,6 +247,7 @@ async function handleGET(req: NextRequest) {
         isTransfer: t.isTransfer,
         isFee: t.isFee,
         personalNote: t.personalNote,
+        flagged: t.flagged,
         source: t.source,
         label: t.label,
         linkedTo,

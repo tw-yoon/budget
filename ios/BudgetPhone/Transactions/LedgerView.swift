@@ -225,6 +225,12 @@ private struct LedgerRowCell: View {
       .groupedRow(isLast: row.id == store.rows.last?.id)
     }
     .buttonStyle(GroupedRowStyle())
+    .contextMenu {
+      Button(row.flagged ? "Unflag" : "Flag", systemImage: row.flagged ? "flag.slash" : "flag") {
+        // A failure puts the row back; the store's haptic reports it.
+        Task { try? await store.setFlag(row.id, !row.flagged) }
+      }
+    }
     .id(row.id)
     .compactRowsCell(row.id, in: visible)
     .onAppear {

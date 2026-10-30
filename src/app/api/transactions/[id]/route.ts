@@ -6,7 +6,10 @@ import { validateLink } from "@/lib/links";
 // PATCH /api/transactions/:id — manually override a transaction's category,
 // and/or connect a money-in row to the purchase it offsets.
 //   body: { category?: string | null, subcategory?: string | null,
-//           linkedToLabel?: number | null }
+//           linkedToLabel?: number | null, flagged?: boolean }
+//
+// `flagged` alone sets or clears the "come back to this" marker and touches
+// nothing else.
 //
 // `linkedToLabel` absent leaves any existing link alone; null unlinks; a number
 // links to the transaction carrying that display label. A linked row derives
@@ -22,7 +25,19 @@ export async function PATCH(
       category?: string | null;
       subcategory?: string | null;
       linkedToLabel?: number | null;
+      flagged?: boolean;
     };
+
+    if (typeof body.flagged === "boolean") {
+      const { count } = await prisma.transaction.updateMany({
+        where: { id },
+        data: { flagged: body.flagged },
+      });
+      if (count === 0) {
+        return NextResponse.json({ error: "Not found" }, { status: 404 });
+      }
+      return NextResponse.json({ ok: true, flagged: body.flagged });
+    }
 
     if (body.linkedToLabel !== undefined) {
       return handleLink(id, body.linkedToLabel);
